@@ -9,9 +9,9 @@
   
 ### Черновые наработки
 
+- [Архитектура проекта](https://app.holst.so/share/b/439f9bcf-6ba3-461a-b33f-77b70b8c0e24)
 - [Подборка статей](https://docs.google.com/spreadsheets/d/1DEcljkSaYthpqDpmnTCPZ1kd0spt1vIQvR-3gnOUGnI/edit?usp=sharing)
 - [Текст ВКР](https://docs.google.com/document/d/1zzOziu1jGeVdMyChw2c1PJslwqUSkldpi6YAtA3p_9Y/edit?usp=sharing)
-- [Архитектура проекта](https://docs.google.com/document/d/1sMyfLlUeC4o-veBX7YQPu0-6j6j0Kd-P9xe-knjx_Bg/edit?usp=sharing)
 
 </td>
 </tr>
