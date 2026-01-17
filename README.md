@@ -1,4 +1,4 @@
-# HSE Prom Prog - Agile AI Assistant
+# HSE Prom Prog - Agile AI Assistant (Задание 2)
 
 Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM и
 PostgreSQL.
