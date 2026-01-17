@@ -47,9 +47,7 @@ class LLMClient:
         self.temperature = temperature or settings.vllm_temperature
         self.max_tokens = max_tokens or settings.vllm_max_tokens
 
-        logger.info(
-            f"Initializing LLM client with base_url={self.base_url}, model={self.model}"
-        )
+        logger.info(f"Initializing LLM client with base_url={self.base_url}, model={self.model}")
 
         self.client = ChatOpenAI(
             base_url=self.base_url,

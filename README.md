@@ -1,10 +1,12 @@
 # HSE Prom Prog - Agile AI Assistant (Задание 1)
 
-Базовый multi-agent прототип для анализа Jira-задач с использованием LangGraph и vLLM.
+Базовый multi-agent прототип для анализа Jira-задач с использованием LangGraph и
+vLLM.
 
 ## Архитектура
 
-Приложение построено на основе LangGraph и использует три последовательных агента для обработки пользовательских запросов о Jira-задачах:
+Приложение построено на основе LangGraph и использует три последовательных
+агента для обработки пользовательских запросов о Jira-задачах:
 
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
@@ -17,16 +19,19 @@
 ### Компоненты
 
 **1. Supervisor Agent**
+
 - Извлекает ключ Jira-задачи (например, "ABC-123") из пользовательского запроса
 - Использует regex + LLM для надежного извлечения
 - Передает issue_key следующему агенту
 
 **2. SQL Agent (заглушка)**
+
 - Принимает issue_key от Supervisor
 - Возвращает mock-данные вместо реального SQL-запроса
 - В следующем задании будет подключен к PostgreSQL
 
 **3. Response Agent**
+
 - Форматирует финальный ответ в markdown
 - Создает user-friendly вывод
 
@@ -95,50 +100,48 @@ cp .env.example .env
 nano .env
 ```
 
-### Шаг 3: Запуск vLLM
+### Шаг 3: Запуск vLLM через Docker
 
-#### Вариант A: Локальный запуск vLLM (рекомендуется для разработки)
-
-```bash
-# Установите vLLM
-pip install vllm
-
-# Запустите vLLM сервер
-vllm serve Qwen/Qwen2.5-3B-Instruct \
-    --quantization gptq \
-    --dtype half \
-    --max-model-len 2048 \
-    --port 8000
-```
-
-#### Вариант B: Запуск vLLM в Docker
+Запустите vLLM сервер в Docker контейнере:
 
 ```bash
-docker run --runtime nvidia --gpus all \
-    -v ~/.cache/huggingface:/root/.cache/huggingface \
-    -p 8000:8000 \
-    --ipc=host \
-    vllm/vllm-openai:latest \
-    --model Qwen/Qwen2.5-3B-Instruct \
-    --quantization gptq \
-    --dtype half \
-    --max-model-len 2048
+docker run --gpus all -p 8000:8000 vllm/vllm-openai:v0.6.0 \
+    --model Qwen/Qwen2.5-3B-Instruct
 ```
 
-#### Вариант C: CPU-only запуск (медленнее, но без GPU)
+Команда загрузит модель и запустит OpenAI-compatible API endpoint на порту 8000.
+При первом запуске модель будет скачана (может занять несколько минут в
+зависимости от скорости интернета).
 
-```bash
-vllm serve Qwen/Qwen2.5-3B-Instruct \
-    --dtype float16 \
-    --max-model-len 2048 \
-    --port 8000
-```
+**Параметры команды:**
+
+- `--gpus all` - использовать все доступные GPU
+- `-p 8000:8000` - пробросить порт 8000 из контейнера на хост
+- `vllm/vllm-openai:v0.6.0` - Docker образ vLLM версии 0.6.0
+- `--model Qwen/Qwen2.5-3B-Instruct` - модель для загрузки
 
 ### Шаг 4: Проверка vLLM
 
+Дождитесь, пока в логах появится сообщение о готовности сервера, затем проверьте
+работу:
+
 ```bash
-# Проверьте, что vLLM работает
 curl http://localhost:8000/v1/models
+```
+
+Ожидаемый ответ:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "Qwen/Qwen2.5-3B-Instruct",
+      "object": "model",
+      ...
+    }
+  ]
+}
 ```
 
 ## Использование
@@ -220,20 +223,22 @@ docker run --rm \
     hse-prom-prog
 ```
 
-## Тестирование
+## Разработка
+
+### Установка dev-зависимостей
+
+Для разработки необходимо установить дополнительные зависимости:
 
 ```bash
-# Запустите тесты
-poetry run pytest tests/
-
-# С подробным выводом
-poetry run pytest tests/ -v
-
-# С покрытием кода
-poetry run pytest tests/ --cov=hse_prom_prog
+poetry install --with dev
 ```
 
-## Разработка
+Это установит:
+
+- `ruff` - линтер и форматтер кода
+- `pre-commit` - хуки для git
+- `pytest` и `pytest-asyncio` - тестирование
+- `pytest-cov` - покрытие кода тестами
 
 ### Code Quality
 
@@ -260,40 +265,32 @@ poetry run pre-commit install
 poetry run pre-commit run --all-files
 ```
 
+### Тестирование
+
+```bash
+# Запустите тесты
+poetry run pytest tests/
+
+# С подробным выводом
+poetry run pytest tests/ -v
+
+# С покрытием кода
+poetry run pytest tests/ --cov=hse_prom_prog
+```
+
 ## Конфигурация
 
-Все настройки управляются через переменные окружения (см. [.env.example](.env.example)):
+Все настройки управляются через переменные окружения (см.
+[.env.example](.env.example)):
 
-| Переменная | Описание | По умолчанию |
-|-----------|----------|--------------|
-| `VLLM_BASE_URL` | URL vLLM API endpoint | `http://localhost:8000/v1` |
-| `VLLM_MODEL` | Название модели | `Qwen/Qwen2.5-3B-Instruct` |
-| `VLLM_API_KEY` | API ключ для vLLM | `EMPTY` |
-| `VLLM_TEMPERATURE` | Temperature для LLM | `0.7` |
-| `VLLM_MAX_TOKENS` | Максимум токенов | `512` |
-| `LOG_LEVEL` | Уровень логирования | `INFO` |
-
-## Архитектурные решения
-
-### Почему LangGraph?
-
-- Декларативное описание workflow через граф
-- Встроенная поддержка state management
-- Простая интеграция с LangChain
-- Легко добавлять новых агентов
-
-### Почему vLLM?
-
-- Высокая производительность (continuous batching, PagedAttention)
-- OpenAI-compatible API
-- Поддержка квантизации (GPTQ, AWQ)
-- Production-ready deployment
-
-### Type Safety
-
-- Все функции имеют type hints
-- Pydantic для валидации настроек и состояния
-- Строгая типизация через `TypedDict` для state
+| Переменная         | Описание              | По умолчанию               |
+| ------------------ | --------------------- | -------------------------- |
+| `VLLM_BASE_URL`    | URL vLLM API endpoint | `http://localhost:8000/v1` |
+| `VLLM_MODEL`       | Название модели       | `Qwen/Qwen2.5-3B-Instruct` |
+| `VLLM_API_KEY`     | API ключ для vLLM     | `EMPTY`                    |
+| `VLLM_TEMPERATURE` | Temperature для LLM   | `0.7`                      |
+| `VLLM_MAX_TOKENS`  | Максимум токенов      | `512`                      |
+| `LOG_LEVEL`        | Уровень логирования   | `INFO`                     |
 
 ## Следующие шаги (Задание 2)
 
@@ -307,7 +304,3 @@ poetry run pre-commit run --all-files
 ## Лицензия
 
 MIT
-
-## Авторы
-
-HSE Prom Prog Team
