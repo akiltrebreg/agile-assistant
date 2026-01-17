@@ -30,6 +30,9 @@ RUN poetry config virtualenvs.create false && \
 # Copy application code
 COPY hse_prom_prog ./hse_prom_prog
 
+# Copy documentation
+COPY README.md ./
+
 # Install the package
 RUN poetry install --no-interaction --no-ansi
 
