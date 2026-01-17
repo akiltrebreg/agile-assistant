@@ -13,6 +13,7 @@ from langgraph.graph.message import add_messages
 from hse_prom_prog.agents.response_agent import ResponseAgent
 from hse_prom_prog.agents.sql_agent import SQLAgent
 from hse_prom_prog.agents.supervisor import SupervisorAgent
+from hse_prom_prog.database.connection import DatabaseConnection
 from hse_prom_prog.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -46,20 +47,30 @@ class AgileWorkflow:
         supervisor: Supervisor agent instance.
         sql_agent: SQL agent instance.
         response_agent: Response agent instance.
+        db: Database connection instance.
         graph: Compiled LangGraph state graph.
     """
 
-    def __init__(self, llm_client: LLMClient) -> None:
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        db_connection: DatabaseConnection | None = None,
+    ) -> None:
         """Initialize the workflow with all required agents.
 
         Args:
             llm_client: LLM client for agents that need it.
+            db_connection: Optional database connection. If not provided,
+                          SQL Agent will create one on demand.
         """
         logger.info("[Workflow] Initializing AgileWorkflow...")
 
+        # Store database connection
+        self.db = db_connection
+
         # Initialize agents
         self.supervisor = SupervisorAgent(llm_client)
-        self.sql_agent = SQLAgent()
+        self.sql_agent = SQLAgent(db_connection=self.db)
         self.response_agent = ResponseAgent()
 
         # Build the graph
@@ -76,8 +87,7 @@ class AgileWorkflow:
             Updated state with issue_key extracted.
         """
         logger.info("[Workflow] Entering Supervisor node")
-        result = self.supervisor.process(state["original_query"])
-        return result
+        return self.supervisor.process(state["original_query"])
 
     def _sql_agent_node(self, state: WorkflowState) -> dict[str, Any]:
         """Node function for SQL agent.
@@ -89,8 +99,7 @@ class AgileWorkflow:
             Updated state with sql_response.
         """
         logger.info("[Workflow] Entering SQL Agent node")
-        result = self.sql_agent.process(state)
-        return result
+        return self.sql_agent.process(state)
 
     def _response_agent_node(self, state: WorkflowState) -> dict[str, Any]:
         """Node function for Response agent.
@@ -102,8 +111,7 @@ class AgileWorkflow:
             Updated state with final_response.
         """
         logger.info("[Workflow] Entering Response Agent node")
-        result = self.response_agent.process(state)
-        return result
+        return self.response_agent.process(state)
 
     def _build_graph(self) -> Any:
         """Build the LangGraph state graph.

@@ -1,34 +1,32 @@
-# HSE Prom Prog - Agile AI Assistant (Задание 1)
+# HSE Prom Prog - Agile AI Assistant
 
-Базовый multi-agent прототип для анализа Jira-задач с использованием LangGraph и
-vLLM.
+Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM и
+PostgreSQL.
 
 ## Содержание
 
 - [Архитектура](#архитектура)
   - [Компоненты](#компоненты)
   - [LLM Backend](#llm-backend)
+  - [База данных](#база-данных)
 - [Структура проекта](#структура-проекта)
-- [Быстрый старт (локальная разработка)](#быстрый-старт-локальная-разработка)
+- [Быстрый старт с Docker Compose](#быстрый-старт-с-docker-compose)
+  - [Настройка переменных окружения](#настройка-переменных-окружения)
+- [Локальная разработка](#локальная-разработка)
   - [Требования](#требования)
-  - [Шаг 1: Клонирование и установка зависимостей](#шаг-1-клонирование-и-установка-зависимостей)
-  - [Шаг 2: Настройка переменных окружения](#шаг-2-настройка-переменных-окружения)
-  - [Шаг 3: Запуск vLLM через Docker](#шаг-3-запуск-vllm-через-docker)
-  - [Шаг 4: Проверка vLLM](#шаг-4-проверка-vllm)
+  - [Шаг 1: Установка зависимостей](#шаг-1-установка-зависимостей)
+  - [Шаг 2: Настройка PostgreSQL](#шаг-2-настройка-postgresql)
+  - [Шаг 3: Запуск vLLM](#шаг-3-запуск-vllm)
+  - [Шаг 4: Запуск приложения](#шаг-4-запуск-приложения)
 - [Использование](#использование)
-  - [Базовое использование](#базовое-использование)
   - [Примеры запросов](#примеры-запросов)
   - [Пример вывода](#пример-вывода)
-- [Production деплой](#production-деплой)
-  - [Сборка образа](#сборка-образа)
-  - [Запуск контейнера](#запуск-контейнера)
 - [Разработка](#разработка)
   - [Установка dev-зависимостей](#установка-dev-зависимостей)
   - [Code Quality](#code-quality)
-  - [Pre-commit hooks](#pre-commit-hooks)
   - [Тестирование](#тестирование)
 - [Конфигурация](#конфигурация)
-- [Следующие шаги](#следующие-шаги)
+- [Архитектурные решения](#архитектурные-решения)
 - [Лицензия](#лицензия)
 
 ## Архитектура
@@ -52,22 +50,32 @@ vLLM.
 - Использует regex + LLM для надежного извлечения
 - Передает issue_key следующему агенту
 
-**2. SQL Agent (заглушка)**
+**2. SQL Agent**
 
 - Принимает issue_key от Supervisor
-- Возвращает mock-данные вместо реального SQL-запроса
-- В следующем задании будет подключен к PostgreSQL
+- Выполняет SQL-запросы к PostgreSQL базе данных
+- Использует SQLAlchemy для безопасной работы с БД
+- Возвращает полную информацию о Jira-задаче
 
 **3. Response Agent**
 
-- Форматирует финальный ответ в markdown
-- Создает user-friendly вывод
+- Форматирует данные из БД в читаемые таблицы
+- Использует `tabulate` для создания красивых таблиц
+- Группирует информацию по категориям (Основная, Спринт, Команда, Метрики)
+- Обрабатывает ошибки и отсутствующие данные
 
 ### LLM Backend
 
-- **Модель**: Qwen/Qwen2.5-3B-Instruct (4-bit квантизация)
+- **Модель**: Qwen/Qwen2.5-3B-Instruct
 - **Backend**: vLLM с OpenAI-compatible API
 - **URL**: `http://localhost:8000/v1`
+
+### База данных
+
+- **СУБД**: PostgreSQL 16 (Alpine)
+- **Таблица**: `jira_issues` с 29 полями
+- **Индексы**: issue_key (PRIMARY), sprint_state, assignee_name
+- **Тестовые данные**: 5 задач (ABC-123, AXYZ-789, PROJ-456, DEV-999, TECH-555)
 
 ## Структура проекта
 
@@ -78,8 +86,11 @@ hse-prom-prog/
 │   ├── agents/
 │   │   ├── __init__.py
 │   │   ├── supervisor.py          # Supervisor agent
-│   │   ├── sql_agent.py           # SQL agent с заглушкой
+│   │   ├── sql_agent.py           # SQL agent с PostgreSQL
 │   │   └── response_agent.py      # Response agent
+│   ├── database/
+│   │   ├── __init__.py
+│   │   └── connection.py          # PostgreSQL connection manager
 │   ├── graph/
 │   │   ├── __init__.py
 │   │   └── workflow.py            # LangGraph StateGraph
@@ -88,9 +99,12 @@ hse-prom-prog/
 │   │   └── client.py              # OpenAI client для vLLM
 │   ├── config.py                  # Pydantic settings
 │   └── main.py                    # Entry point
+├── database/
+│   └── init.sql                   # PostgreSQL schema & test data
 ├── tests/
 │   ├── __init__.py
 │   └── test_workflow.py           # Тесты workflow
+├── docker-compose.yml             # Docker Compose configuration
 ├── Dockerfile
 ├── .env.example
 ├── pyproject.toml
@@ -98,16 +112,84 @@ hse-prom-prog/
 └── README.md
 ```
 
-## Быстрый старт (локальная разработка)
+## Быстрый старт с Docker Compose
+
+Самый простой способ запустить весь стек (PostgreSQL + vLLM + приложение):
+
+```bash
+# Клонируйте репозиторий
+git clone <repository-url>
+cd hse-prom-prog
+
+# Скопируйте example файл окружения
+cp .env.example .env
+
+# Запустите все сервисы
+docker-compose up -d
+
+# Проверьте статус сервисов
+docker-compose ps
+
+# Запустите приложение (в отдельном терминале после запуска сервисов)
+docker-compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
+
+# Остановите сервисы
+docker-compose down
+```
+
+**Что запускается:**
+
+- PostgreSQL на порту 5432 с тестовыми данными
+- vLLM сервер на порту 8000
+- Приложение готово к использованию
+
+### Настройка переменных окружения
+
+Перед запуском создайте файл `.env` на основе `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Отредактируйте `.env` файл при необходимости:
+
+```bash
+# vLLM Configuration
+VLLM_BASE_URL=http://localhost:8000/v1
+VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+VLLM_API_KEY=EMPTY
+VLLM_TEMPERATURE=0.7
+VLLM_MAX_TOKENS=512
+
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=hse_user
+POSTGRES_PASSWORD=hse_password
+POSTGRES_DB=hse_jira_db
+
+# Logging
+LOG_LEVEL=INFO
+```
+
+**Примечания:**
+
+- Для Docker Compose используйте `VLLM_BASE_URL=http://vllm:8000/v1` и
+  `POSTGRES_HOST=postgres`
+- Для локальной разработки используйте `localhost` для обоих сервисов
+- Значения по умолчанию подходят для большинства случаев использования
+
+## Локальная разработка
 
 ### Требования
 
 - Python 3.12+
 - Poetry
-- vLLM (локально или через Docker)
-- NVIDIA GPU (опционально, для vLLM с GPU)
+- PostgreSQL 16 (или Docker для PostgreSQL)
+- vLLM (или Docker для vLLM)
+- NVIDIA GPU (рекомендуется для vLLM)
 
-### Шаг 1: Клонирование и установка зависимостей
+### Шаг 1: Установка зависимостей
 
 ```bash
 # Клонируйте репозиторий
@@ -118,137 +200,142 @@ cd hse-prom-prog
 poetry install
 ```
 
-### Шаг 2: Настройка переменных окружения
+### Шаг 2: Настройка PostgreSQL
+
+**Вариант A: Используя Docker**
 
 ```bash
-# Скопируйте example файл
-cp .env.example .env
-
-# Отредактируйте .env при необходимости
-nano .env
+docker run --name hse-postgres \
+    -e POSTGRES_USER=hse_user \
+    -e POSTGRES_PASSWORD=hse_password \
+    -e POSTGRES_DB=hse_jira_db \
+    -p 5432:5432 \
+    -v $(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \
+    -d postgres:16-alpine
 ```
 
-### Шаг 3: Запуск vLLM через Docker
-
-Запустите vLLM сервер в Docker контейнере:
+**Вариант B: Локальный PostgreSQL**
 
 ```bash
-docker run --gpus all -p 8000:8000 vllm/vllm-openai:v0.6.0 \
+# Создайте базу данных
+createdb -U postgres hse_jira_db
+
+# Инициализируйте схему и данные
+psql -U postgres -d hse_jira_db -f database/init.sql
+```
+
+### Шаг 3: Запуск vLLM
+
+```bash
+docker run -d --gpus all --name vllm-server -p 8000:8000 \
+    vllm/vllm-openai:v0.6.0 \
     --model Qwen/Qwen2.5-3B-Instruct
 ```
 
-Команда загрузит модель и запустит OpenAI-compatible API endpoint на порту 8000.
-При первом запуске модель будет скачана (может занять несколько минут в
-зависимости от скорости интернета).
-
-**Параметры команды:**
-
-- `--gpus all` - использовать все доступные GPU
-- `-p 8000:8000` - пробросить порт 8000 из контейнера на хост
-- `vllm/vllm-openai:v0.6.0` - Docker образ vLLM версии 0.6.0
-- `--model Qwen/Qwen2.5-3B-Instruct` - модель для загрузки
-
-### Шаг 4: Проверка vLLM
-
-Дождитесь, пока в логах появится сообщение о готовности сервера, затем проверьте
-работу:
+### Шаг 4: Запуск приложения
 
 ```bash
-curl http://localhost:8000/v1/models
-```
-
-Ожидаемый ответ:
-
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "id": "Qwen/Qwen2.5-3B-Instruct",
-      "object": "model",
-      ...
-    }
-  ]
-}
+poetry run python -m hse_prom_prog.main "Привет! Выведи данные по задаче ABC-123"
 ```
 
 ## Использование
 
-### Базовое использование
-
-```bash
-# Активируйте Poetry окружение
-poetry shell
-
-# Запустите приложение
-python -m hse_prom_prog.main "Привет! Выведи данные по задаче ABC-123"
-```
-
 ### Примеры запросов
 
 ```bash
-# Пример 1: Простой запрос
-python -m hse_prom_prog.main "Выведи данные по задаче XYZ-789"
+# Через Docker Compose
+docker-compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
 
-# Пример 2: Запрос с дополнительным текстом
-python -m hse_prom_prog.main "Привет! Мне нужна информация о задаче PROJ-456"
+# Локально
+poetry run python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
 
-# Пример 3: Неформальный запрос
-python -m hse_prom_prog.main "Покажи мне что там с DEV-999"
+# Другие примеры
+poetry run python -m hse_prom_prog.main "Информация о задаче AXYZ-789"
+poetry run python -m hse_prom_prog.main "Покажи мне что там с PROJ-456"
+poetry run python -m hse_prom_prog.main "DEV-999"
 ```
 
 ### Пример вывода
 
 ```
 🤖 Agile AI Assistant
-📝 Query: Привет! Выведи данные по задаче ABC-123
+📝 Query: Выведи данные по задаче ABC-123
 
 ============================================================
 
-[Supervisor] Извлекаю ключ задачи из запроса...
+[Supervisor] Извлекаю ключ задачи...
 [Supervisor] Найден ключ: ABC-123
 
-[SQL Agent] Обработка задачи ABC-123...
-[SQL Agent] Привет! Во втором задании я научусь отправлять запрос в Postgres и пришлю данные по задаче ABC-123!
+[SQL Agent] Выполняю запрос к PostgreSQL...
+[SQL Agent] Данные успешно получены
 
-[Response Agent] Формирование ответа...
+[Response Agent] Форматирую ответ...
 
 ============================================================
 
 === ФИНАЛЬНЫЙ ОТВЕТ ===
 
-## Результат обработки задачи ABC-123
+## Информация по задаче ABC-123
 
-Привет! Во втором задании я научусь отправлять запрос в Postgres и пришлю данные по задаче ABC-123!
+### Основная информация
+
++--------------------+----------------------+
+| Поле               | Значение             |
++====================+======================+
+| Ключ задачи        | ABC-123              |
+| Проект             | ABC Project          |
+| Тип                | Story                |
+| Статус             | In Progress          |
+| Создана            | 2026-01-07 10:00     |
++--------------------+----------------------+
+
+### Спринт
+
++------------------------+--------------------+
+| Поле                   | Значение           |
++========================+====================+
+| ID спринта             | 101                |
+| Название спринта       | Sprint 25          |
+| Состояние спринта      | active             |
+| Начало                 | 2026-01-06 00:00   |
+| Конец                  | 2026-01-17 23:59   |
++------------------------+--------------------+
+
+### Команда
+
++------------------+-------------------------+
+| Поле             | Значение                |
++==================+=========================+
+| Команда          | Team Alpha              |
+| Репортер         | Ivan Petrov             |
+| Исполнитель      | Olga Komkova            |
+| Кластер          | Product Development     |
+| Подразделение    | Backend Team            |
++------------------+-------------------------+
+
+### Метрики
+
++------------------------------+-----------+
+| Поле                         | Значение  |
++==============================+===========+
+| Story Points (начало)        | 5.0       |
+| Story Points (конец)         | 5.0       |
+| Время в работе (ч)           | 12        |
+| Время не исправлено (ч)      | 3         |
+| Резолюция                    | —         |
++------------------------------+-----------+
+
+### Метки
+
+`backend`, `api`
+
+---
+*Данные получены из PostgreSQL базы данных*
 
 ---
 *Запрос обработан успешно*
 
 ============================================================
-```
-
-## Production деплой
-
-### Сборка образа
-
-```bash
-# Сборка Docker образа
-docker build -t hse-prom-prog .
-```
-
-### Запуск контейнера
-
-```bash
-# Запуск с дефолтным запросом
-docker run --rm hse-prom-prog
-
-# Запуск с кастомным запросом
-docker run --rm hse-prom-prog python -m hse_prom_prog.main "Выведи данные по задаче XYZ-123"
-
-# Запуск с подключением к vLLM на хосте
-docker run --rm \
-    -e VLLM_BASE_URL=http://host.docker.internal:8000/v1 \
-    hse-prom-prog
 ```
 
 ## Разработка
@@ -311,6 +398,8 @@ poetry run pytest tests/ --cov=hse_prom_prog
 Все настройки управляются через переменные окружения (см.
 [.env.example](.env.example)):
 
+### vLLM Configuration
+
 | Переменная         | Описание              | По умолчанию               |
 | ------------------ | --------------------- | -------------------------- |
 | `VLLM_BASE_URL`    | URL vLLM API endpoint | `http://localhost:8000/v1` |
@@ -318,16 +407,22 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `VLLM_API_KEY`     | API ключ для vLLM     | `EMPTY`                    |
 | `VLLM_TEMPERATURE` | Temperature для LLM   | `0.7`                      |
 | `VLLM_MAX_TOKENS`  | Максимум токенов      | `512`                      |
-| `LOG_LEVEL`        | Уровень логирования   | `INFO`                     |
 
-## Следующие шаги
+### PostgreSQL Configuration
 
-В следующих заданиях будет добавлено:
+| Переменная          | Описание        | По умолчанию   |
+| ------------------- | --------------- | -------------- |
+| `POSTGRES_HOST`     | Хост PostgreSQL | `localhost`    |
+| `POSTGRES_PORT`     | Порт PostgreSQL | `5432`         |
+| `POSTGRES_USER`     | Пользователь БД | `hse_user`     |
+| `POSTGRES_PASSWORD` | Пароль БД       | `hse_password` |
+| `POSTGRES_DB`       | Название БД     | `hse_jira_db`  |
 
-1. Подключение к PostgreSQL для хранения Jira-данных
-2. Реальные SQL-запросы вместо mock-данных
-3. Расширенная обработка данных из БД
-4. Больше агентов для анализа задач
+### Other
+
+| Переменная  | Описание            | По умолчанию |
+| ----------- | ------------------- | ------------ |
+| `LOG_LEVEL` | Уровень логирования | `INFO`       |
 
 ## Лицензия
 

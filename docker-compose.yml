@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: hse-prom-prog-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hse_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hse_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hse_jira_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hse_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hse-network
+
+  # vLLM service for serving the LLM model
+  vllm:
+    image: vllm/vllm-openai:v0.6.0
+    container_name: vllm-server
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    command:
+      - --model=Qwen/Qwen2.5-3B-Instruct
+    volumes:
+      - vllm-cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hse-network
+
+  # Application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hse-prom-prog-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_API_KEY=EMPTY
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    stdin_open: true
+    tty: true
+    networks:
+      - hse-network
+
+volumes:
+  postgres_data:
+  vllm-cache:
+
+networks:
+  hse-network:
+    driver: bridge
