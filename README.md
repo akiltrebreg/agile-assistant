@@ -121,6 +121,12 @@ hse-prom-prog/
 git clone <repository-url>
 cd hse-prom-prog
 
+# Скачайте все ветки из удаленного репозитория
+git fetch --all
+
+# Переключитесь на ветку checkpoint_2
+git checkout checkpoint_2
+
 # Скопируйте example файл окружения
 cp .env.example .env
 
