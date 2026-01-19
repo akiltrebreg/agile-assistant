@@ -37,8 +37,8 @@ PostgreSQL.
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
 │   Supervisor    │────▶│  SQL Agent   │────▶│ Response Agent  │
-│  (извлекает     │     │  (mock data) │     │  (форматирует   │
-│   issue_key)    │     │              │     │    ответ)       │
+│  (извлекает     │     │  (выгружает  │     │  (форматирует   │
+│   issue_key)    │     │ данные из БД)│     │    ответ)       │
 └─────────────────┘     └──────────────┘     └─────────────────┘
 ```
 
@@ -131,16 +131,16 @@ git checkout checkpoint_2
 cp .env.example .env
 
 # Запустите все сервисы
-docker-compose up -d
+docker compose up -d
 
 # Проверьте статус сервисов
-docker-compose ps
+docker compose ps
 
-# Запустите приложение (в отдельном терминале после запуска сервисов)
-docker-compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
+# Запустите приложение
+docker compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
 
 # Остановите сервисы
-docker-compose down
+docker compose down
 ```
 
 **Что запускается:**
@@ -250,7 +250,7 @@ poetry run python -m hse_prom_prog.main "Привет! Выведи данные
 
 ```bash
 # Через Docker Compose
-docker-compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
+docker compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
 
 # Локально
 poetry run python -m hse_prom_prog.main "Выведи данные по задаче ABC-123"
