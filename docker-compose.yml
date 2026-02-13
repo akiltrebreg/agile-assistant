@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hse-prom-prog-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hse_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hse_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hse_jira_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hse_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hse-network
+
+  vllm:
+    image: vllm/vllm-openai:v0.6.0
+    container_name: vllm-server
+    runtime: nvidia
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - NVIDIA_VISIBLE_DEVICES=all
+    command:
+      - "--model"
+      - "Qwen/Qwen2.5-3B-Instruct"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - vllm-cache:/root/.cache/huggingface
+    ipc: host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    networks:
+      - hse-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hse-prom-prog-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_API_KEY=EMPTY
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    stdin_open: true
+    tty: true
+    networks:
+      - hse-network
+
+volumes:
+  postgres_data:
+  vllm-cache:
+
+networks:
+  hse-network:
+    driver: bridge

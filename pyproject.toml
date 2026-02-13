@@ -1,0 +1,80 @@
+[project]
+name = "hse-prom-prog"
+version = "0.1.0"
+description = "Add your description here"
+packages = [{include = "hse_prom_prog"}]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "gitpython>=3.1.45",
+    "numpy>=2.3.5",
+    "pandas>=2.3.3",
+    "langgraph>=0.2.60",
+    "langchain>=0.3.20",
+    "langchain-openai>=0.3.0",
+    "langchain-community>=0.3.20",
+    "pydantic>=2.10.6",
+    "pydantic-settings>=2.7.1",
+    "python-dotenv>=1.0.1",
+    "psycopg2-binary>=2.9.10",
+    "sqlalchemy>=2.0.36",
+    "tabulate>=0.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.0",
+    "ruff>=0.14.9",
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.2",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+format = { docstring-code-format = true }
+
+[tool.ruff.lint]
+select = [
+    # isort
+    "I",
+    # pycodestyle
+    "E", "W",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # flake8-builtins
+    "A",
+    # flake8-return
+    "RET",
+    # flake8-use-pathlib
+    "PTH",
+    # flynt
+    "FLY",
+    # mccabe
+    "C90",
+    # NumPy-specific rules
+    "NPY",
+    # pep8-naming
+    "N",
+    # Ruff-specific rules
+    "RUF",
+    # Pylint - very strict, may be use when have enough time
+    "PL",
+    # refurb - also may be overwhelming
+    "FURB",
+]
+
+pycodestyle = { max-doc-length = 105 }
+
+[tool.ruff.lint.isort]
+known-first-party = ["hse_prom_prog"]
+
+# [tool.ruff.lint.per-file-ignores]
+# "__init__.py" = ["E402"]
+# "**/{tests,docs,tools}/*" = ["E402"]
