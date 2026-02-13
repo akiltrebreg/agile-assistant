@@ -157,7 +157,7 @@ class TaskRepository:
         # Update result if provided (usually for COMPLETED)
         if result is not None:
             updates.append("result = :result")
-            params["result"] = json.dumps(result)  # Convert to JSON string
+            params["result"] = json.dumps(result, default=str)
 
         # Update error if provided (usually for FAILED)
         if error is not None:
@@ -167,7 +167,7 @@ class TaskRepository:
         # Update workflow_state if provided
         if workflow_state is not None:
             updates.append("workflow_state = :workflow_state")
-            params["workflow_state"] = json.dumps(workflow_state)  # Convert to JSON string
+            params["workflow_state"] = json.dumps(workflow_state, default=str)
 
         sql = f"""
             UPDATE tasks
