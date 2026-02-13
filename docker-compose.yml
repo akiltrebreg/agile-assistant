@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # PostgreSQL database
   postgres:
@@ -14,6 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/data:/docker-entrypoint-initdb.d/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hse_user}"]
       interval: 10s
@@ -24,7 +23,7 @@ services:
 
   # vLLM service for serving the LLM model
   vllm:
-    image: vllm/vllm-openai:v0.6.0
+    image: vllm/vllm-openai:v0.8.5
     container_name: vllm-server
     ports:
       - "8000:8000"
@@ -46,12 +45,12 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 10
+      start_period: 300s
     networks:
       - hse-network
 
-  # Application service
+  # Application service (CLI)
   app:
     build:
       context: .
@@ -80,9 +79,141 @@ services:
     networks:
       - hse-network
 
+  # Redis for Celery broker
+  redis:
+    image: redis:7-alpine
+    container_name: hse-prom-prog-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hse-network
+
+  # FastAPI service (Producer)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hse-prom-prog-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_API_KEY=EMPTY
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - FASTAPI_HOST=0.0.0.0
+      - FASTAPI_PORT=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    command:
+      uvicorn hse_prom_prog.api.app:app --host 0.0.0.0 --port 8080 --reload
+    networks:
+      - hse-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery worker (Consumer) — uses the SAME Dockerfile, only command differs
+  # No container_name so that --scale works: docker compose up --scale celery-worker=3
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_API_KEY=EMPTY
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CELERY_TASK_TIME_LIMIT=600
+      - CELERY_TASK_SOFT_TIME_LIMIT=300
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    # --pool=threads: I/O-bound tasks (waiting for vLLM HTTP), not CPU-bound
+    command:
+      celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
+      --pool=threads --concurrency=4
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 10",
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 15s
+    networks:
+      - hse-network
+
+  # Alembic migration runner (one-shot: docker compose run --rm migrate)
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./.env:/app/.env
+    command: alembic upgrade head
+    networks:
+      - hse-network
+
 volumes:
   postgres_data:
   vllm-cache:
+  redis_data:
 
 networks:
   hse-network:

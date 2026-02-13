@@ -19,6 +19,14 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "sqlalchemy>=2.0.36",
     "tabulate>=0.9.0",
+    # FastAPI and ASGI server
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    # Celery and Redis
+    "celery>=5.4.0",
+    "redis>=5.2.0",
+    # Database migrations
+    "alembic>=1.14.0",
 ]
 
 [dependency-groups]
@@ -72,9 +80,14 @@ select = [
 
 pycodestyle = { max-doc-length = 105 }
 
+# RUF001: ambiguous unicode — project uses Russian (Cyrillic) strings intentionally
+ignore = ["RUF001"]
+
+[tool.ruff.lint.per-file-ignores]
+# B008: FastAPI Depends() in function defaults is the standard pattern
+"hse_prom_prog/api/routers/*.py" = ["B008"]
+# PLR2004: magic values like `len(sys.argv) < 2` are standard CLI patterns
+"hse_prom_prog/main.py" = ["PLR2004"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["hse_prom_prog"]
-
-# [tool.ruff.lint.per-file-ignores]
-# "__init__.py" = ["E402"]
-# "**/{tests,docs,tools}/*" = ["E402"]

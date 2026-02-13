@@ -42,7 +42,7 @@ class TestSupervisorAgent:
         agent = SupervisorAgent(mock_llm)
 
         # Query without clear pattern
-        result = agent.process("Покажи задачу экс уай зет семьсот восемьдесят девять")
+        agent.process("Покажи задачу экс уай зет семьсот восемьдесят девять")
 
         # Should still try LLM
         mock_llm.invoke.assert_called_once()

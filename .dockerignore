@@ -1,0 +1,46 @@
+# Version control
+.git
+.gitignore
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist
+build
+
+# Virtual environments
+.venv
+venv
+.tox
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+
+# Ruff cache
+.ruff_cache
+
+# Environment files (mounted as volume, not baked into image)
+.env
+.env.*
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# Database data (mounted as volume)
+database/data/*.csv
+
+# Documentation (keep README.md — referenced by pyproject.toml)
+LICENSE
+docs/
