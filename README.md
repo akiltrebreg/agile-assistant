@@ -1,7 +1,7 @@
-# HSE Prom Prog - Agile AI Assistant (Задание 2)
+# HSE Prom Prog - Agile AI Assistant (Задание 3)
 
 Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM и
-PostgreSQL.
+PostgreSQL, Celery и Redis.
 
 ## Содержание
 
@@ -33,7 +33,6 @@ PostgreSQL.
   - [Code Quality](#code-quality)
   - [Тестирование](#тестирование)
 - [Конфигурация](#конфигурация)
-- [Архитектурные решения](#архитектурные-решения)
 - [Лицензия](#лицензия)
 
 ## Архитектура
@@ -44,8 +43,8 @@ PostgreSQL.
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
 │   Supervisor    │────▶│  SQL Agent   │────▶│ Response Agent  │
-│  (извлекает     │     │  (mock data) │     │  (форматирует   │
-│   issue_key)    │     │              │     │    ответ)       │
+│  (извлекает     │     │ (PostgreSQL) │     │  (генерирует    │
+│   issue_key)    │     │              │     │  ответ с LLM)   │
 └─────────────────┘     └──────────────┘     └─────────────────┘
 ```
 
@@ -94,30 +93,60 @@ PostgreSQL.
 hse-prom-prog/
 ├── hse_prom_prog/
 │   ├── __init__.py
+│   ├── config.py                      # Pydantic settings
+│   ├── main.py                        # CLI entry point
 │   ├── agents/
 │   │   ├── __init__.py
-│   │   ├── supervisor.py          # Supervisor agent
-│   │   ├── sql_agent.py           # SQL agent с PostgreSQL
-│   │   └── response_agent.py      # Response agent
+│   │   ├── supervisor.py              # Supervisor agent
+│   │   ├── sql_agent.py              # SQL agent (PostgreSQL)
+│   │   └── response_agent.py         # Response agent (LLM)
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── app.py                    # FastAPI application
+│   │   ├── dependencies.py           # DI (DB, repo)
+│   │   ├── routers/
+│   │   │   ├── __init__.py
+│   │   │   └── tasks.py              # POST/GET /tasks endpoints
+│   │   └── schemas/
+│   │       ├── __init__.py
+│   │       └── task.py               # Pydantic request/response
 │   ├── database/
 │   │   ├── __init__.py
-│   │   └── connection.py          # PostgreSQL connection manager
+│   │   ├── connection.py             # PostgreSQL connection manager
+│   │   └── task_repository.py        # Task CRUD (raw SQL)
 │   ├── graph/
 │   │   ├── __init__.py
-│   │   └── workflow.py            # LangGraph StateGraph
+│   │   └── workflow.py               # LangGraph StateGraph
 │   ├── llm/
 │   │   ├── __init__.py
-│   │   └── client.py              # OpenAI client для vLLM
-│   ├── config.py                  # Pydantic settings
-│   └── main.py                    # Entry point
+│   │   └── client.py                 # OpenAI client для vLLM
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── task.py                   # TaskStatus enum, Task model
+│   └── tasks/
+│       ├── __init__.py
+│       ├── celery_app.py             # Celery application factory
+│       └── workflow_task.py          # Celery task (wraps workflow)
+├── alembic/
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       ├── 001_add_tasks_table.py
+│       └── 002_add_cleanup_function.py
 ├── database/
-│   └── init.sql                   # PostgreSQL schema & test data
+│   ├── init.sql                       # PostgreSQL schema
+│   └── data/
+│       ├── report_agile_dashboard.csv
+│       └── report_agile_dashboard_metrics.csv
 ├── tests/
 │   ├── __init__.py
-│   └── test_workflow.py           # Тесты workflow
-├── docker-compose.yml             # Docker Compose configuration
+│   └── test_workflow.py
+├── alembic.ini
+├── docker-compose.yml
 ├── Dockerfile
+├── .dockerignore
 ├── .env.example
+├── .pre-commit-config.yaml
 ├── pyproject.toml
 ├── poetry.lock
 └── README.md
@@ -125,7 +154,8 @@ hse-prom-prog/
 
 ## Быстрый старт с Docker Compose
 
-Самый простой способ запустить весь стек (PostgreSQL + vLLM + приложение):
+Самый простой способ запустить весь стек (PostgreSQL + vLLM + Redis + FastAPI +
+Celery + приложение):
 
 ```bash
 # Клонируйте репозиторий
@@ -158,7 +188,11 @@ docker compose down
 
 - PostgreSQL на порту 5432 с тестовыми данными
 - vLLM сервер на порту 8000
-- Приложение готово к использованию
+- Redis на порту 6380 (брокер Celery)
+- FastAPI API на порту 8080
+- Celery worker (обработка задач)
+- Alembic миграции (таблица tasks)
+- CLI-приложение готово к использованию
 
 ### Настройка переменных окружения
 
@@ -292,87 +326,24 @@ poetry run python -m hse_prom_prog.main "AL-39043"
 
 === ФИНАЛЬНЫЙ ОТВЕТ ===
 
-## Информация по задаче AL-38787
+Конечно, я расскажу вам о задаче AL-38787. Вот основные детали:
 
-### Основная информация
+- **Ключ задачи**: AL-38787
+- **Проект**: DeepMind Logistics
+- **Тип задачи**: Улучшение
+- **Описание**: Приемочное тестирование для B2C FBS ПВЗ-Постамата
+- **Текущий статус**: В процессе выполнения
+- **Статус в конце спринта**: Открытый
+- **Дата создания**: 22 сентября 2025 года
+- **Исполнитель**: Юпитер Петров
+- **Команда**: lpop
+- **Команды в начале и конце спринта**: lpop
+- **Репортер**: Владимир Реценков
+- **Завершение спринта**: 26 января 2026 года в 12:03
 
-+---------------------------+------------------------------------------+
-| Поле                      | Значение                                 |
-+===========================+==========================================+
-| Ключ задачи               | AL-38787                                 |
-| Проект                    | DeepMind Logistics                       |
-| Тип                       | Improvement                              |
-| Статус (текущий)          | In Progress                              |
-| Статус (конец спринта)    | Open                                     |
-| Создана                   | 2025-09-22 11:37                         |
-| Резолюция                 | —                                        |
-| Время резолюции           | —                                        |
-| Описание                  | Приёмочное тестирование B2C FBS ПВЗ...  |
-+---------------------------+------------------------------------------+
+В этом спринте было определено 5.0 Story Points, что стало меньше по сравнению с началом спринта (3.0 Story Points). Исполнитель потратил 3427 часов на эту задачу, что означает, что работа заняла больше времени, чем планировалось.
 
-### Спринт
-
-+----------------------+--------------------+
-| Поле                 | Значение           |
-+======================+====================+
-| ID спринта           | 28765000002        |
-| Название спринта     | #1 Q1'26           |
-| Состояние спринта    | closed             |
-| Дата активации       | 2026-01-12 21:03   |
-| Начало               | 2026-01-12 17:16   |
-| Конец                | 2026-01-26 17:16   |
-| Завершение           | 2026-01-26 12:03   |
-+------------------------+--------------------+
-
-### Команда
-
-+-------------------------------+-------------------------+
-| Поле                          | Значение                |
-+===============================+=========================+
-| Команда                       | lpop                    |
-| Команда (начало спринта)      | —                       |
-| Команда (конец спринта)       | —                       |
-| Репортер                      | Vladimir Reznikov       |
-| Исполнитель                   | yuvpetrov               |
-| Департамент                   | AL                      |
-| Кластер                       | Logistics               |
-| Подразделение                 | Logistics Platform      |
-+-------------------------------+-------------------------+
-
-### Метрики
-
-+-------------------------------------+-----------+
-| Поле                                | Значение  |
-+=====================================+===========+
-| Story Points (актуальные)           | 5.0       |
-| Story Points (начало)               | 3.0       |
-| Story Points (конец)                | 3.0       |
-| Story Points (след. спринт)         | 5.0       |
-| Время в работе (ч)                  | -5        |
-| Время не исправлено (ч)             | 3427      |
-| Количество PR                       | 0         |
-+-------------------------------------+-----------+
-
-### Дополнительно
-
-+------------------------+-----------+
-| Поле                   | Значение  |
-+========================+===========+
-| Подход разработки      | —         |
-| Эпик                   | —         |
-| Отчетная задача        | False     |
-| Технический долг       | False     |
-+------------------------+-----------+
-
-### Метки
-
-`Groomed`
-
----
-*Данные получены из PostgreSQL базы данных*
-
----
-*Запрос обработан успешно*
+Если у вас есть еще вопросы или нужна дополнительная информация, не стесняйтесь спрашивать!
 
 ============================================================
 ```
@@ -582,6 +553,31 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `POSTGRES_USER`     | Пользователь БД | `hse_user`     |
 | `POSTGRES_PASSWORD` | Пароль БД       | `hse_password` |
 | `POSTGRES_DB`       | Название БД     | `hse_jira_db`  |
+
+### Redis Configuration
+
+| Переменная       | Описание         | По умолчанию |
+| ---------------- | ---------------- | ------------ |
+| `REDIS_HOST`     | Хост Redis       | `localhost`  |
+| `REDIS_PORT`     | Порт Redis       | `6379`       |
+| `REDIS_DB`       | Номер базы Redis | `0`          |
+| `REDIS_PASSWORD` | Пароль Redis     | —            |
+
+### Celery Configuration
+
+| Переменная                    | Описание                    | По умолчанию |
+| ----------------------------- | --------------------------- | ------------ |
+| `CELERY_BROKER_URL`           | URL брокера (авто из Redis) | —            |
+| `CELERY_TASK_TIME_LIMIT`      | Hard timeout задачи (сек)   | `600`        |
+| `CELERY_TASK_SOFT_TIME_LIMIT` | Soft timeout задачи (сек)   | `300`        |
+
+### FastAPI Configuration
+
+| Переменная     | Описание                 | По умолчанию |
+| -------------- | ------------------------ | ------------ |
+| `FASTAPI_HOST` | Хост FastAPI сервера     | `0.0.0.0`    |
+| `FASTAPI_PORT` | Порт FastAPI сервера     | `8080`       |
+| `CORS_ORIGINS` | Разрешённые CORS origins | `*`          |
 
 ### Other
 
