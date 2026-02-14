@@ -77,6 +77,7 @@ if prompt := st.chat_input("Введите запрос..."):
             deadline = time.time() + POLL_TIMEOUT_SEC
             task_data: dict = {}
 
+            processing_shown = False
             while time.time() < deadline:
                 task_data = client.get_task(task_id)
                 task_status = task_data.get("status", "")
@@ -98,8 +99,9 @@ if prompt := st.chat_input("Введите запрос..."):
                     break
 
                 # Still processing
-                if task_status == "PROCESSING":
+                if task_status == "PROCESSING" and not processing_shown:
                     st.write("Задача обрабатывается...")
+                    processing_shown = True
                 time.sleep(POLL_INTERVAL_SEC)
             else:
                 # Timeout
