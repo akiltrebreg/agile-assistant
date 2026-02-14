@@ -30,6 +30,13 @@ RUN poetry config virtualenvs.create false && \
 # Copy application code
 COPY hse_prom_prog ./hse_prom_prog
 
+# Copy Streamlit app and config
+COPY streamlit_app ./streamlit_app
+COPY .streamlit ./.streamlit
+
+# Copy static assets (served by nginx in production)
+COPY static ./static
+
 # Copy Alembic migrations
 COPY alembic ./alembic
 COPY alembic.ini ./

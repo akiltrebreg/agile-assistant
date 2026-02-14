@@ -1,0 +1,6 @@
+# Minimal container that holds static files and shares them via volume.
+# nginx reads from the shared volume at /var/www/static.
+FROM busybox:1.37
+COPY static /var/www/static
+# Keep container alive so the volume stays mounted
+CMD ["sh", "-c", "while true; do sleep 3600; done"]

@@ -28,6 +28,13 @@ PostgreSQL, Celery и Redis.
   - [Параллельная обработка](#параллельная-обработка)
   - [Мониторинг](#мониторинг)
   - [Горизонтальное масштабирование](#горизонтальное-масштабирование)
+- [Streamlit UI](#streamlit-ui)
+  - [Возможности](#возможности)
+- [Nginx + Production](#nginx--production)
+  - [Архитектура контейнеров](#архитектура-контейнеров)
+  - [Маршруты nginx](#маршруты-nginx)
+  - [Запуск production-стека](#запуск-production-стека)
+  - [Проверка](#проверка)
 - [Разработка](#разработка)
   - [Установка dev-зависимостей](#установка-dev-зависимостей)
   - [Code Quality](#code-quality)
@@ -138,6 +145,23 @@ hse-prom-prog/
 │   └── data/
 │       ├── report_agile_dashboard.csv
 │       └── report_agile_dashboard_metrics.csv
+├── streamlit_app/
+│   ├── app.py                        # Streamlit entrypoint (chat UI)
+│   ├── api_client.py                 # HTTP client for FastAPI
+│   ├── config.py                     # Env-based settings
+│   └── components/
+│       ├── __init__.py
+│       ├── sidebar.py                # Sidebar (status, controls)
+│       └── result.py                 # Result/error rendering
+├── nginx/
+│   ├── nginx.conf                    # Nginx reverse proxy config
+│   └── Dockerfile.static             # Static files container
+├── static/
+│   ├── favicon.svg                   # Application favicon
+│   ├── logo.svg                      # Application logo
+│   └── style.css                     # Custom CSS
+├── .streamlit/
+│   └── config.toml                   # Streamlit theme
 ├── tests/
 │   ├── __init__.py
 │   └── test_workflow.py
@@ -186,11 +210,14 @@ docker compose down
 
 **Что запускается:**
 
+- **Nginx** на порту 80 (единая точка входа)
 - PostgreSQL на порту 5432 с тестовыми данными
 - vLLM сервер на порту 8000
 - Redis на порту 6380 (брокер Celery)
-- FastAPI API на порту 8080
+- FastAPI API (внутренний, через gunicorn)
 - Celery worker (обработка задач)
+- Streamlit UI (внутренний, через nginx)
+- Static-контейнер (статические файлы)
 - Alembic миграции (таблица tasks)
 - CLI-приложение готово к использованию
 
@@ -381,7 +408,7 @@ docker compose ps
 ### Создание задачи
 
 ```bash
-curl -s -X POST http://localhost:8080/tasks \
+curl -s -X POST http://localhost/api/tasks \
   -H "Content-Type: application/json" \
   -d '{"query": "Расскажи о задаче AL-38787"}'
 ```
@@ -400,7 +427,7 @@ curl -s -X POST http://localhost:8080/tasks \
 
 ```bash
 # Подставьте task_id из ответа выше
-curl -s http://localhost:8080/tasks/<task_id> | python3 -m json.tool
+curl -s http://localhost/api/tasks/<task_id> | python3 -m json.tool
 ```
 
 Задача проходит через статусы: `PENDING` → `PROCESSING` → `COMPLETED` /
@@ -431,9 +458,9 @@ curl -s http://localhost:8080/tasks/<task_id> | python3 -m json.tool
 
 ```bash
 for i in 38787 38799 39041; do
-  curl -s -X POST http://localhost:8080/tasks \
+  curl -s -X POST http://localhost/api/tasks \
     -H "Content-Type: application/json" \
-    -d "{\"query\": \"Расскажи о задаче AL-$i\"}" &
+    -d "{\"query\": \"Расскажи о задаче AL-\$i\"}" &
 done
 wait
 ```
@@ -472,6 +499,101 @@ docker compose up --scale celery-worker=3 -d
 # Проверить, что все воркеры подключены
 docker compose exec celery-worker \
   celery -A hse_prom_prog.tasks.celery_app inspect ping
+```
+
+## Streamlit UI
+
+Веб-интерфейс для общения с Agile AI Assistant в формате чата. Streamlit
+работает как тонкий клиент и общается **только** с FastAPI по HTTP. Доступен
+через nginx на `http://localhost/`.
+
+### Возможности
+
+- Чат-интерфейс с историей сообщений
+- Прогресс-индикатор обработки задачи (PENDING -> PROCESSING -> COMPLETED)
+- Индикатор статуса API в сайдбаре (Online / Offline)
+- Обработка ошибок и таймаутов с понятными сообщениями
+- Детали выполнения (timestamps) в раскрывающемся блоке
+- Кнопка очистки чата
+
+## Nginx + Production
+
+Nginx выступает единой точкой входа (порт 80). FastAPI и Streamlit не имеют
+внешних портов и доступны только через reverse proxy.
+
+### Архитектура контейнеров
+
+```
+                          ┌─────────────────────────────────────┐
+                          │        Docker Compose network       │
+  Browser ──► :80 ──►     │                                     │
+                          │  ┌─────────┐                        │
+                          │  │  nginx  │ (Image 1)              │
+                          │  └────┬────┘                        │
+                          │       │                             │
+                ┌─────────┼───────┼──────────┐                  │
+                │         │       │          │                  │
+          /static/        │   /api/*       / (default)          │
+                │         │       │          │                  │
+          ┌─────▼───┐     │ ┌─────▼───┐ ┌───▼──────┐           │
+          │ static  │     │ │   api   │ │streamlit │           │
+          │(Image 3)│     │ │(Image 2)│ │          │           │
+          │ volume  │     │ │gunicorn │ │          │           │
+          └─────────┘     │ └─────────┘ └──────────┘           │
+                          └─────────────────────────────────────┘
+```
+
+| Контейнер  | Образ                 | Роль                                            |
+| ---------- | --------------------- | ----------------------------------------------- |
+| **nginx**  | `nginx:1.27-alpine`   | Reverse proxy, единственный открытый порт (80)  |
+| **api**    | Dockerfile + gunicorn | FastAPI в production (gunicorn + UvicornWorker) |
+| **static** | `busybox` + volume    | Хранит статические файлы, шарит volume с nginx  |
+
+### Маршруты nginx
+
+| Путь              | Куда проксирует  | Особенности                                        |
+| ----------------- | ---------------- | -------------------------------------------------- |
+| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (`/api/tasks` -> `/tasks`) |
+| `/static/*`       | Диск (volume)    | Статика напрямую, без application server           |
+| `/docs`, `/redoc` | `api:8080`       | Swagger UI                                         |
+| `/_stcore/stream` | `streamlit:8501` | WebSocket (Upgrade + Connection headers)           |
+| `/` (default)     | `streamlit:8501` | Streamlit UI с WebSocket-поддержкой                |
+
+### Запуск production-стека
+
+```bash
+# 1. Запустить всё
+docker compose up -d
+
+# 2. Открыть в браузере
+open http://localhost
+
+# FastAPI доступен через /api/:
+curl http://localhost/api/tasks -X POST -H "Content-Type: application/json" \
+  -d '{"query": "Расскажи о задаче AL-38787"}'
+
+# Swagger UI:
+open http://localhost/docs
+
+# Статика:
+curl http://localhost/static/style.css
+```
+
+### Проверка
+
+```bash
+# Статус всех сервисов
+docker compose ps
+
+# Логи nginx
+docker compose logs nginx
+
+# Проверить, что статика отдаётся напрямую
+curl -I http://localhost/static/favicon.svg
+# Должен вернуть Content-Type: image/svg+xml и Cache-Control: public
+
+# Проверить, что FastAPI работает через gunicorn
+docker compose exec api ps aux | grep gunicorn
 ```
 
 ## Разработка
@@ -581,9 +703,10 @@ poetry run pytest tests/ --cov=hse_prom_prog
 
 ### Other
 
-| Переменная  | Описание            | По умолчанию |
-| ----------- | ------------------- | ------------ |
-| `LOG_LEVEL` | Уровень логирования | `INFO`       |
+| Переменная  | Описание                              | По умолчанию |
+| ----------- | ------------------------------------- | ------------ |
+| `DEBUG`     | Debug-режим (hot-reload, verbose log) | `false`      |
+| `LOG_LEVEL` | Уровень логирования                   | `INFO`       |
 
 ## Лицензия
 

@@ -93,6 +93,12 @@ class Settings(BaseSettings):
         description="PostgreSQL database name",
     )
 
+    # Application mode
+    debug: bool = Field(
+        default=False,
+        description="Debug mode (enables hot-reload, verbose logging)",
+    )
+
     # Logging
     log_level: str = Field(
         default="INFO",

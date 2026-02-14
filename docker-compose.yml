@@ -1,4 +1,44 @@
 services:
+  # ──────────────────────────────────────────────────────────────
+  # Image 1: Nginx — single public entrypoint (port 80)
+  # Routes: / → Streamlit, /api/ → FastAPI, /static/ → disk
+  # ──────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: hse-prom-prog-nginx
+    depends_on:
+      api:
+        condition: service_healthy
+      streamlit:
+        condition: service_healthy
+      static:
+        condition: service_started
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_files:/var/www/static:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - hse-network
+
+  # ──────────────────────────────────────────────────────────────
+  # Image 3: Static files container — shares volume with nginx
+  # ──────────────────────────────────────────────────────────────
+  static:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile.static
+    container_name: hse-prom-prog-static
+    volumes:
+      - static_files:/var/www/static
+    networks:
+      - hse-network
+
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
@@ -96,7 +136,10 @@ services:
     networks:
       - hse-network
 
-  # FastAPI service (Producer)
+  # ──────────────────────────────────────────────────────────────
+  # Image 2: FastAPI (Producer) — production mode behind nginx
+  # Gunicorn + UvicornWorker, DEBUG=false
+  # ──────────────────────────────────────────────────────────────
   api:
     build:
       context: .
@@ -110,6 +153,7 @@ services:
       vllm:
         condition: service_healthy
     environment:
+      - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
       - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
       - VLLM_API_KEY=EMPTY
@@ -124,13 +168,16 @@ services:
       - REDIS_DB=0
       - FASTAPI_HOST=0.0.0.0
       - FASTAPI_PORT=8080
-    ports:
-      - "8080:8080"
+    # No external ports — nginx is the single public entrypoint
+    expose:
+      - "8080"
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+    # Production: gunicorn with uvicorn workers (no --reload)
     command:
-      uvicorn hse_prom_prog.api.app:app --host 0.0.0.0 --port 8080 --reload
+      gunicorn hse_prom_prog.api.app:app -k uvicorn.workers.UvicornWorker --bind
+      0.0.0.0:8080 --workers 2 --timeout 300 --access-logfile -
     networks:
       - hse-network
     healthcheck:
@@ -153,6 +200,7 @@ services:
       vllm:
         condition: service_healthy
     environment:
+      - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
       - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
       - VLLM_API_KEY=EMPTY
@@ -187,6 +235,37 @@ services:
     networks:
       - hse-network
 
+  # Streamlit frontend (thin client, talks only to FastAPI)
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hse-prom-prog-streamlit
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - DEBUG=false
+      - API_BASE_URL=http://api:8080
+      - POLL_INTERVAL_SEC=2
+      - POLL_TIMEOUT_SEC=120
+    # No external ports — nginx is the single public entrypoint
+    expose:
+      - "8501"
+    volumes:
+      - ./streamlit_app:/app/streamlit_app
+      - ./.streamlit:/app/.streamlit
+    command:
+      streamlit run streamlit_app/app.py --server.port=8501
+      --server.headless=true --server.address=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - hse-network
+
   # Alembic migration runner (one-shot: docker compose run --rm migrate)
   migrate:
     build:
@@ -214,6 +293,7 @@ volumes:
   postgres_data:
   vllm-cache:
   redis_data:
+  static_files:
 
 networks:
   hse-network:

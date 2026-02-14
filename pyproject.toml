@@ -22,11 +22,15 @@ dependencies = [
     # FastAPI and ASGI server
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
+    "gunicorn>=23.0.0",
     # Celery and Redis
     "celery>=5.4.0",
     "redis>=5.2.0",
     # Database migrations
     "alembic>=1.14.0",
+    # Streamlit frontend
+    "streamlit>=1.40.0",
+    "requests>=2.32.0",
 ]
 
 [dependency-groups]
@@ -90,4 +94,4 @@ ignore = ["RUF001"]
 "hse_prom_prog/main.py" = ["PLR2004"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["hse_prom_prog"]
+known-first-party = ["hse_prom_prog", "streamlit_app"]
