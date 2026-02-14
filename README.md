@@ -51,17 +51,17 @@ PostgreSQL, Celery, Redis, nginx.
 ```
                                         ┌──────────────┐     ┌─────────────────┐
   ┌──────────────────┐   task       ┌──▶│  SQL Agent   │────▶│ Response Agent  │
-  │    Supervisor    │   tasks_filter│   │  (шаблонный  │     │  (ответ по      │
+  │    Supervisor    │  tasks_filter│   │  (шаблонный  │     │  (ответ по      │
   │                  │   metric     │   │   SQL из     │     │  данным из БД)  │
   │  Классифицирует  ├──────────────┘   │  intent +    │     └─────────────────┘
   │  intent:         │                  │  entities)   │
   │  - task          │                  └──────────────┘
   │  - tasks_filter  │
-  │  - metric        │  general         ┌─────────────────┐
+  │  - metric        │  general        ┌─────────────────┐
   │  - general       ├────────────────▶│ Response Agent  │
-  │                  │                  │  (прямой ответ  │
-  │  Извлекает       │                  │  через LLM)    │
-  │  entities:       │                  └─────────────────┘
+  │                  │                 │  (прямой ответ  │
+  │  Извлекает       │                 │  через LLM)     │
+  │  entities:       │                 └─────────────────┘
   │  issue_key,      │
   │  team_name,      │
   │  sprint_name,    │
