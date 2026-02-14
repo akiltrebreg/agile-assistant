@@ -258,49 +258,121 @@ hse-prom-prog/
 
 ## Быстрый старт с Docker Compose
 
-Самый простой способ запустить весь стек (PostgreSQL + Qdrant + vLLM + Redis +
-FastAPI + Celery + приложение):
+Пошаговая инструкция для запуска полного стека (PostgreSQL + Qdrant + vLLM +
+Redis + FastAPI + Celery + Streamlit + Nginx).
+
+### Шаг 0: Клонирование и настройка
 
 ```bash
 # Клонируйте репозиторий
 git clone <repository-url>
 cd hse-prom-prog
 
-# Скачайте все ветки из удаленного репозитория
+# Скачайте все ветки
 git fetch --all
 
 # Переключитесь на ветку checkpoint_3
 git checkout checkpoint_3
 
-# Скопируйте example файл окружения
+# Скопируйте файл окружения
 cp .env.example .env
-
-# Запустите все сервисы
-docker compose up -d
-
-# Проверьте статус сервисов
-docker compose ps
-
-# Запустите приложение (в отдельном терминале после запуска сервисов)
-docker compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче AL-38787"
-
-# Остановите сервисы
-docker compose down
 ```
 
-**Что запускается:**
+### Шаг 1: Сборка образа приложения
 
-- **Nginx** на порту 80 (единая точка входа)
-- PostgreSQL на порту 5432 с тестовыми данными
-- Qdrant на порту 6333 (векторное хранилище для RAG)
-- vLLM сервер на порту 8000
-- Redis на порту 6380 (брокер Celery)
-- FastAPI API (внутренний, через gunicorn)
-- Celery worker (обработка задач)
-- Streamlit UI (внутренний, через nginx)
-- Static-контейнер (статические файлы)
-- Alembic миграции (таблица tasks)
-- CLI-приложение готово к использованию
+```bash
+docker compose build app
+```
+
+Один образ используется для нескольких сервисов: `app`, `api`, `celery-worker`,
+`streamlit`, `migrate`.
+
+### Шаг 2: Запуск инфраструктуры
+
+```bash
+docker compose up -d postgres qdrant redis vllm
+```
+
+Дождитесь, пока все сервисы станут healthy (vLLM загружает модель — это может
+занять несколько минут):
+
+```bash
+docker compose ps
+```
+
+Ожидаемый результат — все четыре сервиса в статусе `healthy`.
+
+### Шаг 3: Применение миграций
+
+```bash
+docker compose run --rm migrate
+```
+
+Создаёт таблицу `tasks` в PostgreSQL для хранения статусов и результатов
+асинхронных запросов.
+
+### Шаг 4: Загрузка базы знаний в Qdrant
+
+```bash
+docker compose run --rm app python -m hse_prom_prog.rag.ingest
+```
+
+Загружает PDF и Markdown документы из `knowledge_base/` в Qdrant. Без этого шага
+RAG-запросы (вопросы о метриках, практиках, регламентах) не будут работать.
+
+### Шаг 5: Запуск сервисов приложения
+
+```bash
+docker compose up -d api celery-worker streamlit nginx
+```
+
+### Шаг 6: Проверка и использование
+
+```bash
+# Проверьте, что все сервисы запущены
+docker compose ps
+
+# Откройте в браузере
+open http://localhost
+```
+
+Streamlit UI доступен по адресу **http://localhost/** — это чат-интерфейс для
+общения с Agile AI Assistant.
+
+### Примеры запросов в Streamlit UI
+
+В чате Streamlit можно отправлять запросы трёх типов:
+
+**1. Запрос данных по конкретной задаче** (таблица `report_agile_dashboard`):
+
+> Расскажи о задаче AL-38787
+
+Supervisor извлекает ключ `AL-38787`, SQL Agent выполняет
+`SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38787'`, Response
+Agent формирует ответ с описанием задачи, статусом, исполнителем, командой,
+story points и другими полями.
+
+**2. Запрос метрик по спринту** (таблица `report_agile_dashboard_metrics`):
+
+> Напиши мне Done Total по спринту 26Q1.1 Конь не валялся
+
+Supervisor определяет intent=`metric`, SQL Agent выполняет запрос к таблице
+`report_agile_dashboard_metrics` с фильтром по `sprint_name`, Response Agent
+возвращает значение метрики `done_total` для указанного спринта.
+
+**3. Вопрос по документации компании** (RAG, база знаний в Qdrant):
+
+> Расскажи мне, как считается метрика Team Lead Time
+
+Supervisor определяет query_type=`rag`, RAG Agent ищет релевантные фрагменты в
+Qdrant (из `knowledge_base/metrics/team_lead_time.pdf`), Response Agent
+генерирует ответ на основе найденного контекста с указанием источников.
+
+### Остановка
+
+```bash
+docker compose down
+```
 
 ### Настройка переменных окружения
 
@@ -392,7 +464,7 @@ poetry run python -m hse_prom_prog.rag.ingest /path/to/docs
 
 Pipeline выполняет:
 
-1. **Загрузка** — читает .pdf (PyPDFLoader) и .md (UnstructuredMarkdownLoader)
+1. **Загрузка** — читает .pdf (PyPDFLoader) и .md (TextLoader)
 2. **Chunking** — разбивает на фрагменты (1000 символов, overlap 200)
 3. **Эмбеддинг** — `intfloat/multilingual-e5-base` (CPU)
 4. **Загрузка в Qdrant** — пересоздаёт коллекцию и загружает все чанки
