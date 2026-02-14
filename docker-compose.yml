@@ -51,7 +51,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333'"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -120,6 +120,8 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      qdrant:
+        condition: service_healthy
     environment:
       - VLLM_BASE_URL=http://vllm:8000/v1
       - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
@@ -130,6 +132,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-hse_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
       - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=business_docs
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env

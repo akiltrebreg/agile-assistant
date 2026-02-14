@@ -14,7 +14,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
     DirectoryLoader,
     PyPDFLoader,
-    UnstructuredMarkdownLoader,
+    TextLoader,
 )
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
@@ -41,7 +41,7 @@ def _load_documents(kb_dir: Path) -> list:
     md_loader = DirectoryLoader(
         str(kb_dir),
         glob="**/*.md",
-        loader_cls=UnstructuredMarkdownLoader,
+        loader_cls=TextLoader,
         show_progress=True,
     )
     md_docs = md_loader.load()

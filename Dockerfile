@@ -37,6 +37,9 @@ COPY .streamlit ./.streamlit
 # Copy static assets (served by nginx in production)
 COPY static ./static
 
+# Copy knowledge base for RAG ingestion
+COPY knowledge_base ./knowledge_base
+
 # Copy Alembic migrations
 COPY alembic ./alembic
 COPY alembic.ini ./
