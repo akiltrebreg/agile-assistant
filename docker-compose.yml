@@ -1,5 +1,4 @@
 services:
-  # PostgreSQL database
   postgres:
     image: postgres:16-alpine
     container_name: hse-prom-prog-db
@@ -21,26 +20,25 @@ services:
     networks:
       - hse-network
 
-  # vLLM service for serving the LLM model
   vllm:
     image: vllm/vllm-openai:v0.8.5
     container_name: vllm-server
-    ports:
-      - "8000:8000"
+    runtime: nvidia
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
+      - NVIDIA_VISIBLE_DEVICES=all
     command:
-      - --model=Qwen/Qwen2.5-3B-Instruct
+      - "--model"
+      - "Qwen/Qwen2.5-3B-Instruct"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+    ports:
+      - "8000:8000"
     volumes:
       - vllm-cache:/root/.cache/huggingface
     ipc: host
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
