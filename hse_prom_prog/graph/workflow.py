@@ -33,6 +33,7 @@ class WorkflowState(TypedDict):
     messages: Annotated[list, add_messages]
     original_query: str
     issue_key: str
+    route: str
     sql_response: str
     final_response: str
 
@@ -113,6 +114,19 @@ class AgileWorkflow:
         logger.info("[Workflow] Entering Response Agent node")
         return self.response_agent.process(state)
 
+    def _route_after_supervisor(self, state: WorkflowState) -> str:
+        """Route based on Supervisor's decision.
+
+        Args:
+            state: Current workflow state.
+
+        Returns:
+            Next node name: 'sql_agent' for DB queries, 'response_agent' for direct answers.
+        """
+        route = state.get("route", "db_query")
+        logger.info(f"[Workflow] Routing decision: {route}")
+        return "sql_agent" if route == "db_query" else "response_agent"
+
     def _build_graph(self) -> Any:
         """Build the LangGraph state graph.
 
@@ -127,9 +141,13 @@ class AgileWorkflow:
         workflow.add_node("sql_agent", self._sql_agent_node)
         workflow.add_node("response_agent", self._response_agent_node)
 
-        # Add edges to define the flow
+        # Define the flow with conditional routing after supervisor
         workflow.set_entry_point("supervisor")
-        workflow.add_edge("supervisor", "sql_agent")
+        workflow.add_conditional_edges(
+            "supervisor",
+            self._route_after_supervisor,
+            {"sql_agent": "sql_agent", "response_agent": "response_agent"},
+        )
         workflow.add_edge("sql_agent", "response_agent")
         workflow.add_edge("response_agent", END)
 
@@ -151,6 +169,7 @@ class AgileWorkflow:
             "messages": [],
             "original_query": user_query,
             "issue_key": "",
+            "route": "",
             "sql_response": "",
             "final_response": "",
         }

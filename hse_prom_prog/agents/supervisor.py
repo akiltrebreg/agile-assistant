@@ -86,7 +86,11 @@ class SupervisorAgent:
                 logger.error(f"[Supervisor] Error during LLM extraction: {e}")
                 issue_key = "ERROR"
 
+        route = "db_query" if issue_key not in ("NOT_FOUND", "ERROR", None) else "direct_response"
+        logger.info(f"[Supervisor] Route decision: {route}")
+
         return {
             "issue_key": issue_key,
             "original_query": user_query,
+            "route": route,
         }

@@ -112,6 +112,32 @@ class ResponseAgent:
         # Convert to JSON for better structure
         return json.dumps(formatted_data, ensure_ascii=False, indent=2)
 
+    def _generate_direct_response(self, original_query: str) -> str:
+        """Generate a direct LLM response without database context.
+
+        Used when the user's query is a general question that does not
+        require data from PostgreSQL.
+
+        Args:
+            original_query: User's original query.
+
+        Returns:
+            Generated natural language response.
+        """
+        prompt = (
+            "Ты — ассистент для анализа данных о Jira-задачах. "
+            "Пользователь задал общий вопрос, не связанный с конкретной задачей "
+            "в базе данных. Ответь на вопрос на русском языке.\n"
+            "\n"
+            f"Вопрос пользователя: {original_query}\n"
+            "\n"
+            "Ответь на вопрос пользователя:"
+        )
+
+        response = self.llm_client.invoke(prompt)
+        logger.info("[Response Agent] Successfully generated direct response using LLM")
+        return response
+
     def _generate_response(self, original_query: str, data: dict[str, Any]) -> str:
         """Generate natural language response using LLM.
 
@@ -185,9 +211,29 @@ class ResponseAgent:
         """
         logger.info("[Response Agent] Generating response using LLM...")
 
-        sql_response = state.get("sql_response")
+        route = state.get("route", "db_query")
         issue_key = state.get("issue_key", "UNKNOWN")
         original_query = state.get("original_query", "")
+
+        # Direct response (no DB needed)
+        if route == "direct_response":
+            logger.info("[Response Agent] Generating direct response (no DB context)")
+            try:
+                formatted_response = self._generate_direct_response(original_query)
+            except Exception as e:
+                logger.error(f"[Response Agent] Error generating direct response: {e}")
+                formatted_response = (
+                    f"Не удалось сгенерировать ответ: {e}\n\n"
+                    "---\n*Попробуйте переформулировать запрос*"
+                )
+            return {
+                "issue_key": issue_key,
+                "original_query": original_query,
+                "sql_response": None,
+                "final_response": formatted_response,
+            }
+
+        sql_response = state.get("sql_response")
         error = state.get("error")
 
         # Handle errors
