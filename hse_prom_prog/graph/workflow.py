@@ -1,7 +1,8 @@
 """LangGraph workflow definition for multi-agent processing.
 
 This module defines the state graph that coordinates the three agents:
-Supervisor -> SQL Agent -> Response Agent.
+Supervisor -> (conditional) -> SQL Agent -> Response Agent
+                            -> Response Agent (direct)
 """
 
 import logging
@@ -25,16 +26,23 @@ class WorkflowState(TypedDict):
     Attributes:
         messages: List of conversation messages (for LangGraph compatibility).
         original_query: The original user query.
-        issue_key: Extracted Jira issue key.
-        sql_response: Response from SQL agent.
+        intent: Classified intent (task, tasks_filter, metric, general).
+        entities: Extracted entities dict from Supervisor.
+        route: Routing decision (db_query or direct_response).
+        sql_query: Generated SQL query string (for debugging).
+        sql_result: Query results as list of dicts.
+        error: Error message if any step failed.
         final_response: Formatted final response.
     """
 
     messages: Annotated[list, add_messages]
     original_query: str
-    issue_key: str
+    intent: str
+    entities: dict[str, Any]
     route: str
-    sql_response: str
+    sql_query: str
+    sql_result: list[dict[str, Any]]
+    error: str
     final_response: str
 
 
@@ -42,7 +50,7 @@ class AgileWorkflow:
     """LangGraph workflow for processing Jira queries through multiple agents.
 
     This class builds and manages a state graph that processes user queries
-    through Supervisor, SQL Agent, and Response Agent in sequence.
+    through Supervisor, SQL Agent, and Response Agent.
 
     Attributes:
         supervisor: Supervisor agent instance.
@@ -57,91 +65,42 @@ class AgileWorkflow:
         llm_client: LLMClient,
         db_connection: DatabaseConnection | None = None,
     ) -> None:
-        """Initialize the workflow with all required agents.
-
-        Args:
-            llm_client: LLM client for agents that need it.
-            db_connection: Optional database connection. If not provided,
-                          SQL Agent will create one on demand.
-        """
         logger.info("[Workflow] Initializing AgileWorkflow...")
 
-        # Store database connection
         self.db = db_connection
 
-        # Initialize agents
         self.supervisor = SupervisorAgent(llm_client)
         self.sql_agent = SQLAgent(db_connection=self.db)
         self.response_agent = ResponseAgent(llm_client)
 
-        # Build the graph
         self.graph = self._build_graph()
         logger.info("[Workflow] Workflow graph built successfully")
 
     def _supervisor_node(self, state: WorkflowState) -> dict[str, Any]:
-        """Node function for Supervisor agent.
-
-        Args:
-            state: Current workflow state.
-
-        Returns:
-            Updated state with issue_key extracted.
-        """
         logger.info("[Workflow] Entering Supervisor node")
         return self.supervisor.process(state["original_query"])
 
     def _sql_agent_node(self, state: WorkflowState) -> dict[str, Any]:
-        """Node function for SQL agent.
-
-        Args:
-            state: Current workflow state.
-
-        Returns:
-            Updated state with sql_response.
-        """
         logger.info("[Workflow] Entering SQL Agent node")
         return self.sql_agent.process(state)
 
     def _response_agent_node(self, state: WorkflowState) -> dict[str, Any]:
-        """Node function for Response agent.
-
-        Args:
-            state: Current workflow state.
-
-        Returns:
-            Updated state with final_response.
-        """
         logger.info("[Workflow] Entering Response Agent node")
         return self.response_agent.process(state)
 
     def _route_after_supervisor(self, state: WorkflowState) -> str:
-        """Route based on Supervisor's decision.
-
-        Args:
-            state: Current workflow state.
-
-        Returns:
-            Next node name: 'sql_agent' for DB queries, 'response_agent' for direct answers.
-        """
+        """Route based on Supervisor's decision."""
         route = state.get("route", "db_query")
         logger.info(f"[Workflow] Routing decision: {route}")
         return "sql_agent" if route == "db_query" else "response_agent"
 
     def _build_graph(self) -> Any:
-        """Build the LangGraph state graph.
-
-        Returns:
-            Compiled state graph ready for execution.
-        """
-        # Create the graph
         workflow = StateGraph(WorkflowState)
 
-        # Add nodes
         workflow.add_node("supervisor", self._supervisor_node)
         workflow.add_node("sql_agent", self._sql_agent_node)
         workflow.add_node("response_agent", self._response_agent_node)
 
-        # Define the flow with conditional routing after supervisor
         workflow.set_entry_point("supervisor")
         workflow.add_conditional_edges(
             "supervisor",
@@ -151,7 +110,6 @@ class AgileWorkflow:
         workflow.add_edge("sql_agent", "response_agent")
         workflow.add_edge("response_agent", END)
 
-        # Compile the graph
         return workflow.compile()
 
     def run(self, user_query: str) -> dict[str, Any]:
@@ -168,9 +126,12 @@ class AgileWorkflow:
         initial_state: WorkflowState = {
             "messages": [],
             "original_query": user_query,
-            "issue_key": "",
+            "intent": "",
+            "entities": {},
             "route": "",
-            "sql_response": "",
+            "sql_query": "",
+            "sql_result": [],
+            "error": "",
             "final_response": "",
         }
 

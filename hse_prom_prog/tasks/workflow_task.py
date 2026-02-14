@@ -85,7 +85,8 @@ def execute_workflow(self, task_id: str, query: str) -> None:
 
         # Update to COMPLETED
         final_response = result.get("final_response", "No response generated")
-        issue_key = result.get("issue_key", "UNKNOWN")
+        entities = result.get("entities") or {}
+        issue_key = entities.get("issue_key")  # None for non-task intents
 
         logger.info(f"[WorkflowTask {task_id}] Workflow completed successfully")
         repo.update_task_status(
