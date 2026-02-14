@@ -27,9 +27,9 @@ st.set_page_config(
     layout="centered",
 )
 
-# ── Hide default Streamlit footer ────────────────────────────
+# ── Load custom CSS from nginx-served static files ───────────
 st.markdown(
-    "<style>footer {visibility: hidden;}</style>",
+    '<link rel="stylesheet" href="/static/style.css">',
     unsafe_allow_html=True,
 )
 

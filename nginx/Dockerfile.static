@@ -1,6 +1,9 @@
 # Minimal container that holds static files and shares them via volume.
 # nginx reads from the shared volume at /var/www/static.
+#
+# Files are staged in /opt/static (inside the image) and copied
+# into the mounted volume on every container start.  This avoids the
+# Docker named-volume pitfall where stale data persists after rebuilds.
 FROM busybox:1.37
-COPY static /var/www/static
-# Keep container alive so the volume stays mounted
-CMD ["sh", "-c", "while true; do sleep 3600; done"]
+COPY static /opt/static
+CMD ["sh", "-c", "cp -r /opt/static/* /var/www/static/ && while true; do sleep 3600; done"]

@@ -8,7 +8,11 @@ from streamlit_app.api_client import APIClient
 def render_sidebar(client: APIClient) -> None:
     """Render the sidebar with status and controls."""
     with st.sidebar:
-        st.title("Agile AI Assistant")
+        st.markdown(
+            '<img src="/static/logo.svg" alt="Agile AI Assistant" '
+            'style="width:100%;max-width:200px;">',
+            unsafe_allow_html=True,
+        )
         st.caption("LangGraph + vLLM + PostgreSQL")
 
         st.divider()
