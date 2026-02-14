@@ -1,8 +1,11 @@
 """Response agent for generating natural language responses using LLM.
 
-This agent takes the SQL agent's output (list of dicts) and uses LLM
-to generate a natural language response based on the user's original query.
-Handles all intents: task, tasks_filter, metric, general.
+Takes validated outputs from SQL Agent and/or RAG Agent and generates
+a natural language response. Supports four query_types:
+  sql     -- DB data only
+  rag     -- knowledge-base context + sources
+  hybrid  -- DB data + knowledge-base context
+  simple  -- direct LLM answer (no external data)
 """
 
 import json
@@ -118,7 +121,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _generate_direct_response(self, original_query: str) -> str:
-        """Generate a direct LLM response without database context."""
+        """Generate a direct LLM response without external context."""
         prompt = (
             "Ты — ассистент для анализа данных о Jira-задачах. "
             "Пользователь задал общий вопрос, не связанный с конкретной задачей "
@@ -186,45 +189,69 @@ class ResponseAgent:
         )
         return self.llm_client.invoke(prompt)
 
+    def _generate_rag_response(
+        self,
+        original_query: str,
+        rag_response: str,
+        rag_sources: list[str],
+    ) -> str:
+        """Format RAG-agent answer with source citations."""
+        sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
+        suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
+        return f"{rag_response}{suffix}"
+
+    def _generate_hybrid_response(
+        self,
+        original_query: str,
+        sql_result: list[dict[str, Any]],
+        intent: str,
+        rag_response: str,
+        rag_sources: list[str],
+    ) -> str:
+        """Combine DB data + RAG context into one answer."""
+        # Prepare SQL data section
+        if intent == "task" and sql_result:
+            sql_section = self._prepare_single_task(sql_result[0])
+        elif intent == "tasks_filter" and sql_result:
+            sql_section = self._prepare_task_list(sql_result)
+        elif intent == "metric" and sql_result:
+            sql_section = self._prepare_metrics(sql_result)
+        else:
+            sql_section = ""
+
+        prompt = (
+            "Ты — ассистент для анализа Agile-метрик и практик.\n"
+            "Используй данные из БД и контекст из базы знаний, "
+            "чтобы дать развёрнутый ответ.\n\n"
+            f"Вопрос пользователя: {original_query}\n\n"
+            f"Данные из БД:\n{sql_section}\n\n"
+            f"Контекст из базы знаний:\n{rag_response}\n\n"
+            "Инструкции:\n"
+            "1. Сначала приведи фактические данные из БД\n"
+            "2. Затем дай рекомендации на основе базы знаний\n"
+            "3. Укажи источники\n"
+            "4. Ответь на русском языке\n\n"
+            "Ответ:"
+        )
+        answer = self.llm_client.invoke(prompt)
+
+        sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
+        suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
+        return f"{answer}{suffix}"
+
     # ------------------------------------------------------------------
-    # Main entry point
+    # SQL-only response
     # ------------------------------------------------------------------
 
-    def process(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Generate natural language response based on intent and data.
-
-        Args:
-            state: Workflow state with intent, entities, sql_result, error, etc.
-
-        Returns:
-            State update with final_response.
-        """
-        logger.info("[Response Agent] Generating response...")
-
-        route = state.get("route", "db_query")
+    def _process_sql_response(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Handle SQL-only response generation."""
+        error = state.get("error")
+        sql_result = state.get("sql_result")
         intent = state.get("intent", "general")
         original_query = state.get("original_query", "")
 
-        # --- Direct response (no DB needed) ---
-        if route == "direct_response":
-            logger.info("[Response Agent] Generating direct response (no DB context)")
-            try:
-                response = self._generate_direct_response(original_query)
-            except Exception as e:
-                logger.error(f"[Response Agent] Direct response error: {e}")
-                response = (
-                    f"Не удалось сгенерировать ответ: {e}\n\n"
-                    "---\n*Попробуйте переформулировать запрос*"
-                )
-            return {"final_response": response}
-
-        # --- DB-based response ---
-        error = state.get("error")
-        sql_result = state.get("sql_result")
-
-        # Handle errors from SQL Agent
         if error:
-            logger.warning(f"[Response Agent] SQL error: {error}")
+            logger.warning("[Response Agent] SQL error: %s", error)
             return {
                 "final_response": (
                     f"Ошибка при выполнении запроса:\n\n{error}\n\n"
@@ -232,7 +259,6 @@ class ResponseAgent:
                 ),
             }
 
-        # Handle empty results
         if not sql_result:
             logger.info("[Response Agent] No results from SQL Agent")
             entities = state.get("entities", {})
@@ -246,7 +272,6 @@ class ResponseAgent:
                 msg = "По вашему запросу ничего не найдено.\n\n---\n*Попробуйте уточнить фильтры*"
             return {"final_response": msg}
 
-        # Generate response based on intent
         try:
             if intent == "task":
                 response = self._generate_task_response(original_query, sql_result[0])
@@ -257,12 +282,95 @@ class ResponseAgent:
             else:
                 response = self._generate_task_response(original_query, sql_result[0])
 
-            logger.info(f"[Response Agent] Generated response for intent={intent}")
+            logger.info("[Response Agent] Generated SQL response for intent=%s", intent)
 
         except Exception as e:
-            logger.error(f"[Response Agent] Error generating response: {e}")
+            logger.error("[Response Agent] Error generating response: %s", e)
             response = (
                 f"Не удалось сгенерировать ответ: {e}\n\n---\n*Попробуйте переформулировать запрос*"
             )
 
         return {"final_response": response}
+
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+
+    def process(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Generate natural language response based on query_type and data.
+
+        Args:
+            state: Workflow state with intent, entities, sql_result,
+                   rag_response, validation_result, error, etc.
+
+        Returns:
+            State update with final_response.
+        """
+        logger.info("[Response Agent] Generating response...")
+
+        query_type = state.get("query_type", "sql")
+        route = state.get("route", "db_query")
+        intent = state.get("intent", "general")
+        original_query = state.get("original_query", "")
+
+        # --- Direct response (simple) ---
+        if route == "direct_response" or query_type == "simple":
+            logger.info("[Response Agent] Generating direct response")
+            try:
+                response = self._generate_direct_response(original_query)
+            except Exception as e:
+                logger.error("[Response Agent] Direct response error: %s", e)
+                response = (
+                    f"Не удалось сгенерировать ответ: {e}\n\n"
+                    "---\n*Попробуйте переформулировать запрос*"
+                )
+            return {"final_response": response}
+
+        # Read validation result
+        validation = state.get("validation_result", {})
+        use_sql = validation.get("use_sql", True)
+        use_rag = validation.get("use_rag", False)
+        note = validation.get("note")
+
+        sql_result = state.get("sql_result")
+        rag_response = state.get("rag_response")
+        rag_sources = state.get("rag_sources", [])
+
+        # --- Both failed ---
+        if note and not use_sql and not use_rag:
+            logger.warning("[Response Agent] Validation note: %s", note)
+            return {
+                "final_response": (
+                    f"Ошибка при выполнении запроса:\n\n{note}\n\n"
+                    "---\n*Попробуйте переформулировать запрос*"
+                ),
+            }
+
+        # --- RAG only ---
+        if query_type == "rag" and use_rag:
+            logger.info("[Response Agent] RAG-only response")
+            try:
+                response = self._generate_rag_response(original_query, rag_response, rag_sources)
+            except Exception as e:
+                logger.error("[Response Agent] RAG response error: %s", e)
+                response = f"Не удалось сгенерировать ответ: {e}"
+            return {"final_response": response}
+
+        # --- Hybrid ---
+        if query_type == "hybrid" and (use_sql or use_rag):
+            logger.info("[Response Agent] Hybrid response")
+            try:
+                response = self._generate_hybrid_response(
+                    original_query,
+                    sql_result or [],
+                    intent,
+                    rag_response or "",
+                    rag_sources,
+                )
+            except Exception as e:
+                logger.error("[Response Agent] Hybrid response error: %s", e)
+                response = f"Не удалось сгенерировать ответ: {e}"
+            return {"final_response": response}
+
+        # --- SQL only (default) ---
+        return self._process_sql_response(state)

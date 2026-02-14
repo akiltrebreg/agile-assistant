@@ -93,6 +93,20 @@ class Settings(BaseSettings):
         description="PostgreSQL database name",
     )
 
+    # Qdrant Configuration
+    qdrant_url: str = Field(
+        default="http://localhost:6333",
+        description="Qdrant vector store URL",
+    )
+    qdrant_collection_name: str = Field(
+        default="business_docs",
+        description="Qdrant collection name for RAG documents",
+    )
+    embedding_model: str = Field(
+        default="intfloat/multilingual-e5-base",
+        description="HuggingFace embedding model for RAG",
+    )
+
     # Application mode
     debug: bool = Field(
         default=False,

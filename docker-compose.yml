@@ -39,6 +39,25 @@ services:
     networks:
       - hse-network
 
+  # ──────────────────────────────────────────────────────────────
+  # Qdrant — vector store for RAG Agent
+  # ──────────────────────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: hse-prom-prog-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hse-network
+
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
@@ -199,6 +218,8 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      qdrant:
+        condition: service_healthy
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
@@ -213,6 +234,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=business_docs
       - CELERY_TASK_TIME_LIMIT=600
       - CELERY_TASK_SOFT_TIME_LIMIT=300
     volumes:
@@ -294,6 +317,7 @@ volumes:
   vllm-cache:
   redis_data:
   static_files:
+  qdrant_data:
 
 networks:
   hse-network:

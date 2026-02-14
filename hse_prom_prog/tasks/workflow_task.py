@@ -16,6 +16,7 @@ from hse_prom_prog.database.task_repository import TaskRepository
 from hse_prom_prog.graph.workflow import AgileWorkflow
 from hse_prom_prog.llm.client import get_llm_client
 from hse_prom_prog.models.task import TaskStatus
+from hse_prom_prog.rag.retriever import get_retriever
 from hse_prom_prog.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -76,9 +77,10 @@ def execute_workflow(self, task_id: str, query: str) -> None:
         else:
             logger.info(f"[WorkflowTask {task_id}] Retry {self.request.retries}/{self.max_retries}")
 
-        # Execute existing workflow (unchanged business logic)
+        # Build workflow with optional RAG retriever
         llm_client = get_llm_client()
-        workflow = AgileWorkflow(llm_client, db_connection=db)
+        retriever = _get_retriever_safe()
+        workflow = AgileWorkflow(llm_client, db_connection=db, retriever=retriever)
 
         logger.info(f"[WorkflowTask {task_id}] Running AgileWorkflow for: {query[:50]}...")
         result = workflow.run(query)
@@ -87,14 +89,16 @@ def execute_workflow(self, task_id: str, query: str) -> None:
         final_response = result.get("final_response", "No response generated")
         entities = result.get("entities") or {}
         issue_key = entities.get("issue_key")  # None for non-task intents
+        query_type = result.get("query_type", "sql")
 
-        logger.info(f"[WorkflowTask {task_id}] Workflow completed successfully")
+        logger.info(f"[WorkflowTask {task_id}] Workflow completed (query_type={query_type})")
         repo.update_task_status(
             task_uuid,
             TaskStatus.COMPLETED,
             result={
                 "final_response": final_response,
                 "issue_key": issue_key,
+                "query_type": query_type,
             },
             workflow_state=result,
         )
@@ -124,6 +128,15 @@ def execute_workflow(self, task_id: str, query: str) -> None:
     finally:
         if db is not None:
             db.close()
+
+
+def _get_retriever_safe():
+    """Try to get the Qdrant retriever; return None if unavailable."""
+    try:
+        return get_retriever()
+    except Exception as e:
+        logger.warning("[WorkflowTask] Qdrant retriever unavailable: %s", e)
+        return None
 
 
 def _update_task_failed(db, task_uuid: UUID, task_id: str, error_msg: str) -> None:
