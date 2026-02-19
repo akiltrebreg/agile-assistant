@@ -23,6 +23,9 @@ from hse_prom_prog.agents.supervisor import SupervisorAgent
 from hse_prom_prog.agents.validator_agent import ValidatorAgent
 from hse_prom_prog.database.connection import DatabaseConnection
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.rag.bm25_index import get_bm25_index
+from hse_prom_prog.rag.reranker import get_reranker
+from hse_prom_prog.rag.retriever import get_vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +73,42 @@ class AgileWorkflow:
 
         self.supervisor = SupervisorAgent(llm_client)
         self.sql_agent = SQLAgent(db_connection=self.db)
-        self.rag_agent = RAGAgent(llm_client, retriever) if retriever else None
+        self.rag_agent = self._build_rag_agent(llm_client, retriever)
         self.validator = ValidatorAgent()
         self.response_agent = ResponseAgent(llm_client)
 
         self.graph = self._build_graph()
         logger.info("[Workflow] Workflow graph built successfully")
+
+    @staticmethod
+    def _build_rag_agent(
+        llm_client: LLMClient,
+        retriever: Any | None,
+    ) -> RAGAgent | None:
+        """Build RAGAgent with optional vector store, BM25 index, and reranker."""
+        if retriever is None:
+            return None
+
+        vector_store = None
+        bm25_index = None
+        reranker = None
+
+        try:
+            vector_store = get_vector_store()
+        except Exception as e:
+            logger.warning("[Workflow] Could not get vector store: %s", e)
+
+        try:
+            bm25_index = get_bm25_index()
+        except Exception as e:
+            logger.warning("[Workflow] Could not build BM25 index: %s", e)
+
+        try:
+            reranker = get_reranker()
+        except Exception as e:
+            logger.warning("[Workflow] Could not load reranker: %s", e)
+
+        return RAGAgent(llm_client, retriever, vector_store, bm25_index, reranker)
 
     # ------------------------------------------------------------------
     # Node wrappers
