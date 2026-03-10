@@ -107,50 +107,6 @@ class Settings(BaseSettings):
         description="HuggingFace embedding model for RAG",
     )
 
-    # Reranker Configuration
-    reranker_model: str = Field(
-        default="BAAI/bge-reranker-base",
-        description="HuggingFace cross-encoder model for reranking",
-    )
-    reranker_threshold: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Minimum cross-encoder score to keep a document",
-    )
-    reranker_top_n: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Number of documents to keep after reranking",
-    )
-
-    # Chunking Configuration
-    parent_chunk_size: int = Field(
-        default=1500,
-        ge=500,
-        le=5000,
-        description="Parent chunk size in characters for LLM context",
-    )
-    parent_chunk_overlap: int = Field(
-        default=200,
-        ge=0,
-        le=500,
-        description="Overlap between parent chunks in characters",
-    )
-    child_chunk_size: int = Field(
-        default=350,
-        ge=100,
-        le=1000,
-        description="Child chunk size in characters for vector/BM25 indexing",
-    )
-    child_chunk_overlap: int = Field(
-        default=50,
-        ge=0,
-        le=200,
-        description="Overlap between child chunks in characters",
-    )
-
     # Application mode
     debug: bool = Field(
         default=False,

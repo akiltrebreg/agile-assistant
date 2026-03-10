@@ -4,18 +4,18 @@ Tests cover:
 - Supervisor: regex fast path, LLM classification, JSON parsing, query_type
 - SQL Agent: query building for all intents, validation
 - RAG Agent: retrieval, LLM generation, empty results, errors
+- Ingestion: splitting, metadata enrichment
 - Validator Agent: sql-only, rag-only, hybrid, both-failed scenarios
 - Response Agent: direct, DB-based, RAG, hybrid, error handling
 - Workflow: end-to-end integration with mocked agents (all 4 routes)
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 from sqlalchemy.exc import OperationalError
 
-from hse_prom_prog.agents.rag_agent import RAGAgent
 from hse_prom_prog.agents.response_agent import ResponseAgent
 from hse_prom_prog.agents.sql_agent import SQLAgent
 from hse_prom_prog.agents.supervisor import SupervisorAgent
@@ -370,7 +370,7 @@ class TestSQLAgent:
 
 
 class TestRAGAgent:
-    """Tests for RAG agent."""
+    """Tests for simplified RAG agent."""
 
     def _make_mock_doc(self, content: str, source: str = "doc.md", category: str = "agile"):
         """Create a mock LangChain Document."""
@@ -381,6 +381,8 @@ class TestRAGAgent:
 
     def test_process_success(self) -> None:
         """RAG Agent retrieves docs and generates answer."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = "Scope Drop — это снижение объёма спринта."
         mock_retriever = MagicMock()
@@ -398,8 +400,9 @@ class TestRAGAgent:
 
     def test_process_no_documents(self) -> None:
         """No relevant documents → rag_response is None."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "rewritten query"
         mock_retriever = MagicMock()
         mock_retriever.invoke.return_value = []
         agent = RAGAgent(mock_llm, mock_retriever)
@@ -410,9 +413,10 @@ class TestRAGAgent:
         assert result["rag_sources"] == []
 
     def test_process_retrieval_error(self) -> None:
-        """All retrieval sub-queries fail → rag_response is None."""
+        """Retrieval failure → rag_response is None with error."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "rewritten query"
         mock_retriever = MagicMock()
         mock_retriever.invoke.side_effect = ConnectionError("Qdrant down")
         agent = RAGAgent(mock_llm, mock_retriever)
@@ -421,9 +425,12 @@ class TestRAGAgent:
 
         assert result["rag_response"] is None
         assert result["rag_sources"] == []
+        assert "RAG retrieval error" in result["error"]
 
     def test_process_llm_error(self) -> None:
         """LLM generation error is caught; sources still returned."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_llm.invoke.side_effect = ConnectionError("vLLM down")
         mock_retriever = MagicMock()
@@ -438,26 +445,10 @@ class TestRAGAgent:
         assert len(result["rag_sources"]) == 1
         assert "RAG generation error" in result["error"]
 
-    def test_context_truncation(self) -> None:
-        """Long documents are truncated to _MAX_CONTEXT_CHARS."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "Answer"
-        mock_retriever = MagicMock()
-        # Create documents that exceed the 4000 char limit
-        mock_retriever.invoke.return_value = [
-            self._make_mock_doc("A" * 3000, "doc1.md"),
-            self._make_mock_doc("B" * 3000, "doc2.md"),
-        ]
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Answer"
-        # Only one source because second doc exceeds char limit
-        assert len(result["rag_sources"]) == 1
-
     def test_deduplicates_sources(self) -> None:
         """Same source appearing in multiple docs is deduplicated."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = "Answer"
         mock_retriever = MagicMock()
@@ -471,1188 +462,95 @@ class TestRAGAgent:
 
         assert result["rag_sources"] == ["agile/doc.md"]
 
-    # ── Query Rewriter tests ──────────────────────────────────
+    def test_all_chunks_in_context(self) -> None:
+        """All retrieved chunks are included in LLM context (no truncation)."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
 
-    def test_rewrite_query_success(self) -> None:
-        """Query rewriter transforms vague query into precise search query."""
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "определение и расчёт метрики Scope Drop в Agile"
+        mock_llm.invoke.return_value = "Answer"
         mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._rewrite_query("как считается эта метрика?")
-
-        assert result == "определение и расчёт метрики Scope Drop в Agile"
-        mock_llm.invoke.assert_called_once()
-
-    def test_rewrite_query_fallback_on_error(self) -> None:
-        """Query rewriter falls back to original query on LLM error."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = ConnectionError("LLM down")
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._rewrite_query("test query")
-
-        assert result == "test query"
-
-    def test_rewrite_query_fallback_on_empty(self) -> None:
-        """Query rewriter falls back to original if LLM returns empty string."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "   "
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._rewrite_query("test query")
-
-        assert result == "test query"
-
-    # ── Multi-Query tests ─────────────────────────────────────
-
-    def test_generate_multi_queries_success(self) -> None:
-        """Multi-query generates 3 alternative formulations."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = (
-            "Что такое Scope Drop в Agile\n"
-            "Как рассчитывается показатель Scope Drop\n"
-            "Метрика снижения объёма спринта"
-        )
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._generate_multi_queries("Scope Drop")
-
-        assert len(result) == 3
-        assert "Scope Drop" in result[0]
-
-    def test_generate_multi_queries_fallback_on_error(self) -> None:
-        """Multi-query falls back to [original_query] on LLM error."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = ConnectionError("LLM down")
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._generate_multi_queries("test query")
-
-        assert result == ["test query"]
-
-    def test_generate_multi_queries_empty_response(self) -> None:
-        """Multi-query falls back to [original_query] on empty LLM response."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = ""
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._generate_multi_queries("test query")
-
-        assert result == ["test query"]
-
-    # ── HyDE tests ────────────────────────────────────────────
-
-    def test_generate_hyde_document_success(self) -> None:
-        """HyDE generates a hypothetical document fragment."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = (
-            "Scope Drop — это метрика, отражающая процент задач, "
-            "исключённых из спринта после его начала."
-        )
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._generate_hyde_document("Что такое Scope Drop?")
-
-        assert "Scope Drop" in result
-        assert len(result) > 20
-
-    def test_generate_hyde_document_fallback_on_error(self) -> None:
-        """HyDE returns empty string on LLM error."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = ConnectionError("LLM down")
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._generate_hyde_document("test query")
-
-        assert result == ""
-
-    # ── Advanced retrieval integration tests ──────────────────
-
-    def test_retrieve_deduplicates_across_sub_queries(self) -> None:
-        """Results from multiple sub-queries are deduplicated by page_content."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten query",  # _rewrite_query
-            "variant 1\nvariant 2",  # _generate_multi_queries
-            "hypothetical document about topic",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
+        mock_retriever.invoke.return_value = [
+            self._make_mock_doc("A" * 3000, "doc1.md"),
+            self._make_mock_doc("B" * 3000, "doc2.md"),
         ]
-        mock_retriever = MagicMock()
-
-        shared_doc = self._make_mock_doc("Shared content", "doc.md", "agile")
-        unique_doc = self._make_mock_doc("Unique content", "doc2.md", "agile")
-        mock_retriever.invoke.side_effect = [
-            [shared_doc],  # variant 1
-            [shared_doc, unique_doc],  # variant 2
-            [shared_doc],  # HyDE
-        ]
-
         agent = RAGAgent(mock_llm, mock_retriever)
+
         result = agent.process({"original_query": "test"})
 
-        assert result["rag_response"] == "Final answer"
+        assert result["rag_response"] == "Answer"
+        # Both sources included — no truncation
         assert len(result["rag_sources"]) == 2
 
-    def test_retrieve_partial_sub_query_failure(self) -> None:
-        """If some sub-queries fail, results from successful ones are used."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten query",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries (1 variant)
-            "hypothetical document",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
-        ]
-        mock_retriever = MagicMock()
+    def test_prompt_contains_context_and_question(self) -> None:
+        """Generated prompt contains context and question sections."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
 
-        doc = self._make_mock_doc("Some content", "doc.md", "agile")
-        mock_retriever.invoke.side_effect = [
-            [doc],  # variant 1 succeeds
-            ConnectionError("Qdrant timeout"),  # HyDE query fails
-        ]
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Final answer"
-        assert "agile/doc.md" in result["rag_sources"]
-
-    def test_retrieve_all_strategies_fail_gracefully(self) -> None:
-        """When all retriever sub-queries fail, result is None (no crash)."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten query",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hypothetical doc",  # _generate_hyde_document
-        ]
-        mock_retriever = MagicMock()
-        mock_retriever.invoke.side_effect = ConnectionError("Qdrant down")
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] is None
-        assert result["rag_sources"] == []
-
-    # ── RRF tests ─────────────────────────────────────────────
-
-    def test_rrf_merge_combines_ranked_lists(self) -> None:
-        """RRF merges two ranked lists; doc in both lists ranks higher."""
-        doc_a = self._make_mock_doc("Content A", "a.md")
-        doc_b = self._make_mock_doc("Content B", "b.md")
-        doc_c = self._make_mock_doc("Content C", "c.md")
-
-        vector_list = [doc_a, doc_b]  # A rank 0, B rank 1
-        bm25_list = [doc_b, doc_c]  # B rank 0, C rank 1
-
-        result = RAGAgent._rrf_merge([vector_list, bm25_list])
-
-        contents = [doc.page_content for doc in result]
-        # B appears in both lists → highest RRF score
-        assert contents[0] == "Content B"
-        assert len(result) == 3
-
-    def test_rrf_merge_empty_lists(self) -> None:
-        """RRF with empty input returns empty output."""
-        result = RAGAgent._rrf_merge([[], []])
-        assert result == []
-
-    # ── Metadata filtering tests ──────────────────────────────
-
-    def test_resolve_category_filter_metric(self) -> None:
-        """intent=metric → category filter 'metrics'."""
-        mock_llm = MagicMock()
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._resolve_category_filter({"intent": "metric"})
-        assert result == "metrics"
-
-    def test_resolve_category_filter_general(self) -> None:
-        """intent=general → no category filter."""
-        mock_llm = MagicMock()
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent._resolve_category_filter({"intent": "general"})
-        assert result is None
-
-    # ── BM25 search tests ─────────────────────────────────────
-
-    def test_bm25_search_returns_results(self) -> None:
-        """BM25 search delegates to bm25_index when available."""
-        mock_llm = MagicMock()
-        mock_retriever = MagicMock()
-        mock_bm25 = MagicMock()
-        doc = self._make_mock_doc("BM25 result", "doc.md")
-        mock_bm25.search.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever, bm25_index=mock_bm25)
-        result = agent._bm25_search("scope_drop", k=4)
-
-        assert len(result) == 1
-        assert result[0].page_content == "BM25 result"
-        mock_bm25.search.assert_called_once_with("scope_drop", k=4, category=None)
-
-    def test_bm25_search_without_index(self) -> None:
-        """BM25 search returns empty when index is None."""
-        mock_llm = MagicMock()
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)  # no bm25_index
-
-        result = agent._bm25_search("test")
-        assert result == []
-
-    # ── Hybrid search integration tests ───────────────────────
-
-    def test_hybrid_search_combines_bm25_and_vector(self) -> None:
-        """Hybrid search uses both BM25 and vector, merges with RRF."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
-        ]
-        mock_retriever = MagicMock()
-
-        # Vector search returns doc_a
-        mock_vector_store = MagicMock()
-        doc_a = self._make_mock_doc("Vector result", "vec.md", "metrics")
-        mock_vector_store.similarity_search.return_value = [doc_a]
-
-        # BM25 returns doc_b
-        mock_bm25 = MagicMock()
-        doc_b = self._make_mock_doc("BM25 result", "bm25.md", "metrics")
-        mock_bm25.search.return_value = [doc_b]
-
-        agent = RAGAgent(mock_llm, mock_retriever, mock_vector_store, mock_bm25)
-        result = agent.process({"original_query": "scope_drop", "intent": "metric"})
-
-        assert result["rag_response"] == "Final answer"
-        # Both sources should be present (from vector and BM25)
-        assert len(result["rag_sources"]) >= 1
-        mock_vector_store.similarity_search.assert_called()
-        mock_bm25.search.assert_called()
-
-    def test_hybrid_search_vector_only_fallback(self) -> None:
-        """Without bm25_index, falls back to vector-only search."""
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = "Answer"
         mock_retriever = MagicMock()
-
-        mock_vector_store = MagicMock()
-        doc = self._make_mock_doc("Vector doc", "v.md")
-        mock_vector_store.similarity_search.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever, mock_vector_store)  # no bm25
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Answer"
-        mock_vector_store.similarity_search.assert_called()
-
-    def test_hybrid_search_with_category_filter(self) -> None:
-        """intent=metric passes category='metrics' to vector search filter."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
+        mock_retriever.invoke.return_value = [
+            self._make_mock_doc("Important context here"),
         ]
-        mock_retriever = MagicMock()
+        agent = RAGAgent(mock_llm, mock_retriever)
 
-        mock_vector_store = MagicMock()
-        doc = self._make_mock_doc("Metric doc", "m.md", "metrics")
-        mock_vector_store.similarity_search.return_value = [doc]
+        agent.process({"original_query": "My question?"})
 
-        agent = RAGAgent(mock_llm, mock_retriever, mock_vector_store)
-        agent.process({"original_query": "scope_drop", "intent": "metric"})
-
-        # Verify filter was passed to similarity_search
-        call_kwargs = mock_vector_store.similarity_search.call_args_list[0]
-        assert call_kwargs.kwargs.get("filter") is not None
-
-    # ── BM25Index class test ──────────────────────────────────
-
-    def test_bm25_index_search_with_category_filter(self) -> None:
-        """BM25Index.search filters by category metadata."""
-        from hse_prom_prog.rag.bm25_index import BM25Index
-
-        doc_metrics = MagicMock()
-        doc_metrics.page_content = "scope drop definition and calculation"
-        doc_metrics.metadata = {"source": "scope.md", "category": "metrics"}
-
-        doc_agile = MagicMock()
-        doc_agile.page_content = "general agile practices overview"
-        doc_agile.metadata = {"source": "agile.md", "category": "agile"}
-
-        index = BM25Index([doc_metrics, doc_agile])
-
-        # Without filter: both docs are candidates
-        results_all = index.search("scope drop", k=4)
-        assert len(results_all) >= 1
-
-        # With metrics filter: only metrics doc
-        results_filtered = index.search("scope drop", k=4, category="metrics")
-        for doc in results_filtered:
-            assert doc.metadata["category"] == "metrics"
+        prompt = mock_llm.invoke.call_args[0][0]
+        assert "Important context here" in prompt
+        assert "My question?" in prompt
 
 
 # ────────────────────────────────────────────────────────────────
-# Reranker
+# Ingestion Pipeline
 # ────────────────────────────────────────────────────────────────
 
 
-class TestReranker:
-    """Tests for the cross-encoder Reranker."""
+class TestIngestion:
+    """Tests for simplified ingestion pipeline."""
 
-    def _make_mock_doc(self, content: str, source: str = "doc.md", category: str = "agile"):
-        """Create a mock LangChain Document."""
-        doc = MagicMock()
-        doc.page_content = content
-        doc.metadata = {"source": source, "category": category}
-        return doc
-
-    @patch("hse_prom_prog.rag.reranker.CrossEncoder")
-    def test_rerank_scores_and_filters(self, mock_ce_cls: MagicMock) -> None:
-        """Docs below threshold are filtered out."""
-        from hse_prom_prog.rag.reranker import Reranker
-
-        mock_model = MagicMock()
-        mock_model.predict.return_value = np.array([0.9, 0.1, 0.7, 0.2, 0.5])
-        mock_ce_cls.return_value = mock_model
-
-        reranker = Reranker(model_name="test-model", threshold=0.3, top_n=5)
-        docs = [self._make_mock_doc(f"Doc {i}") for i in range(5)]
-        result = reranker.rerank("test query", docs)
-
-        # Scores 0.1, 0.2 are below threshold 0.3 → filtered out
-        assert len(result) == 3
-        mock_model.predict.assert_called_once()
-
-    @patch("hse_prom_prog.rag.reranker.CrossEncoder")
-    def test_rerank_respects_top_n(self, mock_ce_cls: MagicMock) -> None:
-        """Only top_n documents returned even if more pass threshold."""
-        from hse_prom_prog.rag.reranker import Reranker
-
-        mock_model = MagicMock()
-        mock_model.predict.return_value = np.array([0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.35, 0.31])
-        mock_ce_cls.return_value = mock_model
-
-        reranker = Reranker(model_name="test-model", threshold=0.3, top_n=3)
-        docs = [self._make_mock_doc(f"Doc {i}") for i in range(8)]
-        result = reranker.rerank("test query", docs)
-
-        assert len(result) == 3
-
-    @patch("hse_prom_prog.rag.reranker.CrossEncoder")
-    def test_rerank_empty_input(self, mock_ce_cls: MagicMock) -> None:
-        """Empty document list returns empty, predict not called."""
-        from hse_prom_prog.rag.reranker import Reranker
-
-        mock_model = MagicMock()
-        mock_ce_cls.return_value = mock_model
-
-        reranker = Reranker(model_name="test-model", threshold=0.3, top_n=5)
-        result = reranker.rerank("test query", [])
-
-        assert result == []
-        mock_model.predict.assert_not_called()
-
-    @patch("hse_prom_prog.rag.reranker.CrossEncoder")
-    def test_rerank_all_below_threshold(self, mock_ce_cls: MagicMock) -> None:
-        """All docs below threshold → empty result."""
-        from hse_prom_prog.rag.reranker import Reranker
-
-        mock_model = MagicMock()
-        mock_model.predict.return_value = np.array([0.1, 0.05, 0.2])
-        mock_ce_cls.return_value = mock_model
-
-        reranker = Reranker(model_name="test-model", threshold=0.3, top_n=5)
-        docs = [self._make_mock_doc(f"Doc {i}") for i in range(3)]
-        result = reranker.rerank("test query", docs)
-
-        assert result == []
-
-    def test_lost_in_the_middle_reorder(self) -> None:
-        """Most relevant docs placed at start and end, weakest in middle."""
-        from hse_prom_prog.rag.reranker import Reranker
-
-        docs = [self._make_mock_doc(f"Doc {i}") for i in range(5)]
-        scored_docs = [
-            (0.9, docs[0]),  # best
-            (0.7, docs[1]),  # 2nd
-            (0.5, docs[2]),  # 3rd
-            (0.3, docs[3]),  # 4th
-            (0.1, docs[4]),  # 5th
-        ]
-        result = Reranker._lost_in_the_middle_reorder(scored_docs)
-
-        # Expected: [best, 3rd, 5th, 4th, 2nd]
-        assert result[0].page_content == "Doc 0"  # best at start
-        assert result[-1].page_content == "Doc 1"  # 2nd-best at end
-        assert result[2].page_content == "Doc 4"  # weakest in middle
-        assert len(result) == 5
-
-    # ── RAGAgent reranking integration ─────────────────────────
-
-    def test_rerank_integration_filters_docs(self) -> None:
-        """Reranker in RAGAgent filters out low-scoring docs."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
-        ]
-        mock_retriever = MagicMock()
-
-        doc_a = self._make_mock_doc("Kept doc", "kept.md")
-        doc_b = self._make_mock_doc("Dropped doc", "dropped.md")
-        mock_retriever.invoke.return_value = [doc_a, doc_b]
-
-        mock_reranker = MagicMock()
-        mock_reranker.rerank.return_value = [doc_a]  # drops doc_b
-
-        agent = RAGAgent(mock_llm, mock_retriever, reranker=mock_reranker)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Final answer"
-        assert "agile/kept.md" in result["rag_sources"]
-        mock_reranker.rerank.assert_called()
-
-    def test_rerank_disabled_when_no_reranker(self) -> None:
-        """Without reranker, docs pass through unchanged."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "Answer"
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Content", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever)  # no reranker
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Answer"
-        assert "agile/doc.md" in result["rag_sources"]
-
-    def test_rerank_failure_falls_back(self) -> None:
-        """Reranker error → docs returned in original order."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "Answer"
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Content", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        mock_reranker = MagicMock()
-        mock_reranker.rerank.side_effect = RuntimeError("model crashed")
-
-        agent = RAGAgent(mock_llm, mock_retriever, reranker=mock_reranker)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Answer"
-        assert "agile/doc.md" in result["rag_sources"]
-
-    def test_rerank_returns_empty_gives_none_response(self) -> None:
-        """Reranker returns empty → rag_response is None."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",
-            "variant 1",
-            "hyde doc",
-        ]
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Content", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        mock_reranker = MagicMock()
-        mock_reranker.rerank.return_value = []  # all below threshold
-
-        agent = RAGAgent(mock_llm, mock_retriever, reranker=mock_reranker)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] is None
-        assert result["rag_sources"] == []
-
-    def test_retrieve_with_reranker_full_pipeline(self) -> None:
-        """Full pipeline: multi-query + hybrid + reranking."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten query",  # _rewrite_query
-            "v1\nv2",  # _generate_multi_queries
-            "hypothetical answer",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
-        ]
-        mock_retriever = MagicMock()
-
-        doc1 = self._make_mock_doc("Doc 1", "d1.md")
-        doc2 = self._make_mock_doc("Doc 2", "d2.md")
-        doc3 = self._make_mock_doc("Doc 3", "d3.md")
-        mock_retriever.invoke.return_value = [doc1, doc2, doc3]
-
-        mock_reranker = MagicMock()
-        mock_reranker.rerank.return_value = [doc1, doc3]  # keeps 2 of 3
-
-        agent = RAGAgent(mock_llm, mock_retriever, reranker=mock_reranker)
-        result = agent.process({"original_query": "scope_drop"})
-
-        assert result["rag_response"] == "Final answer"
-        sources = result["rag_sources"]
-        assert "agile/d1.md" in sources
-        assert "agile/d3.md" in sources
-        mock_reranker.rerank.assert_called_once()
-
-
-# ────────────────────────────────────────────────────────────────
-# Context Assembly (Parent-Child Chunking, Dedup, Metadata)
-# ────────────────────────────────────────────────────────────────
-
-
-class TestContextAssembly:
-    """Tests for parent-child chunking, parent-level dedup, and structured metadata."""
-
-    def _make_mock_doc(self, content: str, source: str = "doc.md", category: str = "agile"):
-        """Create a mock LangChain Document."""
-        doc = MagicMock()
-        doc.page_content = content
-        doc.metadata = {"source": source, "category": category}
-        return doc
-
-    # ── Section extraction ───────────────────────────────────
-
-    def test_extract_section_finds_markdown_heading(self) -> None:
-        """Section extraction finds the first markdown heading."""
-        from hse_prom_prog.rag.ingest import _extract_section
-
-        text = "Some preamble\n## Описание метрики\nContent here"
-        assert _extract_section(text) == "Описание метрики"
-
-    def test_extract_section_no_heading(self) -> None:
-        """Section extraction returns em-dash when no heading found."""
-        from hse_prom_prog.rag.ingest import _extract_section
-
-        text = "Plain text without any headings at all."
-        assert _extract_section(text) == "\u2014"
-
-    # ── Parent-child splitting ───────────────────────────────
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_split_parent_child_metadata(self, mock_settings: MagicMock) -> None:
-        """Parent-child split adds parent_id, parent_content, section to children."""
+    def test_split_documents_produces_chunks(self) -> None:
+        """_split_documents splits long text into chunks."""
         from langchain_core.documents import Document
 
-        from hse_prom_prog.rag.ingest import _split_parent_child
+        from hse_prom_prog.rag.ingest import _split_documents
 
-        mock_settings.parent_chunk_size = 200
-        mock_settings.parent_chunk_overlap = 0
-        mock_settings.child_chunk_size = 50
-        mock_settings.child_chunk_overlap = 0
+        docs = [Document(page_content="word " * 500, metadata={"source": "test.md"})]
+        chunks = _split_documents(docs)
 
-        doc = Document(
-            page_content="# My Section\n" + "A" * 180,
-            metadata={"source": "test.md", "category": "agile"},
-        )
-        children = _split_parent_child([doc])
+        assert len(chunks) > 1
+        for chunk in chunks:
+            assert len(chunk.page_content) <= 1000 + 50  # small margin for word boundaries
 
-        assert len(children) > 0
-        for child in children:
-            assert "parent_id" in child.metadata
-            assert "parent_content" in child.metadata
-            assert "section" in child.metadata
-            assert "chunk_index" in child.metadata
-            assert child.metadata["section"] == "My Section"
-            assert len(child.metadata["parent_id"]) == 36  # UUID format
-        # chunk_index is sequential within parent
-        indices = [c.metadata["chunk_index"] for c in children]
-        assert indices == list(range(len(children)))
-
-    # ── Parent resolution + dedup ────────────────────────────
-
-    def test_resolve_parents_dedup_by_parent_id(self) -> None:
-        """Two children with same parent_id resolve to a single parent."""
-        child1 = self._make_mock_doc("child chunk 1")
-        child1.metadata["parent_id"] = "pid-1"
-        child1.metadata["parent_content"] = "Full parent content here"
-
-        child2 = self._make_mock_doc("child chunk 2")
-        child2.metadata["parent_id"] = "pid-1"
-        child2.metadata["parent_content"] = "Full parent content here"
-
-        result = RAGAgent._resolve_parents([child1, child2])
-
-        assert len(result) == 1
-        assert result[0].page_content == "Full parent content here"
-
-    def test_resolve_parents_different_parents(self) -> None:
-        """Children from different parents both survive dedup."""
-        child1 = self._make_mock_doc("child chunk 1")
-        child1.metadata["parent_id"] = "pid-1"
-        child1.metadata["parent_content"] = "Parent 1 content"
-
-        child2 = self._make_mock_doc("child chunk 2")
-        child2.metadata["parent_id"] = "pid-2"
-        child2.metadata["parent_content"] = "Parent 2 content"
-
-        result = RAGAgent._resolve_parents([child1, child2])
-
-        assert len(result) == 2
-        contents = {doc.page_content for doc in result}
-        assert "Parent 1 content" in contents
-        assert "Parent 2 content" in contents
-
-    def test_resolve_parents_backward_compat(self) -> None:
-        """Docs without parent_content/parent_id fall back to page_content."""
-        doc1 = self._make_mock_doc("Old chunk A")
-        doc2 = self._make_mock_doc("Old chunk B")
-
-        result = RAGAgent._resolve_parents([doc1, doc2])
-
-        assert len(result) == 2
-        assert result[0].page_content == "Old chunk A"
-        assert result[1].page_content == "Old chunk B"
-
-    def test_resolve_parents_backward_compat_duplicate(self) -> None:
-        """Docs without parent_id with identical page_content are deduped."""
-        doc1 = self._make_mock_doc("Same content")
-        doc2 = self._make_mock_doc("Same content")
-
-        result = RAGAgent._resolve_parents([doc1, doc2])
-
-        assert len(result) == 1
-
-    # ── Structured metadata formatting ───────────────────────
-
-    def test_format_context_block_with_page(self) -> None:
-        """Context block includes source, section, and page for PDF docs."""
-        doc = self._make_mock_doc("Content text here", "metrics/done_total.pdf")
-        doc.metadata["section"] = "Описание метрики"
-        doc.metadata["page"] = 3
-
-        result = RAGAgent._format_context_block(doc)
-
-        assert "[Источник: done_total.pdf" in result
-        assert "Раздел: Описание метрики" in result
-        assert "Стр. 3" in result
-        assert "Content text here" in result
-
-    def test_format_context_block_without_page(self) -> None:
-        """Context block omits page for Markdown docs."""
-        doc = self._make_mock_doc("Content text here", "agile/practices.md")
-        doc.metadata["section"] = "Definition of Done"
-
-        result = RAGAgent._format_context_block(doc)
-
-        assert "[Источник: practices.md" in result
-        assert "Раздел: Definition of Done" in result
-        assert "Стр." not in result
-        assert "Content text here" in result
-
-    def test_format_context_block_no_section(self) -> None:
-        """Context block uses em-dash for section when metadata is missing."""
-        doc = self._make_mock_doc("Content", "doc.md")
-
-        result = RAGAgent._format_context_block(doc)
-
-        assert "\u2014" in result  # em-dash as fallback section
-
-
-# ────────────────────────────────────────────────────────────────
-# Semantic Chunking Pipeline
-# ────────────────────────────────────────────────────────────────
-
-
-class TestTableDetection:
-    """Tests for _detect_table_blocks regex-based table detection."""
-
-    def test_detect_pipe_table(self) -> None:
-        """Pipe-delimited table (3+ lines) is detected."""
-        from hse_prom_prog.rag.ingest import _detect_table_blocks
-
-        text = "Some text\n| A | B | C |\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |\nMore text"
-        regions = _detect_table_blocks(text)
-        assert len(regions) == 1
-        assert regions[0] == (1, 3)
-
-    def test_detect_whitespace_table(self) -> None:
-        """Multi-column whitespace-aligned table is detected."""
-        from hse_prom_prog.rag.ingest import _detect_table_blocks
-
-        text = "Header\nCol1  Col2  Col3\nA     B     C\nD     E     F\nEnd"
-        regions = _detect_table_blocks(text)
-        assert len(regions) == 1
-
-    def test_no_table_detected(self) -> None:
-        """Plain text without tables returns empty list."""
-        from hse_prom_prog.rag.ingest import _detect_table_blocks
-
-        text = "Just some regular text.\nAnother line.\nThird line."
-        regions = _detect_table_blocks(text)
-        assert regions == []
-
-    def test_short_run_not_detected(self) -> None:
-        """Only 2 consecutive table lines (below threshold of 3) are not detected."""
-        from hse_prom_prog.rag.ingest import _detect_table_blocks
-
-        text = "Text\n| A | B |\n| 1 | 2 |\nMore text"
-        regions = _detect_table_blocks(text)
-        assert regions == []
-
-    def test_multiple_tables(self) -> None:
-        """Multiple separate table regions are all detected."""
-        from hse_prom_prog.rag.ingest import _detect_table_blocks
-
-        text = (
-            "Intro\n| A | B |\n| 1 | 2 |\n| 3 | 4 |\n"
-            "Middle text\n| X | Y |\n| 5 | 6 |\n| 7 | 8 |\nEnd"
-        )
-        regions = _detect_table_blocks(text)
-        assert len(regions) == 2
-
-
-class TestSplitTextPreservingTables:
-    """Tests for _split_text_preserving_tables."""
-
-    def test_no_tables_splits_normally(self) -> None:
-        """Text without tables is split by the parent splitter."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-        from hse_prom_prog.rag.ingest import _split_text_preserving_tables
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0)
-        text = "A" * 200
-        segments = _split_text_preserving_tables(text, splitter)
-        assert all(not is_table for _, is_table in segments)
-        assert len(segments) >= 2
-
-    def test_table_preserved_as_atomic(self) -> None:
-        """Table region is kept as one atomic chunk."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-        from hse_prom_prog.rag.ingest import _split_text_preserving_tables
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=50, chunk_overlap=0)
-        text = "Before\n| A | B |\n| 1 | 2 |\n| 3 | 4 |\nAfter"
-        segments = _split_text_preserving_tables(text, splitter)
-        table_segments = [(t, f) for t, f in segments if f]
-        assert len(table_segments) == 1
-
-    def test_mixed_content_preserves_order(self) -> None:
-        """Non-table, table, non-table segments maintain document order."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-        from hse_prom_prog.rag.ingest import _split_text_preserving_tables
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
-        text = "Before text.\n| A | B |\n| 1 | 2 |\n| 3 | 4 |\nAfter text."
-        segments = _split_text_preserving_tables(text, splitter)
-        flags = [is_table for _, is_table in segments]
-        assert flags == [False, True, False]
-
-
-class TestMarkdownSemantic:
-    """Tests for _split_markdown_semantically."""
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_heading_based_split(self, mock_settings: MagicMock) -> None:
-        """Markdown is split on headings; section metadata derived from heading."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_markdown_semantically
-
-        mock_settings.parent_chunk_size = 1500
-        mock_settings.parent_chunk_overlap = 200
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-        doc = Document(
-            page_content=("# Title\nIntro\n## Section A\nContent A\n## Section B\nContent B"),
-            metadata={"source": "test.md", "category": "agile"},
-        )
-        parents = _split_markdown_semantically([doc], splitter)
-        sections = [p.metadata["section"] for p in parents]
-        assert "Section A" in sections
-        assert "Section B" in sections
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_oversized_section_falls_back(self, mock_settings: MagicMock) -> None:
-        """Section exceeding parent_chunk_size is further split."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_markdown_semantically
-
-        mock_settings.parent_chunk_size = 100
-        mock_settings.parent_chunk_overlap = 0
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0)
-        doc = Document(
-            page_content="# Big Section\n" + "A " * 200,
-            metadata={"source": "test.md", "category": "agile"},
-        )
-        parents = _split_markdown_semantically([doc], splitter)
-        assert len(parents) > 1
-        for p in parents:
-            assert p.metadata["section"] == "Big Section"
-
-
-class TestPdfWithTables:
-    """Tests for _split_pdf_with_tables."""
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_table_gets_is_table_metadata(self, mock_settings: MagicMock) -> None:
-        """PDF table region gets is_table=True metadata."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_pdf_with_tables
-
-        mock_settings.parent_chunk_size = 500
-        mock_settings.parent_chunk_overlap = 0
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
-        doc = Document(
-            page_content="Intro text.\n| A | B |\n| 1 | 2 |\n| 3 | 4 |\nEnd text.",
-            metadata={"source": "test.pdf", "category": "metrics", "page": 0},
-        )
-        parents = _split_pdf_with_tables([doc], splitter)
-        table_parents = [p for p in parents if p.metadata.get("is_table")]
-        assert len(table_parents) == 1
-        assert table_parents[0].metadata["section"] == "Table"
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_non_table_text_gets_section(self, mock_settings: MagicMock) -> None:
-        """Non-table PDF text gets section from _extract_section."""
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_pdf_with_tables
-
-        mock_settings.parent_chunk_size = 500
-        mock_settings.parent_chunk_overlap = 0
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
-        doc = Document(
-            page_content="## My Section\nSome content here.",
-            metadata={"source": "test.pdf", "category": "metrics", "page": 0},
-        )
-        parents = _split_pdf_with_tables([doc], splitter)
-        assert parents[0].metadata["section"] == "My Section"
-        assert parents[0].metadata.get("is_table") is False
-
-
-class TestMetadataEnrichment:
-    """Tests for metadata enrichment: filename, chunk_index, is_table."""
-
-    def test_enrich_metadata_adds_filename(self) -> None:
-        """_enrich_metadata adds filename from source path."""
-        from pathlib import Path
-
+    def test_enrich_metadata_adds_category(self) -> None:
+        """_enrich_metadata extracts category from sub-folder name."""
         from langchain_core.documents import Document
 
         from hse_prom_prog.rag.ingest import _enrich_metadata
 
+        kb_dir = Path("/data/knowledge_base")
         doc = Document(
             page_content="test",
-            metadata={"source": "/kb/metrics/done_total.pdf"},
+            metadata={"source": "/data/knowledge_base/metrics/scope_drop.md"},
         )
-        _enrich_metadata(doc, Path("/kb"))
-        assert doc.metadata["filename"] == "done_total.pdf"
+        _enrich_metadata(doc, kb_dir)
 
-    def test_enrich_metadata_empty_source(self) -> None:
-        """_enrich_metadata handles empty source gracefully."""
-        from pathlib import Path
+        assert doc.metadata["category"] == "metrics"
+        assert "ingested_at" in doc.metadata
 
+    def test_enrich_metadata_general_fallback(self) -> None:
+        """_enrich_metadata falls back to 'general' for root-level files."""
         from langchain_core.documents import Document
 
         from hse_prom_prog.rag.ingest import _enrich_metadata
 
-        doc = Document(page_content="test", metadata={"source": ""})
-        _enrich_metadata(doc, Path("/kb"))
-        assert doc.metadata["filename"] == "unknown"
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_split_parent_child_adds_chunk_index(self, mock_settings: MagicMock) -> None:
-        """Child chunks get sequential chunk_index (0-based)."""
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_parent_child
-
-        mock_settings.parent_chunk_size = 200
-        mock_settings.parent_chunk_overlap = 0
-        mock_settings.child_chunk_size = 50
-        mock_settings.child_chunk_overlap = 0
-
+        kb_dir = Path("/data/knowledge_base")
         doc = Document(
-            page_content="A" * 180,
-            metadata={"source": "/path/to/doc.pdf", "category": "metrics"},
+            page_content="test",
+            metadata={"source": "/data/knowledge_base/readme.md"},
         )
-        children = _split_parent_child([doc])
-        indices = [c.metadata["chunk_index"] for c in children]
-        assert indices == list(range(len(children)))
+        _enrich_metadata(doc, kb_dir)
 
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_split_parent_child_filename_metadata(self, mock_settings: MagicMock) -> None:
-        """Children preserve filename from enriched metadata."""
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_parent_child
-
-        mock_settings.parent_chunk_size = 200
-        mock_settings.parent_chunk_overlap = 0
-        mock_settings.child_chunk_size = 50
-        mock_settings.child_chunk_overlap = 0
-
-        doc = Document(
-            page_content="Content " * 30,
-            metadata={
-                "source": "/kb/metrics/done_total.pdf",
-                "category": "metrics",
-                "filename": "done_total.pdf",
-            },
-        )
-        children = _split_parent_child([doc])
-        for child in children:
-            assert child.metadata["filename"] == "done_total.pdf"
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_split_parent_child_table_is_atomic(self, mock_settings: MagicMock) -> None:
-        """PDF table chunks skip child splitting and have is_table=True."""
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_parent_child
-
-        mock_settings.parent_chunk_size = 500
-        mock_settings.parent_chunk_overlap = 0
-        mock_settings.child_chunk_size = 50
-        mock_settings.child_chunk_overlap = 0
-
-        table_text = "| Col1 | Col2 | Col3 |\n| A | B | C |\n| D | E | F |\n| G | H | I |"
-        doc = Document(
-            page_content=table_text,
-            metadata={"source": "/kb/metrics/done_total.pdf", "category": "metrics"},
-        )
-        children = _split_parent_child([doc])
-        assert len(children) == 1
-        assert children[0].metadata.get("is_table") is True
-        assert children[0].metadata["chunk_index"] == 0
-
-    @patch("hse_prom_prog.rag.ingest.settings")
-    def test_split_parent_child_md_heading_section(self, mock_settings: MagicMock) -> None:
-        """Markdown doc gets section from heading via MarkdownHeaderTextSplitter."""
-        from langchain_core.documents import Document
-
-        from hse_prom_prog.rag.ingest import _split_parent_child
-
-        mock_settings.parent_chunk_size = 1500
-        mock_settings.parent_chunk_overlap = 0
-        mock_settings.child_chunk_size = 50
-        mock_settings.child_chunk_overlap = 0
-
-        doc = Document(
-            page_content="## My Heading\nContent about this topic " * 10,
-            metadata={"source": "test.md", "category": "agile"},
-        )
-        children = _split_parent_child([doc])
-        for child in children:
-            assert child.metadata["section"] == "My Heading"
-
-
-# ────────────────────────────────────────────────────────────────
-# Faithfulness Check
-# ────────────────────────────────────────────────────────────────
-
-
-class TestFaithfulness:
-    """Tests for faithfulness check, citation instructions, and conflict handling."""
-
-    def _make_mock_doc(self, content: str, source: str = "doc.md", category: str = "agile"):
-        """Create a mock LangChain Document."""
-        doc = MagicMock()
-        doc.page_content = content
-        doc.metadata = {"source": source, "category": category}
-        return doc
-
-    # ── Unit tests for _check_faithfulness ────────────────────
-
-    def test_faithfulness_check_passes(self) -> None:
-        """LLM returns 'FAITHFUL' → check returns True."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "FAITHFUL"
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        assert agent._check_faithfulness("answer", "context") is True
-
-    def test_faithfulness_check_fails(self) -> None:
-        """LLM returns 'UNFAITHFUL' → check returns False."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "UNFAITHFUL"
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        assert agent._check_faithfulness("answer", "context") is False
-
-    def test_faithfulness_check_with_extra_text(self) -> None:
-        """Whitespace/case variations handled correctly."""
-        mock_llm = MagicMock()
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        mock_llm.invoke.return_value = "  faithful  "
-        assert agent._check_faithfulness("a", "c") is True
-
-        mock_llm.invoke.return_value = "UNFAITHFUL - some claims not supported"
-        assert agent._check_faithfulness("a", "c") is False
-
-    # ── Prompt verification ───────────────────────────────────
-
-    def test_generate_answer_prompt_has_citation_instructions(self) -> None:
-        """Generation prompt includes citation format and conflict instructions."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "answer"
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        agent._generate_answer("test query", "test context", ["source.md"])
-
-        prompt = mock_llm.invoke.call_args[0][0]
-        assert "[имя_файла, стр. N]" in prompt
-        assert "противоречие" in prompt
-
-    def test_check_faithfulness_prompt_structure(self) -> None:
-        """Faithfulness prompt contains context, answer, and verdict sections."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "FAITHFUL"
-        mock_retriever = MagicMock()
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        agent._check_faithfulness("test answer", "test context")
-
-        prompt = mock_llm.invoke.call_args[0][0]
-        assert "КОНТЕКСТ:" in prompt
-        assert "ОТВЕТ:" in prompt
-        assert "Вердикт:" in prompt
-
-    # ── Integration tests for process() faithfulness loop ─────
-
-    def test_process_faithful_no_warning(self) -> None:
-        """Faithful answer → no warning appended."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            "FAITHFUL",  # _check_faithfulness
-        ]
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Context", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Final answer"
-        assert "⚠️" not in result["rag_response"]
-
-    def test_process_unfaithful_then_faithful_retry(self) -> None:
-        """First check unfaithful, retry succeeds → no warning."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Bad answer",  # _generate_answer (1st)
-            "UNFAITHFUL",  # _check_faithfulness (1st)
-            "Good answer",  # _generate_answer (retry)
-            "FAITHFUL",  # _check_faithfulness (retry)
-        ]
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Context", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Good answer"
-        assert "⚠️" not in result["rag_response"]
-
-    def test_process_unfaithful_both_times_warning(self) -> None:
-        """Both checks unfaithful → warning appended to retry answer."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Bad answer",  # _generate_answer (1st)
-            "UNFAITHFUL",  # _check_faithfulness (1st)
-            "Still bad answer",  # _generate_answer (retry)
-            "UNFAITHFUL",  # _check_faithfulness (retry)
-        ]
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Context", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert "⚠️" in result["rag_response"]
-        assert "Still bad answer" in result["rag_response"]
-
-    def test_process_faithfulness_check_error_skips(self) -> None:
-        """Faithfulness check raises → original answer returned, no warning."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Final answer",  # _generate_answer
-            ConnectionError("LLM down"),  # _check_faithfulness error
-        ]
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Context", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Final answer"
-        assert "⚠️" not in result["rag_response"]
-
-    def test_process_faithfulness_retry_error(self) -> None:
-        """Unfaithful + retry raises → warning on original answer."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.side_effect = [
-            "rewritten",  # _rewrite_query
-            "variant 1",  # _generate_multi_queries
-            "hyde doc",  # _generate_hyde_document
-            "Bad answer",  # _generate_answer (1st)
-            "UNFAITHFUL",  # _check_faithfulness (1st)
-            ConnectionError("LLM down"),  # _generate_answer retry error
-        ]
-        mock_retriever = MagicMock()
-        doc = self._make_mock_doc("Context", "doc.md")
-        mock_retriever.invoke.return_value = [doc]
-
-        agent = RAGAgent(mock_llm, mock_retriever)
-        result = agent.process({"original_query": "test"})
-
-        assert "⚠️" in result["rag_response"]
-        assert "Bad answer" in result["rag_response"]
+        assert doc.metadata["category"] == "general"
 
 
 # ────────────────────────────────────────────────────────────────
