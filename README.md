@@ -39,6 +39,10 @@ PostgreSQL, Qdrant, Celery, Redis, nginx.
   - [Маршруты nginx](#маршруты-nginx)
   - [Запуск production-стека](#запуск-production-стека)
   - [Проверка](#проверка)
+- [Оценка RAG-пайплайна (RAGAS)](#оценка-rag-пайплайна-ragas)
+  - [Golden Dataset](#golden-dataset)
+  - [Запуск оценки](#запуск-оценки)
+  - [Сравнение экспериментов](#сравнение-экспериментов)
 - [Разработка](#разработка)
   - [Установка dev-зависимостей](#установка-dev-зависимостей)
   - [Code Quality](#code-quality)
@@ -242,6 +246,13 @@ hse-prom-prog/
 │   └── style.css                      # Custom CSS
 ├── .streamlit/
 │   └── config.toml                    # Streamlit theme
+├── eval/
+│   ├── __init__.py
+│   ├── golden_dataset.json            # 41 вопрос для оценки RAG
+│   ├── metrics.py                     # RAGAS-метрики (GPT-5.2 as judge)
+│   ├── run_eval.py                    # CLI: запуск оценки
+│   ├── compare.py                     # CLI: сравнение экспериментов
+│   └── results/                       # Результаты (gitignored)
 ├── tests/
 │   ├── __init__.py
 │   └── test_workflow.py               # 65 тестов (все агенты + workflow)
@@ -271,8 +282,8 @@ cd hse-prom-prog
 # Скачайте все ветки
 git fetch --all
 
-# Переключитесь на ветку checkpoint_3
-git checkout checkpoint_3
+# Переключитесь на ветку checkpoint_5
+git checkout checkpoint_5
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -403,6 +414,10 @@ POSTGRES_DB=hse_jira_db
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=business_docs
 EMBEDDING_MODEL=intfloat/multilingual-e5-base
+
+# VSELLM (LLM-as-judge для RAGAS evaluation)
+VSELLM_API_KEY=your-vsellm-api-key
+VSELLM_BASE_URL=https://api.vsellm.ru/v1
 
 # Logging
 LOG_LEVEL=INFO
@@ -859,6 +874,112 @@ docker compose exec api ps aux | grep gunicorn
 curl http://localhost:6333/healthz
 ```
 
+## Оценка RAG-пайплайна (RAGAS)
+
+Модуль `eval/` реализует автоматическую оценку качества RAG-пайплайна с помощью
+фреймворка [RAGAS](https://docs.ragas.io/). В качестве LLM-as-judge используется
+GPT-5.2 через OpenAI-compatible API (vsellm).
+
+### Метрики
+
+| Метрика              | Что оценивает                                | Категория  |
+| -------------------- | -------------------------------------------- | ---------- |
+| `context_precision`  | Точность найденных чанков                    | Retrieval  |
+| `context_recall`     | Полнота найденных чанков                     | Retrieval  |
+| `faithfulness`       | Верность ответа контексту (без галлюцинаций) | Generation |
+| `answer_relevancy`   | Релевантность ответа вопросу                 | Generation |
+| `answer_correctness` | Корректность ответа (vs ground truth)        | End-to-end |
+
+### Golden Dataset
+
+Файл `eval/golden_dataset.json` содержит 41 вопрос с эталонными ответами,
+составленными строго по документам из `knowledge_base/`:
+
+| Категория | Вопросов | Описание                                                    |
+| --------- | -------- | ----------------------------------------------------------- |
+| metrics   | 25       | Вопросы по описаниям метрик (done_total, scope_drop и т.д.) |
+| agile     | 6        | Agile-практики, дашборды                                    |
+| cross_doc | 5        | Вопросы, требующие информации из нескольких документов      |
+| negative  | 5        | Вопросы, на которые в базе знаний **нет** ответа            |
+
+Негативные примеры прогоняются через пайплайн, но исключаются из RAGAS-оценки
+(нет ground truth для сравнения).
+
+### Запуск оценки
+
+```bash
+# Запуск с дефолтным именем эксперимента (baseline)
+poetry run python -m eval.run_eval
+
+# Запуск с пользовательским именем
+poetry run python -m eval.run_eval --experiment semantic_v2
+```
+
+Скрипт выполняет:
+
+1. Загружает `golden_dataset.json`
+2. Прогоняет каждый вопрос через RAG-пайплайн (retrieve → generate)
+3. Вычисляет RAGAS-метрики (LLM-as-judge: GPT-5.2 через vsellm)
+4. Сохраняет результаты в `eval/results/{experiment}_{timestamp}.json`
+5. Выводит сводную таблицу в консоль
+
+Формат результата:
+
+```json
+{
+  "experiment": "baseline",
+  "timestamp": "20260310_143000",
+  "config": {
+    "vllm_model": "Qwen/Qwen2.5-3B-Instruct",
+    "embedding_model": "intfloat/multilingual-e5-base",
+    "chunk_size": 1000,
+    "chunk_overlap": 200,
+    "retriever_top_k": 4
+  },
+  "aggregate": {
+    "context_precision": 0.82,
+    "faithfulness": 0.91,
+    "answer_correctness": 0.75
+  },
+  "per_question": [...]
+}
+```
+
+**Требования**: переменные `VSELLM_API_KEY` и `VSELLM_BASE_URL` должны быть
+заданы в `.env` (см. [Конфигурация](#конфигурация)). Qdrant должен быть запущен
+с загруженной базой знаний.
+
+### Сравнение экспериментов
+
+```bash
+# Сравнение двух экспериментов
+poetry run python -m eval.compare \
+  eval/results/baseline_20260310_143000.json \
+  eval/results/semantic_v2_20260310_150000.json
+
+# Сравнение трёх и более
+poetry run python -m eval.compare eval/results/*.json
+```
+
+Выводит:
+
+- Таблицу метрик с дельтами (зелёный — улучшение, красный — деградация)
+- Различия в конфигурациях пайплайна между экспериментами
+
+```
+Metric             baseline           semantic_v2        delta (last − first)
+-----------------  -----------------  -----------------  --------------------
+context_precision  0.8200             0.8900             +0.0700
+faithfulness       0.9100             0.9300             +0.0200
+answer_correctness 0.7500             0.7200             -0.0300
+
+Config differences
+param         baseline                 semantic_v2
+------------  -----------------------  -----------------------
+chunk_size    1000                     512
+chunk_overlap 200                      100
+```
+
 ## Разработка
 
 ### Установка dev-зависимостей
@@ -983,6 +1104,13 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `FASTAPI_HOST` | Хост FastAPI сервера     | `0.0.0.0`    |
 | `FASTAPI_PORT` | Порт FastAPI сервера     | `8080`       |
 | `CORS_ORIGINS` | Разрешённые CORS origins | `*`          |
+
+### VSELLM Configuration (LLM-as-judge)
+
+| Переменная        | Описание                    | По умолчанию               |
+| ----------------- | --------------------------- | -------------------------- |
+| `VSELLM_API_KEY`  | API ключ для vsellm (RAGAS) | —                          |
+| `VSELLM_BASE_URL` | URL vsellm API endpoint     | `https://api.vsellm.ru/v1` |
 
 ### Other
 
