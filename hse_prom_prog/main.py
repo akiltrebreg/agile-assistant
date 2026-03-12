@@ -6,7 +6,6 @@ multi-agent Jira query processing workflow.
 
 import logging
 import sys
-from pathlib import Path
 
 from hse_prom_prog.config import settings
 from hse_prom_prog.graph.workflow import AgileWorkflow

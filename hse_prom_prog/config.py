@@ -23,6 +23,17 @@ class Settings(BaseSettings):
         postgres_password: PostgreSQL password.
         postgres_db: PostgreSQL database name.
         log_level: Logging level for the application.
+        redis_host: Redis host address.
+        redis_port: Redis port number.
+        redis_db: Redis database number.
+        redis_password: Redis password (optional).
+        celery_broker_url: Celery broker URL (optional, defaults to Redis URL).
+        celery_task_track_started: Whether to track task start times.
+        celery_task_time_limit: Hard time limit for tasks in seconds.
+        celery_task_soft_time_limit: Soft time limit for tasks in seconds.
+        fastapi_host: FastAPI server bind address.
+        fastapi_port: FastAPI server port number.
+        fastapi_workers: Number of Uvicorn worker processes.
     """
 
     model_config = SettingsConfigDict(
@@ -88,6 +99,78 @@ class Settings(BaseSettings):
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
     )
 
+    # Redis Configuration
+    redis_host: str = Field(
+        default="localhost",
+        description="Redis host address",
+    )
+    redis_port: int = Field(
+        default=6379,
+        ge=1,
+        le=65535,
+        description="Redis port number",
+    )
+    redis_db: int = Field(
+        default=0,
+        ge=0,
+        le=15,
+        description="Redis database number",
+    )
+    redis_password: str | None = Field(
+        default=None,
+        description="Redis password (optional)",
+    )
+
+    # Celery Configuration
+    celery_broker_url: str | None = Field(
+        default=None,
+        description="Celery broker URL (auto-generated from Redis if not provided)",
+    )
+    celery_task_track_started: bool = Field(
+        default=True,
+        description="Track when tasks are started",
+    )
+    celery_task_time_limit: int = Field(
+        default=600,  # 10 minutes
+        ge=1,
+        description="Hard time limit for tasks (seconds)",
+    )
+    celery_task_soft_time_limit: int = Field(
+        default=300,  # 5 minutes
+        ge=1,
+        description="Soft time limit for tasks (seconds)",
+    )
+
+    # FastAPI Configuration
+    fastapi_host: str = Field(
+        default="0.0.0.0",
+        description="FastAPI server host",
+    )
+    fastapi_port: int = Field(
+        default=8080,
+        ge=1,
+        le=65535,
+        description="FastAPI server port",
+    )
+    fastapi_workers: int = Field(
+        default=1,
+        ge=1,
+        description="Number of Uvicorn workers",
+    )
+    cors_origins: str = Field(
+        default="*",
+        description="Comma-separated list of allowed CORS origins, or '*' for all",
+    )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS origins into a list.
+
+        Returns:
+            List of allowed origins. ['*'] means all origins.
+        """
+        return [origin.strip() for origin in self.cors_origins.split(",")]
+
     @property
     def database_url(self) -> str:
         """Construct PostgreSQL connection URL.
@@ -99,6 +182,29 @@ class Settings(BaseSettings):
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def redis_url(self) -> str:
+        """Construct Redis connection URL.
+
+        Returns:
+            Redis connection string.
+        """
+        if self.redis_password:
+            return (
+                f"redis://:{self.redis_password}@{self.redis_host}:"
+                f"{self.redis_port}/{self.redis_db}"
+            )
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def celery_broker(self) -> str:
+        """Get Celery broker URL.
+
+        Returns:
+            Celery broker connection string (defaults to Redis URL).
+        """
+        return self.celery_broker_url or self.redis_url
 
 
 # Global settings instance

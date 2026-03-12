@@ -1,6 +1,6 @@
 """SQL agent for querying Jira issues from PostgreSQL.
 
-This agent retrieves Jira issue data from PostgreSQL database
+This agent retrieves Jira issue data from report_agile_dashboard table
 using SQLAlchemy for database operations.
 """
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class SQLAgent:
     """Agent that queries PostgreSQL database for Jira issue data.
 
-    This agent executes SQL queries against the jira_issues table
+    This agent executes SQL queries against the report_agile_dashboard table
     and retrieves complete issue information.
 
     Attributes:
@@ -67,23 +67,38 @@ class SQLAgent:
                     sprint_name,
                     start_date,
                     end_date,
+                    complete_date,
+                    activation_date,
                     sprint_state,
+                    issue_department,
                     issue_project,
+                    unit,
+                    cluster,
                     issue_type,
                     feature_teams,
+                    storypoints_act,
                     reporter,
-                    assignee_name,
-                    issue_status_end_of_sprint,
-                    storypoints_start_of_sprint,
-                    storypoints_end_of_sprint,
-                    time_h_in_progress,
-                    time_h_not_fixed,
                     create_time,
+                    resolution_time,
+                    summary,
                     resolution,
+                    issue_status_act,
                     labels,
-                    cluster,
-                    unit
-                FROM jira_issues
+                    issue_status_end_of_sprint,
+                    storypoints_end_of_sprint,
+                    storypoints_start_of_sprint,
+                    storypoints_next_sprint,
+                    assignee_name,
+                    time_h_not_fixed,
+                    time_h_in_progress,
+                    merged_pr_count,
+                    feature_teams_start_of_sprint,
+                    feature_teams_end_of_sprint,
+                    dev_approach,
+                    is_report,
+                    is_tech_debt,
+                    epic_issue_key
+                FROM report_agile_dashboard
                 WHERE issue_key = :issue_key
             """
 

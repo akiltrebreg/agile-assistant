@@ -30,7 +30,11 @@ RUN poetry config virtualenvs.create false && \
 # Copy application code
 COPY hse_prom_prog ./hse_prom_prog
 
-# Copy documentation
+# Copy Alembic migrations
+COPY alembic ./alembic
+COPY alembic.ini ./
+
+# Copy README (referenced by pyproject.toml)
 COPY README.md ./
 
 # Install the package

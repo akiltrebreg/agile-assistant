@@ -71,7 +71,7 @@ class AgileWorkflow:
         # Initialize agents
         self.supervisor = SupervisorAgent(llm_client)
         self.sql_agent = SQLAgent(db_connection=self.db)
-        self.response_agent = ResponseAgent()
+        self.response_agent = ResponseAgent(llm_client)
 
         # Build the graph
         self.graph = self._build_graph()
