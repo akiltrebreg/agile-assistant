@@ -1,0 +1,19 @@
+/* Custom styles for Agile AI Assistant.
+   Served by nginx directly, bypassing the application server. */
+
+:root {
+    --primary-color: #4A90D9;
+    --bg-color: #FFFFFF;
+    --secondary-bg: #F0F2F6;
+    --text-color: #262730;
+}
+
+/* Chat message styling */
+.stChatMessage {
+    border-radius: 12px;
+}
+
+/* Hide Streamlit branding */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
