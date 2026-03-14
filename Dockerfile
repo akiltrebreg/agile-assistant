@@ -34,8 +34,9 @@ COPY hse_prom_prog ./hse_prom_prog
 COPY streamlit_app ./streamlit_app
 COPY .streamlit ./.streamlit
 
-# Copy static assets (served by nginx in production)
+# Copy static assets (served by nginx in production, Streamlit static serving in K8s)
 COPY static ./static
+RUN ln -s /app/static /app/streamlit_app/static
 
 # Copy knowledge base for RAG ingestion
 COPY knowledge_base ./knowledge_base

@@ -26,6 +26,60 @@ spec:
                 port:
                   number: 8080
 ---
+# Ingress for /static/*.svg — serves SVG with correct Content-Type
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agile-assistant-static-svg
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /app/static/$1
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_hide_header Content-Type;
+      add_header Content-Type "image/svg+xml";
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /static/(.*\.svg)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: streamlit
+                port:
+                  number: 8501
+---
+# Ingress for /static/*.css — serves CSS with correct Content-Type
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agile-assistant-static-css
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /app/static/$1
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_hide_header Content-Type;
+      add_header Content-Type "text/css";
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /static/(.*\.css)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: streamlit
+                port:
+                  number: 8501
+---
 # Ingress for Streamlit UI + Swagger + WebSocket
 apiVersion: networking.k8s.io/v1
 kind: Ingress
