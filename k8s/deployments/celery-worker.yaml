@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: agile-assistant
+  labels:
+    app: celery-worker
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: agile-assistant:latest
+          imagePullPolicy: Never
+          command:
+            - celery
+            - -A
+            - hse_prom_prog.tasks.celery_app
+            - worker
+            - --loglevel=info
+            - --pool=threads
+            - --concurrency=4
+          envFrom:
+            - configMapRef:
+                name: app-config
+          readinessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - hse_prom_prog.tasks.celery_app
+                - inspect
+                - ping
+                - --timeout
+                - "10"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 15
+          livenessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - hse_prom_prog.tasks.celery_app
+                - inspect
+                - ping
+                - --timeout
+                - "10"
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 15
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi

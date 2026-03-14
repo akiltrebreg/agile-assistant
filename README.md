@@ -39,6 +39,16 @@ PostgreSQL, Qdrant, Celery, Redis, nginx.
   - [Маршруты nginx](#маршруты-nginx)
   - [Запуск production-стека](#запуск-production-стека)
   - [Проверка](#проверка)
+- [Kubernetes (minikube)](#kubernetes-minikube)
+  - [Требования](#требования-1)
+  - [Структура манифестов](#структура-манифестов)
+  - [Шаг 1: Запуск minikube с GPU](#шаг-1-запуск-minikube-с-gpu)
+  - [Шаг 2: Сборка образов в minikube](#шаг-2-сборка-образов-в-minikube)
+  - [Шаг 3: Развёртывание](#шаг-3-развёртывание)
+  - [Шаг 4: Проверка](#шаг-4-проверка)
+  - [Шаг 5: Использование](#шаг-5-использование)
+  - [Маршруты Ingress](#маршруты-ingress)
+  - [Полезные команды](#полезные-команды)
 - [Оценка RAG-пайплайна (RAGAS)](#оценка-rag-пайплайна-ragas)
   - [Golden Dataset](#golden-dataset)
   - [Запуск оценки](#запуск-оценки)
@@ -872,6 +882,225 @@ docker compose exec api ps aux | grep gunicorn
 
 # Проверить Qdrant
 curl http://localhost:6333/healthz
+```
+
+## Kubernetes (minikube)
+
+Проект можно развернуть в Kubernetes с помощью minikube. Все манифесты находятся
+в `k8s/`.
+
+### Требования
+
+- [minikube](https://minikube.sigs.k8s.io/) v1.38+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- Docker (driver для minikube)
+- NVIDIA GPU + драйверы (для vLLM)
+
+### Структура манифестов
+
+```
+k8s/
+├── namespace.yaml                # Namespace agile-assistant
+├── Dockerfile.postgres           # Custom Postgres image (CSV data baked in)
+├── ingress.yaml                  # Ingress (API rewrite + Streamlit/WebSocket)
+├── configmaps/
+│   ├── app-config.yaml           # Env vars (DNS names, credentials)
+│   └── postgres-init.yaml        # init.sql (schema + COPY)
+├── storage/
+│   ├── postgres-pvc.yaml         # PVC 2Gi
+│   └── qdrant-pvc.yaml           # PVC 2Gi
+├── deployments/
+│   ├── postgres.yaml             # PostgreSQL 16 (custom image)
+│   ├── qdrant.yaml               # Qdrant v1.13.2
+│   ├── redis.yaml                # Redis 7 (ephemeral)
+│   ├── vllm.yaml                 # vLLM (Qwen2.5-3B, GPU)
+│   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
+│   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
+│   └── streamlit.yaml            # Streamlit UI
+└── services/
+    ├── postgres-svc.yaml         # ClusterIP :5432
+    ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
+    ├── redis-svc.yaml            # ClusterIP :6379
+    ├── vllm-svc.yaml             # ClusterIP :8000
+    ├── api-svc.yaml              # ClusterIP :8080
+    └── streamlit-svc.yaml        # ClusterIP :8501
+```
+
+### Шаг 1: Запуск minikube с GPU
+
+```bash
+minikube start --driver=docker --gpus=all --cpus=8 --memory=13000 --disk-size=40g
+```
+
+Включите необходимые аддоны:
+
+```bash
+minikube addons enable ingress
+minikube addons enable metrics-server
+minikube addons enable nvidia-device-plugin
+```
+
+### Шаг 2: Сборка образов в minikube
+
+Переключите Docker-клиент на Docker daemon внутри minikube:
+
+```bash
+eval $(minikube docker-env)
+```
+
+Соберите образы:
+
+```bash
+# Основной образ приложения (API, Celery, Streamlit)
+docker build -t agile-assistant:latest .
+
+# Custom Postgres с CSV-данными
+docker build -t agile-assistant-postgres:latest -f k8s/Dockerfile.postgres .
+```
+
+### Шаг 3: Развёртывание
+
+Применяйте манифесты в порядке зависимостей:
+
+```bash
+# 1. Namespace + ConfigMaps + Storage
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmaps/
+kubectl apply -f k8s/storage/
+
+# 2. Инфраструктурные сервисы (БД, кеш, LLM)
+kubectl apply -f k8s/services/
+kubectl apply -f k8s/deployments/postgres.yaml
+kubectl apply -f k8s/deployments/qdrant.yaml
+kubectl apply -f k8s/deployments/redis.yaml
+kubectl apply -f k8s/deployments/vllm.yaml
+
+# 3. Дождитесь готовности инфраструктуры
+kubectl -n agile-assistant wait --for=condition=ready pod -l app=postgres --timeout=120s
+kubectl -n agile-assistant wait --for=condition=ready pod -l app=qdrant --timeout=120s
+kubectl -n agile-assistant wait --for=condition=ready pod -l app=redis --timeout=60s
+
+# 4. Миграции Alembic (таблица tasks)
+cat <<'MIGRATE' | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: migrate
+  namespace: agile-assistant
+spec:
+  restartPolicy: Never
+  containers:
+    - name: migrate
+      image: docker.io/library/agile-assistant:latest
+      imagePullPolicy: Never
+      command: ["alembic", "upgrade", "head"]
+      envFrom:
+        - configMapRef:
+            name: app-config
+MIGRATE
+kubectl -n agile-assistant wait --for=condition=ready pod/migrate --timeout=120s
+kubectl -n agile-assistant logs migrate
+kubectl -n agile-assistant delete pod migrate
+
+# 5. Загрузка базы знаний в Qdrant
+cat <<'INGEST' | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: qdrant-ingest
+  namespace: agile-assistant
+spec:
+  restartPolicy: Never
+  containers:
+    - name: qdrant-ingest
+      image: docker.io/library/agile-assistant:latest
+      imagePullPolicy: Never
+      command: ["python", "-m", "hse_prom_prog.rag.ingest"]
+      envFrom:
+        - configMapRef:
+            name: app-config
+INGEST
+# Ждите завершения (загрузка модели + индексация ~3-4 мин)
+kubectl -n agile-assistant wait --for=jsonpath='{.status.phase}'=Succeeded pod/qdrant-ingest --timeout=300s
+kubectl -n agile-assistant logs qdrant-ingest
+kubectl -n agile-assistant delete pod qdrant-ingest
+
+# 6. Приложение
+kubectl apply -f k8s/deployments/api.yaml
+kubectl apply -f k8s/deployments/celery-worker.yaml
+kubectl apply -f k8s/deployments/streamlit.yaml
+
+# 7. Ingress
+kubectl apply -f k8s/ingress.yaml
+```
+
+### Шаг 4: Проверка
+
+```bash
+# Статус всех подов
+kubectl -n agile-assistant get pods
+
+# Ожидаемый результат: все поды Running, READY 1/1
+# vLLM может загружаться 2-3 минуты (скачивание модели)
+```
+
+### Шаг 5: Использование
+
+Узнайте IP minikube:
+
+```bash
+minikube ip
+```
+
+Откройте в браузере:
+
+```bash
+# Streamlit UI
+open http://$(minikube ip)
+
+# Swagger UI
+open http://$(minikube ip)/docs
+```
+
+Создайте задачу через API:
+
+```bash
+# Создание задачи
+curl -s -X POST http://$(minikube ip)/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Расскажи о задаче AL-38787"}'
+
+# Проверка статуса (подставьте task_id)
+curl -s http://$(minikube ip)/api/tasks/<task_id> | python3 -m json.tool
+```
+
+### Маршруты Ingress
+
+| Путь              | Сервис           | Особенности                              |
+| ----------------- | ---------------- | ---------------------------------------- |
+| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (rewrite-target) |
+| `/docs`, `/redoc` | `api:8080`       | Swagger UI                               |
+| `/_stcore`        | `streamlit:8501` | WebSocket-эндпоинт Streamlit             |
+| `/` (default)     | `streamlit:8501` | Streamlit UI                             |
+
+### Полезные команды
+
+```bash
+# Логи конкретного сервиса
+kubectl -n agile-assistant logs -l app=vllm --tail=50
+kubectl -n agile-assistant logs -l app=celery-worker --tail=50
+
+# Перезапуск деплоймента
+kubectl -n agile-assistant rollout restart deployment/api
+
+# Масштабирование API
+kubectl -n agile-assistant scale deployment/api --replicas=3
+
+# Остановка всего
+minikube stop
+
+# Удаление кластера
+minikube delete
 ```
 
 ## Оценка RAG-пайплайна (RAGAS)

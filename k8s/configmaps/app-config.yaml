@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+data:
+  # vLLM
+  VLLM_BASE_URL: "http://vllm:8000/v1"
+  VLLM_MODEL: "Qwen/Qwen2.5-3B-Instruct"
+  VLLM_API_KEY: "EMPTY"
+  VLLM_TEMPERATURE: "0.7"
+  VLLM_MAX_TOKENS: "512"
+
+  # PostgreSQL
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "hse_user"
+  POSTGRES_PASSWORD: "hse_password"
+  POSTGRES_DB: "hse_jira_db"
+
+  # Qdrant
+  QDRANT_URL: "http://qdrant:6333"
+  QDRANT_COLLECTION_NAME: "business_docs"
+  EMBEDDING_MODEL: "intfloat/multilingual-e5-base"
+
+  # Redis
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # Celery
+  CELERY_TASK_TIME_LIMIT: "600"
+  CELERY_TASK_SOFT_TIME_LIMIT: "300"
+
+  # FastAPI
+  FASTAPI_HOST: "0.0.0.0"
+  FASTAPI_PORT: "8080"
+
+  # Streamlit
+  API_BASE_URL: "http://api:8080"
+  POLL_INTERVAL_SEC: "2"
+  POLL_TIMEOUT_SEC: "120"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
