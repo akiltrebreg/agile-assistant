@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: postgres
   namespace: agile-assistant
@@ -7,12 +7,11 @@ metadata:
     app: postgres
     app.kubernetes.io/part-of: agile-assistant
 spec:
+  serviceName: postgres
   replicas: 1
   selector:
     matchLabels:
       app: postgres
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
@@ -40,19 +39,13 @@ spec:
               subPath: init.sql
           readinessProbe:
             exec:
-              command:
-                - pg_isready
-                - -U
-                - hse_user
+              command: ["pg_isready", "-U", "hse_user"]
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
           livenessProbe:
             exec:
-              command:
-                - pg_isready
-                - -U
-                - hse_user
+              command: ["pg_isready", "-U", "hse_user"]
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
@@ -64,9 +57,14 @@ spec:
               cpu: "1"
               memory: 512Mi
       volumes:
-        - name: postgres-data
-          persistentVolumeClaim:
-            claimName: postgres-data
         - name: init-sql
           configMap:
             name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

@@ -914,12 +914,12 @@ k8s/
 │   └── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
 ├── secrets/
 │   └── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
+├── statefulsets/
+│   └── postgres.yaml             # StatefulSet: PostgreSQL 16 (headless svc + volumeClaimTemplates)
 ├── storage/
-│   ├── postgres-pvc.yaml         # PVC 2Gi
 │   ├── qdrant-pvc.yaml           # PVC 2Gi
 │   └── vllm-cache-pvc.yaml      # PVC 10Gi (HuggingFace model cache)
 ├── deployments/
-│   ├── postgres.yaml             # PostgreSQL 16 (custom image)
 │   ├── qdrant.yaml               # Qdrant v1.13.2
 │   ├── redis.yaml                # Redis 7 (ephemeral)
 │   ├── vllm.yaml                 # vLLM (Qwen2.5-3B, GPU)
@@ -927,7 +927,7 @@ k8s/
 │   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
 │   └── streamlit.yaml            # Streamlit UI
 └── services/
-    ├── postgres-svc.yaml         # ClusterIP :5432
+    ├── postgres-svc.yaml         # Headless Service :5432 (for StatefulSet)
     ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
     ├── redis-svc.yaml            # ClusterIP :6379
     ├── vllm-svc.yaml             # ClusterIP :8000 (name: vllm-server)
@@ -992,7 +992,7 @@ kubectl apply -f k8s/storage/
 
 # 2. Инфраструктурные сервисы (БД, кеш, LLM)
 kubectl apply -f k8s/services/
-kubectl apply -f k8s/deployments/postgres.yaml
+kubectl apply -f k8s/statefulsets/postgres.yaml
 kubectl apply -f k8s/deployments/qdrant.yaml
 kubectl apply -f k8s/deployments/redis.yaml
 kubectl apply -f k8s/deployments/vllm.yaml
