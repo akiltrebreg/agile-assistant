@@ -909,6 +909,9 @@ k8s/
 ├── configmaps/
 │   ├── app-config.yaml           # Env vars (DNS names, credentials)
 │   └── postgres-init.yaml        # init.sql (schema + COPY)
+├── jobs/
+│   ├── migrate.yaml              # Job: Alembic migrations (backoffLimit: 3)
+│   └── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
 ├── secrets/
 │   └── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
 ├── storage/
@@ -1000,53 +1003,14 @@ kubectl -n agile-assistant wait --for=condition=ready pod -l app=qdrant --timeou
 kubectl -n agile-assistant wait --for=condition=ready pod -l app=redis --timeout=60s
 
 # 4. Миграции Alembic (таблица tasks)
-cat <<'MIGRATE' | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: migrate
-  namespace: agile-assistant
-spec:
-  restartPolicy: Never
-  containers:
-    - name: migrate
-      image: docker.io/library/agile-assistant:latest
-      imagePullPolicy: Never
-      command: ["alembic", "upgrade", "head"]
-      envFrom:
-        - configMapRef:
-            name: app-config
-        - secretRef:
-            name: app-secrets
-MIGRATE
-kubectl -n agile-assistant wait --for=jsonpath='{.status.phase}'=Succeeded pod/migrate --timeout=120s
-kubectl -n agile-assistant logs migrate
-kubectl -n agile-assistant delete pod migrate
+kubectl apply -f k8s/jobs/migrate.yaml
+kubectl -n agile-assistant wait --for=condition=complete job/migrate --timeout=120s
+kubectl -n agile-assistant logs job/migrate
 
-# 5. Загрузка базы знаний в Qdrant
-cat <<'INGEST' | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: qdrant-ingest
-  namespace: agile-assistant
-spec:
-  restartPolicy: Never
-  containers:
-    - name: qdrant-ingest
-      image: docker.io/library/agile-assistant:latest
-      imagePullPolicy: Never
-      command: ["python", "-m", "hse_prom_prog.rag.ingest"]
-      envFrom:
-        - configMapRef:
-            name: app-config
-        - secretRef:
-            name: app-secrets
-INGEST
-# Ждите завершения (загрузка модели + индексация ~3-4 мин)
-kubectl -n agile-assistant wait --for=jsonpath='{.status.phase}'=Succeeded pod/qdrant-ingest --timeout=300s
-kubectl -n agile-assistant logs qdrant-ingest
-kubectl -n agile-assistant delete pod qdrant-ingest
+# 5. Загрузка базы знаний в Qdrant (загрузка модели + индексация ~3-4 мин)
+kubectl apply -f k8s/jobs/qdrant-ingest.yaml
+kubectl -n agile-assistant wait --for=condition=complete job/qdrant-ingest --timeout=300s
+kubectl -n agile-assistant logs job/qdrant-ingest
 
 # 6. Приложение
 kubectl apply -f k8s/deployments/api.yaml

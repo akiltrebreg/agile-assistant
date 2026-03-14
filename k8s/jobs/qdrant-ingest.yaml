@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qdrant-ingest
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ingest
+          image: docker.io/library/agile-assistant:latest
+          imagePullPolicy: Never
+          command: ["python", "-m", "hse_prom_prog.rag.ingest"]
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
