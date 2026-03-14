@@ -13,7 +13,7 @@ data:
   VLLM_MAX_TOKENS: "512"
 
   # PostgreSQL
-  POSTGRES_HOST: "postgres"
+  POSTGRES_HOST: "postgres-cluster-rw"
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "hse_user"
   POSTGRES_DB: "hse_jira_db"

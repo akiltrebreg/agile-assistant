@@ -42,6 +42,7 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - [Kubernetes (minikube)](#kubernetes-minikube)
   - [Требования](#требования-1)
   - [Структура манифестов](#структура-манифестов)
+  - [Архитектурные решения](#архитектурные-решения)
   - [Шаг 1: Запуск minikube с GPU](#шаг-1-запуск-minikube-с-gpu)
   - [Шаг 2: Сборка образов в minikube](#шаг-2-сборка-образов-в-minikube)
   - [Шаг 3: Развёртывание](#шаг-3-развёртывание)
@@ -898,6 +899,7 @@ curl http://localhost:6333/healthz
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - Docker (driver для minikube)
 - NVIDIA GPU + драйверы (для vLLM)
+- [CloudNativePG](https://cloudnative-pg.io/) v1.25+ (устанавливается на шаге 1)
 
 ### Структура манифестов
 
@@ -911,11 +913,12 @@ k8s/
 │   └── postgres-init.yaml        # init.sql (schema + COPY)
 ├── jobs/
 │   ├── migrate.yaml              # Job: Alembic migrations (backoffLimit: 3)
-│   └── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
+│   ├── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
+│   └── postgres-load-data.yaml   # Job: load CSV data into HA PostgreSQL
 ├── secrets/
 │   └── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
 ├── statefulsets/
-│   └── postgres.yaml             # StatefulSet: PostgreSQL 16 (headless svc + volumeClaimTemplates)
+│   └── postgres-cluster.yaml     # CloudNativePG Cluster (1 primary + 2 standby)
 ├── storage/
 │   ├── qdrant-pvc.yaml           # PVC 2Gi
 │   └── vllm-cache-pvc.yaml      # PVC 10Gi (HuggingFace model cache)
@@ -927,13 +930,31 @@ k8s/
 │   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
 │   └── streamlit.yaml            # Streamlit UI
 └── services/
-    ├── postgres-svc.yaml         # Headless Service :5432 (for StatefulSet)
     ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
     ├── redis-svc.yaml            # ClusterIP :6379
     ├── vllm-svc.yaml             # ClusterIP :8000 (name: vllm-server)
     ├── api-svc.yaml              # ClusterIP :8080
     └── streamlit-svc.yaml        # ClusterIP :8501
 ```
+
+### Архитектурные решения
+
+- **PostgreSQL HA** — управляется оператором CloudNativePG. Кластер из 3
+  инстансов (1 primary + 2 standby) со streaming replication и автоматическим
+  failover. Оператор создаёт Service-ы `postgres-cluster-rw` (запись) и
+  `postgres-cluster-ro` (чтение). Приложение подключается через
+  `postgres-cluster-rw`.
+- **Secrets** — пароли (`POSTGRES_PASSWORD`, `VLLM_API_KEY`) хранятся в
+  `k8s/secrets/app-secrets.yaml` (Secret типа Opaque), а не в ConfigMap.
+- **Jobs** — миграции Alembic и загрузка данных (CSV в PostgreSQL, чанки в
+  Qdrant) запускаются как Job-ы с `backoffLimit` для автоматического повтора при
+  ошибках и `ttlSecondsAfterFinished: 300` для автоочистки.
+- **Ingress** — snippet-аннотации для корректных MIME-типов статических файлов
+  (SVG, CSS). Требуют включения `allow-snippet-annotations` в
+  ingress-controller.
+- **vLLM** — Service называется `vllm-server` (не `vllm`), чтобы избежать
+  конфликта с переменной `VLLM_PORT`, которую Kubernetes автоматически создаёт
+  из имени Service.
 
 ### Шаг 1: Запуск minikube с GPU
 
@@ -961,6 +982,14 @@ kubectl -n ingress-nginx rollout restart deployment ingress-nginx-controller
 kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
 ```
 
+Установите CloudNativePG оператор для PostgreSQL HA:
+
+```bash
+kubectl apply --server-side -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
+kubectl -n cnpg-system wait --for=condition=ready pod -l app.kubernetes.io/name=cloudnative-pg --timeout=120s
+```
+
 ### Шаг 2: Сборка образов в minikube
 
 Переключите Docker-клиент на Docker daemon внутри minikube:
@@ -981,44 +1010,85 @@ docker build -t agile-assistant-postgres:latest -f k8s/Dockerfile.postgres .
 
 ### Шаг 3: Развёртывание
 
-Применяйте манифесты в порядке зависимостей:
+Применяйте манифесты строго в указанном порядке — каждый следующий шаг зависит
+от предыдущего.
+
+**3.1. Базовые ресурсы** — namespace, конфигурация, секреты, PVC:
 
 ```bash
-# 1. Namespace + ConfigMaps + Secrets + Storage
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmaps/
-kubectl apply -f k8s/secrets/
-kubectl apply -f k8s/storage/
+kubectl apply -f k8s/namespace.yaml          # создаёт namespace agile-assistant
+kubectl apply -f k8s/configmaps/             # app-config (env vars) + postgres-init (SQL схема)
+kubectl apply -f k8s/secrets/                # app-secrets (POSTGRES_PASSWORD, VLLM_API_KEY)
+kubectl apply -f k8s/storage/                # PVC для Qdrant (2Gi) и vLLM model cache (10Gi)
+```
 
-# 2. Инфраструктурные сервисы (БД, кеш, LLM)
-kubectl apply -f k8s/services/
-kubectl apply -f k8s/statefulsets/postgres.yaml
-kubectl apply -f k8s/deployments/qdrant.yaml
-kubectl apply -f k8s/deployments/redis.yaml
-kubectl apply -f k8s/deployments/vllm.yaml
+**3.2. Service-ы** — создают DNS-имена для межсервисного взаимодействия:
 
-# 3. Дождитесь готовности инфраструктуры
-kubectl -n agile-assistant wait --for=condition=ready pod -l app=postgres --timeout=120s
+```bash
+kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, streamlit
+```
+
+> Service-ы применяются до Deployment-ов, чтобы DNS-имена были доступны при
+> старте контейнеров. PostgreSQL Service создаётся автоматически оператором
+> CloudNativePG.
+
+**3.3. Инфраструктура** — БД, векторное хранилище, кеш, LLM:
+
+```bash
+kubectl apply -f k8s/statefulsets/postgres-cluster.yaml   # CloudNativePG: 1 primary + 2 standby
+kubectl apply -f k8s/deployments/qdrant.yaml              # Qdrant v1.13.2
+kubectl apply -f k8s/deployments/redis.yaml               # Redis 7 (брокер Celery)
+kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + Qwen2.5-3B (GPU)
+```
+
+**3.4. Ожидание готовности инфраструктуры:**
+
+```bash
+# PostgreSQL HA: 3 пода поднимаются, настраивается replication (2-3 мин)
+kubectl -n agile-assistant wait --for=condition=ready cluster/postgres-cluster --timeout=300s
+
 kubectl -n agile-assistant wait --for=condition=ready pod -l app=qdrant --timeout=120s
 kubectl -n agile-assistant wait --for=condition=ready pod -l app=redis --timeout=60s
+```
 
-# 4. Миграции Alembic (таблица tasks)
+> vLLM не ждём — он загружает модель 10-15 минут при первом запуске (скачивание
+> ~6.5GB + компиляция CUDA-графов). При повторных запусках модель берётся из
+> PVC.
+
+**3.5. Инициализация данных** — три Job-а выполняются последовательно:
+
+```bash
+# Загрузка CSV-данных в PostgreSQL (report_agile_dashboard, report_agile_dashboard_metrics)
+kubectl apply -f k8s/jobs/postgres-load-data.yaml
+kubectl -n agile-assistant wait --for=condition=complete job/postgres-load-data --timeout=120s
+kubectl -n agile-assistant logs job/postgres-load-data
+
+# Alembic миграции (создаёт таблицу tasks для API)
 kubectl apply -f k8s/jobs/migrate.yaml
 kubectl -n agile-assistant wait --for=condition=complete job/migrate --timeout=120s
 kubectl -n agile-assistant logs job/migrate
 
-# 5. Загрузка базы знаний в Qdrant (загрузка модели + индексация ~3-4 мин)
+# Загрузка базы знаний в Qdrant (embedding-модель ~500MB + индексация 82 чанков, ~3-4 мин)
 kubectl apply -f k8s/jobs/qdrant-ingest.yaml
 kubectl -n agile-assistant wait --for=condition=complete job/qdrant-ingest --timeout=300s
 kubectl -n agile-assistant logs job/qdrant-ingest
+```
 
-# 6. Приложение
-kubectl apply -f k8s/deployments/api.yaml
-kubectl apply -f k8s/deployments/celery-worker.yaml
-kubectl apply -f k8s/deployments/streamlit.yaml
+> Все Job-ы имеют `backoffLimit` для автоповтора при ошибках и
+> `ttlSecondsAfterFinished: 300` — автоудаление через 5 минут после завершения.
 
-# 7. Ingress
-kubectl apply -f k8s/ingress.yaml
+**3.6. Приложение:**
+
+```bash
+kubectl apply -f k8s/deployments/api.yaml            # FastAPI (2 реплики, gunicorn + uvicorn)
+kubectl apply -f k8s/deployments/celery-worker.yaml   # Celery worker (embedding-модель, 4Gi RAM)
+kubectl apply -f k8s/deployments/streamlit.yaml        # Streamlit UI
+```
+
+**3.7. Ingress** — маршрутизация внешнего трафика:
+
+```bash
+kubectl apply -f k8s/ingress.yaml    # 4 Ingress-ресурса: API, static-svg, static-css, UI
 ```
 
 ### Шаг 4: Проверка
@@ -1028,8 +1098,12 @@ kubectl apply -f k8s/ingress.yaml
 kubectl -n agile-assistant get pods
 
 # Ожидаемый результат: все поды Running, READY 1/1
+# PostgreSQL HA: 3 пода (postgres-cluster-1, -2, -3)
 # vLLM может загружаться 10-15 минут при первом запуске (скачивание модели ~6.5GB + компиляция CUDA-графов)
 # При последующих запусках модель берётся из PVC (vllm-cache)
+
+# Статус PostgreSQL HA кластера
+kubectl -n agile-assistant get cluster postgres-cluster
 ```
 
 ### Шаг 5: Использование
@@ -1064,12 +1138,14 @@ curl -s http://$(minikube ip)/api/tasks/<task_id> | python3 -m json.tool
 
 ### Маршруты Ingress
 
-| Путь              | Сервис           | Особенности                              |
-| ----------------- | ---------------- | ---------------------------------------- |
-| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (rewrite-target) |
-| `/docs`, `/redoc` | `api:8080`       | Swagger UI                               |
-| `/_stcore`        | `streamlit:8501` | WebSocket-эндпоинт Streamlit             |
-| `/` (default)     | `streamlit:8501` | Streamlit UI                             |
+| Путь              | Сервис           | Особенности                                         |
+| ----------------- | ---------------- | --------------------------------------------------- |
+| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (rewrite-target)            |
+| `/static/*.svg`   | `streamlit:8501` | Content-Type: image/svg+xml (configuration-snippet) |
+| `/static/*.css`   | `streamlit:8501` | Content-Type: text/css (configuration-snippet)      |
+| `/docs`, `/redoc` | `api:8080`       | Swagger UI                                          |
+| `/_stcore`        | `streamlit:8501` | WebSocket-эндпоинт Streamlit                        |
+| `/` (default)     | `streamlit:8501` | Streamlit UI                                        |
 
 ### Полезные команды
 
@@ -1083,6 +1159,12 @@ kubectl -n agile-assistant rollout restart deployment/api
 
 # Масштабирование API
 kubectl -n agile-assistant scale deployment/api --replicas=3
+
+# PostgreSQL HA: проверка кластера
+kubectl -n agile-assistant get cluster postgres-cluster
+
+# PostgreSQL HA: тест failover (удалить primary — standby промоутится)
+kubectl -n agile-assistant delete pod postgres-cluster-1
 
 # Остановка всего
 minikube stop
