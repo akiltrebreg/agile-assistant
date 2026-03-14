@@ -905,7 +905,7 @@ curl http://localhost:6333/healthz
 k8s/
 ├── namespace.yaml                # Namespace agile-assistant
 ├── Dockerfile.postgres           # Custom Postgres image (CSV data baked in)
-├── ingress.yaml                  # Ingress (API rewrite + Streamlit/WebSocket)
+├── ingress.yaml                  # Ingress (API rewrite, static MIME fix, Streamlit/WebSocket)
 ├── configmaps/
 │   ├── app-config.yaml           # Env vars (DNS names, credentials)
 │   └── postgres-init.yaml        # init.sql (schema + COPY)
@@ -942,6 +942,18 @@ minikube start --driver=docker --gpus=all --cpus=8 --memory=13000 --disk-size=40
 minikube addons enable ingress
 minikube addons enable metrics-server
 minikube addons enable nvidia-device-plugin
+```
+
+Настройте snippet-аннотации для ingress-controller (нужны для корректных
+MIME-типов статических файлов):
+
+```bash
+kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=120s
+kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
+  --type merge \
+  -p '{"data":{"allow-snippet-annotations":"true","annotations-risk-level":"Critical"}}'
+kubectl -n ingress-nginx rollout restart deployment ingress-nginx-controller
+kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
 ```
 
 ### Шаг 2: Сборка образов в minikube
@@ -1034,13 +1046,7 @@ kubectl apply -f k8s/deployments/api.yaml
 kubectl apply -f k8s/deployments/celery-worker.yaml
 kubectl apply -f k8s/deployments/streamlit.yaml
 
-# 7. Настройка snippet-аннотаций и Ingress
-kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=120s
-kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
-  --type merge \
-  -p '{"data":{"allow-snippet-annotations":"true","annotations-risk-level":"Critical"}}'
-kubectl -n ingress-nginx rollout restart deployment ingress-nginx-controller
-kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
+# 7. Ingress
 kubectl apply -f k8s/ingress.yaml
 ```
 
