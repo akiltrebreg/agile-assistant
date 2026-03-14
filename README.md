@@ -909,6 +909,8 @@ k8s/
 ├── configmaps/
 │   ├── app-config.yaml           # Env vars (DNS names, credentials)
 │   └── postgres-init.yaml        # init.sql (schema + COPY)
+├── secrets/
+│   └── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
 ├── storage/
 │   ├── postgres-pvc.yaml         # PVC 2Gi
 │   ├── qdrant-pvc.yaml           # PVC 2Gi
@@ -979,9 +981,10 @@ docker build -t agile-assistant-postgres:latest -f k8s/Dockerfile.postgres .
 Применяйте манифесты в порядке зависимостей:
 
 ```bash
-# 1. Namespace + ConfigMaps + Storage
+# 1. Namespace + ConfigMaps + Secrets + Storage
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmaps/
+kubectl apply -f k8s/secrets/
 kubectl apply -f k8s/storage/
 
 # 2. Инфраструктурные сервисы (БД, кеш, LLM)
@@ -1013,6 +1016,8 @@ spec:
       envFrom:
         - configMapRef:
             name: app-config
+        - secretRef:
+            name: app-secrets
 MIGRATE
 kubectl -n agile-assistant wait --for=jsonpath='{.status.phase}'=Succeeded pod/migrate --timeout=120s
 kubectl -n agile-assistant logs migrate
@@ -1035,6 +1040,8 @@ spec:
       envFrom:
         - configMapRef:
             name: app-config
+        - secretRef:
+            name: app-secrets
 INGEST
 # Ждите завершения (загрузка модели + индексация ~3-4 мин)
 kubectl -n agile-assistant wait --for=jsonpath='{.status.phase}'=Succeeded pod/qdrant-ingest --timeout=300s

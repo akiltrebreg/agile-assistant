@@ -9,7 +9,6 @@ data:
   # vLLM
   VLLM_BASE_URL: "http://vllm-server:8000/v1"
   VLLM_MODEL: "Qwen/Qwen2.5-3B-Instruct"
-  VLLM_API_KEY: "EMPTY"
   VLLM_TEMPERATURE: "0.7"
   VLLM_MAX_TOKENS: "512"
 
@@ -17,7 +16,6 @@ data:
   POSTGRES_HOST: "postgres"
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "hse_user"
-  POSTGRES_PASSWORD: "hse_password"
   POSTGRES_DB: "hse_jira_db"
 
   # Qdrant
