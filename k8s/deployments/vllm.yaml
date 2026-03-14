@@ -23,11 +23,14 @@ spec:
             - --model=Qwen/Qwen2.5-3B-Instruct
           ports:
             - containerPort: 8000
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 120
+            initialDelaySeconds: 300
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 10
@@ -35,7 +38,7 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 180
+            initialDelaySeconds: 600
             periodSeconds: 60
             timeoutSeconds: 10
             failureThreshold: 5
@@ -47,3 +50,7 @@ spec:
               cpu: "4"
               memory: 8Gi
               nvidia.com/gpu: "1"
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: vllm-cache

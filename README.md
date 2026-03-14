@@ -437,6 +437,9 @@ LOG_LEVEL=INFO
 
 - Для Docker Compose используйте `VLLM_BASE_URL=http://vllm:8000/v1`,
   `POSTGRES_HOST=postgres`, `QDRANT_URL=http://qdrant:6333`
+- Для Kubernetes сервис vLLM называется `vllm-server` (не `vllm`), чтобы
+  избежать конфликта с переменной `VLLM_PORT`, которую Kubernetes создаёт
+  автоматически. Используйте `VLLM_BASE_URL=http://vllm-server:8000/v1`
 - Для локальной разработки используйте `localhost` для всех сервисов
 - Значения по умолчанию подходят для большинства случаев использования
 
@@ -908,7 +911,8 @@ k8s/
 │   └── postgres-init.yaml        # init.sql (schema + COPY)
 ├── storage/
 │   ├── postgres-pvc.yaml         # PVC 2Gi
-│   └── qdrant-pvc.yaml           # PVC 2Gi
+│   ├── qdrant-pvc.yaml           # PVC 2Gi
+│   └── vllm-cache-pvc.yaml      # PVC 10Gi (HuggingFace model cache)
 ├── deployments/
 │   ├── postgres.yaml             # PostgreSQL 16 (custom image)
 │   ├── qdrant.yaml               # Qdrant v1.13.2
@@ -921,7 +925,7 @@ k8s/
     ├── postgres-svc.yaml         # ClusterIP :5432
     ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
     ├── redis-svc.yaml            # ClusterIP :6379
-    ├── vllm-svc.yaml             # ClusterIP :8000
+    ├── vllm-svc.yaml             # ClusterIP :8000 (name: vllm-server)
     ├── api-svc.yaml              # ClusterIP :8080
     └── streamlit-svc.yaml        # ClusterIP :8501
 ```
@@ -998,7 +1002,7 @@ spec:
         - configMapRef:
             name: app-config
 MIGRATE
-kubectl -n agile-assistant wait --for=condition=ready pod/migrate --timeout=120s
+kubectl -n agile-assistant wait --for=jsonpath='{.status.phase}'=Succeeded pod/migrate --timeout=120s
 kubectl -n agile-assistant logs migrate
 kubectl -n agile-assistant delete pod migrate
 
@@ -1030,7 +1034,13 @@ kubectl apply -f k8s/deployments/api.yaml
 kubectl apply -f k8s/deployments/celery-worker.yaml
 kubectl apply -f k8s/deployments/streamlit.yaml
 
-# 7. Ingress
+# 7. Настройка snippet-аннотаций и Ingress
+kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=120s
+kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
+  --type merge \
+  -p '{"data":{"allow-snippet-annotations":"true","annotations-risk-level":"Critical"}}'
+kubectl -n ingress-nginx rollout restart deployment ingress-nginx-controller
+kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
 kubectl apply -f k8s/ingress.yaml
 ```
 
@@ -1041,7 +1051,8 @@ kubectl apply -f k8s/ingress.yaml
 kubectl -n agile-assistant get pods
 
 # Ожидаемый результат: все поды Running, READY 1/1
-# vLLM может загружаться 2-3 минуты (скачивание модели)
+# vLLM может загружаться 10-15 минут при первом запуске (скачивание модели ~6.5GB + компиляция CUDA-графов)
+# При последующих запусках модель берётся из PVC (vllm-cache)
 ```
 
 ### Шаг 5: Использование

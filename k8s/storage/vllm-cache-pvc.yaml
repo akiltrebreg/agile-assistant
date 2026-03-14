@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-cache
+  namespace: agile-assistant
+  labels:
+    app: vllm
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

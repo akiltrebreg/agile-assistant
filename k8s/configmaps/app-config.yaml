@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/part-of: agile-assistant
 data:
   # vLLM
-  VLLM_BASE_URL: "http://vllm:8000/v1"
+  VLLM_BASE_URL: "http://vllm-server:8000/v1"
   VLLM_MODEL: "Qwen/Qwen2.5-3B-Instruct"
   VLLM_API_KEY: "EMPTY"
   VLLM_TEMPERATURE: "0.7"
@@ -41,7 +41,7 @@ data:
   # Streamlit
   API_BASE_URL: "http://api:8080"
   POLL_INTERVAL_SEC: "2"
-  POLL_TIMEOUT_SEC: "120"
+  POLL_TIMEOUT_SEC: "300"
 
   # Logging
   LOG_LEVEL: "INFO"

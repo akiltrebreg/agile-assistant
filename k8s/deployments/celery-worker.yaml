@@ -34,33 +34,24 @@ spec:
           readinessProbe:
             exec:
               command:
-                - celery
-                - -A
-                - hse_prom_prog.tasks.celery_app
-                - inspect
-                - ping
-                - --timeout
-                - "10"
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 15
+                - python3
+                - -c
+                - "import os; assert os.path.exists('/proc/1/status')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
           livenessProbe:
             exec:
               command:
-                - celery
-                - -A
-                - hse_prom_prog.tasks.celery_app
-                - inspect
-                - ping
-                - --timeout
-                - "10"
-            initialDelaySeconds: 60
+                - python3
+                - -c
+                - "import os; assert os.path.exists('/proc/1/status')"
+            initialDelaySeconds: 300
             periodSeconds: 60
-            timeoutSeconds: 15
+            timeoutSeconds: 5
           resources:
             requests:
               cpu: 500m
-              memory: 1Gi
+              memory: 2Gi
             limits:
               cpu: "2"
-              memory: 2Gi
+              memory: 4Gi

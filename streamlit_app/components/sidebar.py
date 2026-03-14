@@ -9,8 +9,13 @@ def render_sidebar(client: APIClient) -> None:
     """Render the sidebar with status and controls."""
     with st.sidebar:
         st.markdown(
-            '<img src="/static/logo.svg" alt="Agile AI Assistant" '
-            'style="width:100%;max-width:200px;">',
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50"'
+            ' style="width:100%;max-width:200px;">'
+            '<rect width="200" height="50" rx="8" fill="#4A90D9"/>'
+            '<text x="100" y="33" font-family="Arial,sans-serif"'
+            ' font-size="20" font-weight="bold"'
+            ' fill="white" text-anchor="middle">Agile AI Assistant</text>'
+            "</svg>",
             unsafe_allow_html=True,
         )
         st.caption("LangGraph + vLLM + PostgreSQL")
