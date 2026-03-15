@@ -1005,7 +1005,7 @@ eval $(minikube docker-env)
 docker build -t agile-assistant:latest .
 
 # Custom Postgres с CSV-данными
-docker build -t agile-assistant-postgres:latest -f k8s/Dockerfile.postgres .
+docker build -t agile-assistant-postgres-16:1.0.0 -f k8s/Dockerfile.postgres .
 ```
 
 ### Шаг 3: Развёртывание
@@ -1018,7 +1018,7 @@ docker build -t agile-assistant-postgres:latest -f k8s/Dockerfile.postgres .
 ```bash
 kubectl apply -f k8s/namespace.yaml          # создаёт namespace agile-assistant
 kubectl apply -f k8s/configmaps/             # app-config (env vars) + postgres-init (SQL схема)
-kubectl apply -f k8s/secrets/                # app-secrets (POSTGRES_PASSWORD, VLLM_API_KEY)
+kubectl apply -f k8s/secrets/                # app-secrets + postgres-credentials (для CloudNativePG)
 kubectl apply -f k8s/storage/                # PVC для Qdrant (2Gi) и vLLM model cache (10Gi)
 ```
 
@@ -1075,7 +1075,7 @@ kubectl -n agile-assistant logs job/qdrant-ingest
 ```
 
 > Все Job-ы имеют `backoffLimit` для автоповтора при ошибках и
-> `ttlSecondsAfterFinished: 300` — автоудаление через 5 минут после завершения.
+> `ttlSecondsAfterFinished: 3600` — автоудаление через 1 час после завершения.
 
 **3.6. Приложение:**
 

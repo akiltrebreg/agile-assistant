@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/part-of: agile-assistant
 spec:
   backoffLimit: 2
-  ttlSecondsAfterFinished: 300
+  ttlSecondsAfterFinished: 3600
   template:
     spec:
       restartPolicy: OnFailure

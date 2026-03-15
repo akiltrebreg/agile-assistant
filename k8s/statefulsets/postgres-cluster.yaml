@@ -7,8 +7,6 @@ metadata:
     app.kubernetes.io/part-of: agile-assistant
 spec:
   instances: 3
-  imageName: agile-assistant-postgres:latest
-  imagePullPolicy: Never
 
   postgresql:
     parameters:
@@ -20,9 +18,9 @@ spec:
       database: hse_jira_db
       owner: hse_user
       secret:
-        name: app-secrets
-      postInitSQL:
-        - CREATE TABLE IF NOT EXISTS report_agile_dashboard ( launch_id INT NOT
+        name: postgres-credentials
+      postInitApplicationSQL:
+        - "CREATE TABLE IF NOT EXISTS report_agile_dashboard (launch_id INT NOT
           NULL, issue_key VARCHAR(32), jirasprint_id BIGINT, sprint_name
           VARCHAR(256), start_date TIMESTAMP, end_date TIMESTAMP, complete_date
           TIMESTAMP, activation_date TIMESTAMP, sprint_state VARCHAR(128),
@@ -49,8 +47,8 @@ spec:
           feature_teams_resolution VARCHAR(256), dev_approach_resolution
           VARCHAR(32), drop_team VARCHAR(256), is_pr BOOLEAN, epic_issue_key
           VARCHAR(32), actual_resolution VARCHAR(256), last_cancelled_date
-          TIMESTAMP )
-        - CREATE TABLE IF NOT EXISTS report_agile_dashboard_metrics ( launch_id
+          TIMESTAMP)"
+        - "CREATE TABLE IF NOT EXISTS report_agile_dashboard_metrics (launch_id
           INT NOT NULL, cluster_name VARCHAR(128), unit_name VARCHAR(128),
           feature_teams VARCHAR(256), jirasprint_id BIGINT, sprint_name
           VARCHAR(256), activation_date TIMESTAMP, complete_date TIMESTAMP,
@@ -63,27 +61,27 @@ spec:
           added_work_issues FLOAT, final_commitment_issues FLOAT, undone_issues
           FLOAT, cancel_issues FLOAT, complete_issues FLOAT, scope_drop_issues
           FLOAT, done_total_issues FLOAT, done_issues FLOAT,
-          complete_initial_issues FLOAT, cancel_rate FLOAT )
-        - CREATE INDEX IF NOT EXISTS idx_dashboard_issue_key ON
-          report_agile_dashboard(issue_key)
-        - CREATE INDEX IF NOT EXISTS idx_dashboard_sprint_id ON
-          report_agile_dashboard(jirasprint_id)
-        - CREATE INDEX IF NOT EXISTS idx_dashboard_sprint_state ON
-          report_agile_dashboard(sprint_state)
-        - CREATE INDEX IF NOT EXISTS idx_dashboard_assignee ON
-          report_agile_dashboard(assignee_name)
-        - CREATE INDEX IF NOT EXISTS idx_dashboard_launch_id ON
-          report_agile_dashboard(launch_id)
-        - CREATE INDEX IF NOT EXISTS idx_dashboard_feature_teams ON
-          report_agile_dashboard(feature_teams)
-        - CREATE INDEX IF NOT EXISTS idx_metrics_sprint_id ON
-          report_agile_dashboard_metrics(jirasprint_id)
-        - CREATE INDEX IF NOT EXISTS idx_metrics_feature_teams ON
-          report_agile_dashboard_metrics(feature_teams)
-        - CREATE INDEX IF NOT EXISTS idx_metrics_launch_id ON
-          report_agile_dashboard_metrics(launch_id)
-        - CREATE INDEX IF NOT EXISTS idx_metrics_sprint_state ON
-          report_agile_dashboard_metrics(sprint_state)
+          complete_initial_issues FLOAT, cancel_rate FLOAT)"
+        - "CREATE INDEX IF NOT EXISTS idx_dashboard_issue_key ON
+          report_agile_dashboard(issue_key)"
+        - "CREATE INDEX IF NOT EXISTS idx_dashboard_sprint_id ON
+          report_agile_dashboard(jirasprint_id)"
+        - "CREATE INDEX IF NOT EXISTS idx_dashboard_sprint_state ON
+          report_agile_dashboard(sprint_state)"
+        - "CREATE INDEX IF NOT EXISTS idx_dashboard_assignee ON
+          report_agile_dashboard(assignee_name)"
+        - "CREATE INDEX IF NOT EXISTS idx_dashboard_launch_id ON
+          report_agile_dashboard(launch_id)"
+        - "CREATE INDEX IF NOT EXISTS idx_dashboard_feature_teams ON
+          report_agile_dashboard(feature_teams)"
+        - "CREATE INDEX IF NOT EXISTS idx_metrics_sprint_id ON
+          report_agile_dashboard_metrics(jirasprint_id)"
+        - "CREATE INDEX IF NOT EXISTS idx_metrics_feature_teams ON
+          report_agile_dashboard_metrics(feature_teams)"
+        - "CREATE INDEX IF NOT EXISTS idx_metrics_launch_id ON
+          report_agile_dashboard_metrics(launch_id)"
+        - "CREATE INDEX IF NOT EXISTS idx_metrics_sprint_state ON
+          report_agile_dashboard_metrics(sprint_state)"
 
   resources:
     requests:
