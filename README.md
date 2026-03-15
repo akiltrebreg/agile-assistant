@@ -1008,8 +1008,16 @@ docker build -t ghcr.io/akiltrebreg/agile-assistant:latest .
 docker push ghcr.io/akiltrebreg/agile-assistant:latest
 ```
 
-> Если вы ещё не залогинены:
-> `echo "<GHCR_PAT>" | docker login ghcr.io -u akiltrebreg --password-stdin`
+> **Аутентификация в GHCR** (обязательна для push и pull):
+>
+> ```bash
+> echo "<GHCR_PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+> ```
+>
+> Создайте Personal Access Token (classic) с правами `read:packages` /
+> `write:packages`: https://github.com/settings/tokens → Generate new token
+> (classic). Контрибьюторы репозитория могут pull-ить образ, залогинившись со
+> своим PAT.
 
 Создайте Secret для аутентификации в registry:
 
