@@ -16,10 +16,12 @@ spec:
       labels:
         app: celery-worker
     spec:
+      imagePullSecrets:
+        - name: registry-credentials
       containers:
         - name: celery-worker
-          image: agile-assistant:latest
-          imagePullPolicy: Never
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
           command:
             - celery
             - -A

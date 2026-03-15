@@ -917,6 +917,7 @@ k8s/
 ├── secrets/
 │   ├── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
 │   └── postgres-credentials.yaml # basic-auth Secret для CloudNativePG (username/password)
+│   # registry-credentials и basic-auth создаются через kubectl (шаг 2)
 ├── statefulsets/
 │   └── postgres-cluster.yaml     # CloudNativePG Cluster (1 primary + 2 standby)
 ├── storage/
@@ -946,6 +947,14 @@ k8s/
   `postgres-cluster-rw`.
 - **Secrets** — пароли (`POSTGRES_PASSWORD`, `VLLM_API_KEY`) хранятся в
   `k8s/secrets/app-secrets.yaml` (Secret типа Opaque), а не в ConfigMap.
+  `registry-credentials` (docker-registry) — аутентификация в GHCR. `basic-auth`
+  — защита Ingress паролем (Basic Auth).
+- **Docker Registry** — образы публикуются в GitHub Container Registry
+  (`ghcr.io/akiltrebreg/agile-assistant`). Deployment-ы и Job-ы используют
+  `imagePullPolicy: IfNotPresent` с `imagePullSecrets` вместо локальной сборки
+  через `minikube docker-env`.
+- **Basic Auth** — все Ingress-ресурсы защищены HTTP Basic Authentication. При
+  открытии в браузере запрашивается логин и пароль.
 - **Jobs** — миграции Alembic и загрузка данных (CSV в PostgreSQL, чанки в
   Qdrant) запускаются как Job-ы с `backoffLimit` для автоматического повтора при
   ошибках и `ttlSecondsAfterFinished: 3600` для автоочистки.
@@ -990,18 +999,36 @@ kubectl apply --server-side -f \
 kubectl -n cnpg-system wait --for=condition=ready pod -l app.kubernetes.io/name=cloudnative-pg --timeout=120s
 ```
 
-### Шаг 2: Сборка образов в minikube
+### Шаг 2: Сборка и публикация образа
 
-Переключите Docker-клиент на Docker daemon внутри minikube:
+Соберите и запушьте образ в GitHub Container Registry:
 
 ```bash
-eval $(minikube docker-env)
+docker build -t ghcr.io/akiltrebreg/agile-assistant:latest .
+docker push ghcr.io/akiltrebreg/agile-assistant:latest
 ```
 
-Соберите образ приложения:
+> Если вы ещё не залогинены:
+> `echo "<GHCR_PAT>" | docker login ghcr.io -u akiltrebreg --password-stdin`
+
+Создайте Secret для аутентификации в registry:
 
 ```bash
-docker build -t agile-assistant:latest .
+kubectl create namespace agile-assistant 2>/dev/null || true
+kubectl -n agile-assistant create secret docker-registry registry-credentials \
+  --docker-server=ghcr.io \
+  --docker-username=akiltrebreg \
+  --docker-password=<GHCR_PAT> \
+  --docker-email=<ваш-email>
+```
+
+Создайте Secret для Basic Auth (защита UI/API паролем):
+
+```bash
+sudo apt install apache2-utils -y    # если ещё не установлен
+htpasswd -c auth admin               # введите пароль дважды
+kubectl -n agile-assistant create secret generic basic-auth --from-file=auth
+rm auth                              # локальный файл больше не нужен
 ```
 
 ### Шаг 3: Развёртывание
@@ -1009,12 +1036,14 @@ docker build -t agile-assistant:latest .
 Применяйте манифесты строго в указанном порядке — каждый следующий шаг зависит
 от предыдущего.
 
-**3.1. Базовые ресурсы** — namespace, конфигурация, секреты, PVC:
+**3.1. Базовые ресурсы** — конфигурация, секреты, PVC:
 
 ```bash
-kubectl apply -f k8s/namespace.yaml          # создаёт namespace agile-assistant
+# Namespace уже создан на шаге 2, но на всякий случай:
+kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmaps/             # app-config (env vars) + postgres-init (SQL схема)
 kubectl apply -f k8s/secrets/                # app-secrets + postgres-credentials (для CloudNativePG)
+# registry-credentials и basic-auth уже созданы на шаге 2
 kubectl apply -f k8s/storage/                # PVC для Qdrant (2Gi) и vLLM model cache (10Gi)
 ```
 
@@ -1110,7 +1139,7 @@ kubectl -n agile-assistant get cluster postgres-cluster
 minikube ip
 ```
 
-Откройте в браузере:
+Откройте в браузере (при первом входе появится окно Basic Auth — логин `admin`):
 
 ```bash
 # Streamlit UI
@@ -1120,16 +1149,16 @@ open http://$(minikube ip)
 open http://$(minikube ip)/docs
 ```
 
-Создайте задачу через API:
+Создайте задачу через API (Basic Auth обязателен):
 
 ```bash
 # Создание задачи
-curl -s -X POST http://$(minikube ip)/api/tasks \
+curl -s -u admin:<пароль> -X POST http://$(minikube ip)/api/tasks \
   -H "Content-Type: application/json" \
   -d '{"query": "Расскажи о задаче AL-38787"}'
 
 # Проверка статуса (подставьте task_id)
-curl -s http://$(minikube ip)/api/tasks/<task_id> | python3 -m json.tool
+curl -s -u admin:<пароль> http://$(minikube ip)/api/tasks/<task_id> | python3 -m json.tool
 ```
 
 ### Маршруты Ingress

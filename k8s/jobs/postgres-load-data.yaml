@@ -11,10 +11,12 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: registry-credentials
       containers:
         - name: load-data
-          image: docker.io/library/agile-assistant:latest
-          imagePullPolicy: Never
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: app-config

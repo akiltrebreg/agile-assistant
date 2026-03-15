@@ -11,10 +11,12 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: registry-credentials
       containers:
         - name: ingest
-          image: docker.io/library/agile-assistant:latest
-          imagePullPolicy: Never
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
           command: ["python", "-m", "hse_prom_prog.rag.ingest"]
           envFrom:
             - configMapRef:

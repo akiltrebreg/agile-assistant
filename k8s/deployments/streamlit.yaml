@@ -16,10 +16,12 @@ spec:
       labels:
         app: streamlit
     spec:
+      imagePullSecrets:
+        - name: registry-credentials
       containers:
         - name: streamlit
-          image: agile-assistant:latest
-          imagePullPolicy: Never
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
           command:
             - streamlit
             - run

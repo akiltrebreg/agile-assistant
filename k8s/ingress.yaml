@@ -13,6 +13,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
 spec:
   ingressClassName: nginx
   rules:
@@ -40,6 +43,9 @@ metadata:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_hide_header Content-Type;
       add_header Content-Type "image/svg+xml";
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
 spec:
   ingressClassName: nginx
   rules:
@@ -67,6 +73,9 @@ metadata:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_hide_header Content-Type;
       add_header Content-Type "text/css";
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
 spec:
   ingressClassName: nginx
   rules:
@@ -95,6 +104,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
     nginx.ingress.kubernetes.io/websocket-services: "streamlit"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
 spec:
   ingressClassName: nginx
   rules:

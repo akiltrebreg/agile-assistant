@@ -16,10 +16,12 @@ spec:
       labels:
         app: api
     spec:
+      imagePullSecrets:
+        - name: registry-credentials
       containers:
         - name: api
-          image: agile-assistant:latest
-          imagePullPolicy: Never
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
           command:
             - gunicorn
             - hse_prom_prog.api.app:app
