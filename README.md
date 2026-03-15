@@ -1008,6 +1008,16 @@ docker build -t ghcr.io/akiltrebreg/agile-assistant:latest .
 docker push ghcr.io/akiltrebreg/agile-assistant:latest
 ```
 
+> **Для minikube** — образ ~17GB (ML-зависимости: PyTorch,
+> sentence-transformers). Pull из GHCR внутри minikube может занять 30+ минут.
+> Чтобы ускорить, загрузите образ напрямую из локального Docker в minikube:
+>
+> ```bash
+> minikube image load ghcr.io/akiltrebreg/agile-assistant:latest
+> ```
+>
+> Это копирует образ без скачивания из интернета (~1-2 мин).
+
 > **Аутентификация в GHCR** (обязательна для push и pull):
 >
 > ```bash
