@@ -906,7 +906,6 @@ curl http://localhost:6333/healthz
 ```
 k8s/
 ├── namespace.yaml                # Namespace agile-assistant
-├── Dockerfile.postgres           # Custom Postgres image (CSV data baked in)
 ├── ingress.yaml                  # Ingress (API rewrite, static MIME fix, Streamlit/WebSocket)
 ├── configmaps/
 │   ├── app-config.yaml           # Env vars (DNS names, credentials)
@@ -916,7 +915,8 @@ k8s/
 │   ├── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
 │   └── postgres-load-data.yaml   # Job: load CSV data into HA PostgreSQL
 ├── secrets/
-│   └── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
+│   ├── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
+│   └── postgres-credentials.yaml # basic-auth Secret для CloudNativePG (username/password)
 ├── statefulsets/
 │   └── postgres-cluster.yaml     # CloudNativePG Cluster (1 primary + 2 standby)
 ├── storage/
@@ -948,7 +948,7 @@ k8s/
   `k8s/secrets/app-secrets.yaml` (Secret типа Opaque), а не в ConfigMap.
 - **Jobs** — миграции Alembic и загрузка данных (CSV в PostgreSQL, чанки в
   Qdrant) запускаются как Job-ы с `backoffLimit` для автоматического повтора при
-  ошибках и `ttlSecondsAfterFinished: 300` для автоочистки.
+  ошибках и `ttlSecondsAfterFinished: 3600` для автоочистки.
 - **Ingress** — snippet-аннотации для корректных MIME-типов статических файлов
   (SVG, CSS). Требуют включения `allow-snippet-annotations` в
   ingress-controller.
@@ -998,14 +998,10 @@ kubectl -n cnpg-system wait --for=condition=ready pod -l app.kubernetes.io/name=
 eval $(minikube docker-env)
 ```
 
-Соберите образы:
+Соберите образ приложения:
 
 ```bash
-# Основной образ приложения (API, Celery, Streamlit)
 docker build -t agile-assistant:latest .
-
-# Custom Postgres с CSV-данными
-docker build -t agile-assistant-postgres-16:1.0.0 -f k8s/Dockerfile.postgres .
 ```
 
 ### Шаг 3: Развёртывание
