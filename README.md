@@ -316,6 +316,10 @@ docker compose build app
 docker compose up -d postgres qdrant redis vllm
 ```
 
+При первом запуске сервис `download-model` автоматически скачает модель
+`avibe-gptq-4bit` (~5GB) из Yandex Cloud S3 в Docker volume. При повторных
+запусках скачивание пропускается (модель уже на диске).
+
 Дождитесь, пока все сервисы станут healthy (vLLM загружает модель — это может
 занять несколько минут):
 
@@ -1269,6 +1273,24 @@ GPT-5.2 через OpenAI-compatible API (vsellm).
 
 ### Запуск оценки
 
+**Через Docker Compose** (рекомендуемый способ — всё поднимается автоматически):
+
+```bash
+# 1. Убедитесь, что инфраструктура запущена и база знаний загружена
+docker compose up -d postgres qdrant redis vllm
+docker compose run --rm app python -m hse_prom_prog.rag.ingest
+
+# 2. Запуск baseline-оценки
+docker compose run --rm \
+  -e VSELLM_API_KEY=${VSELLM_API_KEY} \
+  -e VSELLM_BASE_URL=${VSELLM_BASE_URL} \
+  app python -m eval.run_eval --experiment baseline
+
+# 3. Результат сохранится в eval/results/baseline_<timestamp>.json
+```
+
+**Локально** (Poetry, если инфраструктура запущена отдельно):
+
 ```bash
 # Запуск с дефолтным именем эксперимента (baseline)
 poetry run python -m eval.run_eval
@@ -1276,6 +1298,10 @@ poetry run python -m eval.run_eval
 # Запуск с пользовательским именем
 poetry run python -m eval.run_eval --experiment semantic_v2
 ```
+
+> **Baseline**: первый запуск `--experiment baseline` фиксирует текущие
+> параметры пайплайна (модель, chunk_size, overlap, top_k) и метрики. Все
+> последующие эксперименты сравниваются с ним через `compare.py`.
 
 Скрипт выполняет:
 

@@ -132,7 +132,7 @@ def evaluate_rag(samples: list[RAGSample]) -> dict:
     dataset = EvaluationDataset(samples=ragas_samples)
 
     logger.info("Running RAGAS evaluation on %d samples …", len(samples))
-    result = evaluate(dataset=dataset, metrics=metrics)
+    result = evaluate(dataset=dataset, metrics=metrics, llm=llm, embeddings=emb)
 
     df = result.to_pandas()
     metric_cols = [

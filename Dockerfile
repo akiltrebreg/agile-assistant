@@ -57,6 +57,9 @@ COPY knowledge_base ./knowledge_base
 # Copy database CSV data (for k8s postgres-load-data Job)
 COPY database/data ./database/data
 
+# Copy eval module (RAGAS evaluation)
+COPY eval ./eval
+
 # Copy Alembic migrations
 COPY alembic ./alembic
 COPY alembic.ini ./

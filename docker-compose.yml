@@ -80,10 +80,41 @@ services:
     networks:
       - hse-network
 
+  # Download avibe-gptq-4bit model from Yandex Cloud S3 into shared volume
+  download-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/avibe-gptq-4bit/config.json ]; then
+          echo "Model already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading avibe-gptq-4bit from S3..."
+        aws s3 sync \
+          s3://${S3_BUCKET:-quant-models-agile}/${S3_MODEL_PATH:-models/avibe-gptq-4bit}/ \
+          /models/avibe-gptq-4bit/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/avibe-gptq-4bit/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/avibe-gptq-4bit/
+    volumes:
+      - vllm-cache:/models
+    networks:
+      - hse-network
+
   # vLLM service for serving the LLM model (avibe-gptq-4bit from S3)
   vllm:
     image: vllm/vllm-openai:v0.8.5
     container_name: vllm-server
+    depends_on:
+      download-model:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     environment:
@@ -139,6 +170,7 @@ services:
       - QDRANT_COLLECTION_NAME=business_docs
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
+      - ./eval:/app/eval
       - ./.env:/app/.env
     stdin_open: true
     tty: true
