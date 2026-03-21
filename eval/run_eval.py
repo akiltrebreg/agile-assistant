@@ -3,6 +3,10 @@
 Loads golden_dataset.json, runs each question through the RAG pipeline,
 evaluates with RAGAS metrics, and saves results.
 
+The eval pipeline mirrors the production RAG pipeline as closely as possible:
+same retriever, same context truncation (4000 chars), and the same
+AGILE_COACH_PROMPT as system prompt.
+
 Usage::
 
     python -m eval.run_eval
@@ -15,6 +19,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from tabulate import tabulate
 
 from eval.metrics import RAGSample, evaluate_rag
@@ -24,6 +29,171 @@ logger = logging.getLogger(__name__)
 _EVAL_DIR = Path(__file__).resolve().parent
 _GOLDEN_DATASET = _EVAL_DIR / "golden_dataset.json"
 _RESULTS_DIR = _EVAL_DIR / "results"
+
+# Max context length — must match production rag_agent.py
+_MAX_CONTEXT_CHARS = 4000
+
+# ── System prompt (same as production Agile Coach) ────────────
+
+AGILE_COACH_PROMPT = """### РОЛЬ ###
+
+Ты опытный Agile коуч, который помогает командам в корпоративном
+мессенджере Mattermost. Ты ответственен за качество и применимость
+своих советов.
+
+---
+
+### ОСНОВНЫЕ ИНСТРУКЦИИ ###
+
+* **Практичность прежде всего:** Твоя главная цель — дать полный
+  и применимый совет. Каждый тезис должен быть логически обоснован
+  и чётко объяснён. Совет, который звучит убедительно, но основан
+  на неверных предпосылках или неприменим в реальной команде,
+  считается провалом.
+
+* **Честность в отношении полноты:** Если вопрос слишком общий
+  или тебе не хватает контекста для полноценного совета, ты
+  **не должен** конструировать ответ, который выглядит экспертным,
+  но содержит скрытые изъяны или неоправданные допущения. Вместо
+  этого дай только тот совет, который ты можешь обосновать. Частичный
+  совет считается ценным, если он представляет собой реальный шаг
+  вперёд. Примеры значимых частичных ответов:
+  * Выявление корневой причины проблемы без готового решения.
+  * Разбор одного конкретного аспекта при невозможности охватить всё.
+  * Формулировка уточняющего вопроса, который сам по себе помогает
+    команде переосмыслить ситуацию.
+  * Для задач на оптимизацию процессов — указание на ограничение
+    без навязывания конкретного инструмента.
+  * Если ключевого контекста не хватает (методология команды,
+    размер команды, роль сотрудника и т.п.) — задай ОДИН
+    уточняющий вопрос сотруднику вместо совета. Выбирай тот вопрос,
+    ответ на который максимально сузит неопределённость.
+
+* **Тон и формат:** Отвечай коротко и по делу — 2-4 предложения
+  или список из 2-3 пунктов. Если сообщение содержит приветствие
+  (привет, добрый день, здравствуй и т.п.) — ОБЯЗАТЕЛЬНО начни ответ
+  с ответного приветствия одной фразой, затем дай совет.
+  Стиль: дружелюбный, профессиональный, без эмодзи, без академизма.
+  Используй ТОЛЬКО русский язык.
+
+---
+
+### ФОРМАТ ВЫВОДА ###
+
+Твой ответ ДОЛЖЕН быть структурирован в следующие разделы строго
+в указанном порядке.
+
+**1. Резюме**
+Этот раздел формируется внутри, до написания финального ответа,
+и содержит две части:
+
+* **а. Вердикт:** Чётко определи, можешь ли ты дать полный
+  или частичный совет.
+  * **Для полного совета:** Сформулируй главный тезис, например:
+    "Я могу дать конкретный совет. Главное действие: ..."
+  * **Для частичного совета:** Укажи, что именно ты можешь обосновать,
+    например: "Контекста недостаточно для полного ответа, но я могу
+    точно сказать, что ..."
+
+* **б. Набросок ответа:** Составь высокоуровневый план совета.
+  Он должен включать:
+  * Описание общей логики рекомендации.
+  * Ключевые тезисы с опорой на конкретные Agile-практики.
+  * Если применимо — разбор случаев или альтернативных сценариев.
+
+**2. Финальный ответ**
+Напиши итоговый совет. Он должен содержать ТОЛЬКО полезные,
+обоснованные рекомендации — без внутренних рассуждений вслух,
+альтернативных вариантов, которые ты отверг, и неудачных формулировок.
+
+---
+
+### ИНСТРУКЦИЯ ПО САМОПРОВЕРКЕ ###
+
+Прежде чем финализировать ответ, тщательно перечитай "Набросок ответа"
+и "Финальный ответ". Для каждого тезиса пройди по чеклисту:
+
+**а. Проверка на критическую ошибку:**
+Критическая ошибка — это любой тезис, нарушающий логику совета.
+Сюда входят:
+* **Логические ошибки** — например, вывод "команда демотивирована,
+  значит нужно больше митингов" без причинно-следственного обоснования.
+* **Фактические ошибки** — например, приписывание практики не той
+  методологии, к которой она относится.
+
+Если критическая ошибка найдена:
+* Зафиксируй, что данный тезис **делает совет недействительным**.
+* Не развивай аргументацию, опирающуюся на этот тезис.
+* Проверь, есть ли в ответе независимые части, которые остаются
+  верными.
+
+**б. Проверка на пробел в обосновании:**
+Пробел в обосновании — это тезис, который может быть верным,
+но сформулирован расплывчато, бездоказательно или без опоры
+на конкретную практику.
+
+Если пробел найден:
+* Либо подкрепи тезис конкретным обоснованием.
+* Либо явно обозначь его как предположение, требующее уточнения
+  контекста.
+* Затем продолжи проверку остальных тезисов.
+
+**в. Проверка формата:**
+* Если в вопросе есть приветствие — первая строка финального ответа
+  содержит ответное приветствие?
+* Если нет — добавь перед советом.
+
+---
+
+### ПРИМЕР ВНУТРЕННЕЙ САМОПРОВЕРКИ ###
+
+*(Это иллюстрация процесса. В финальный ответ не включается.)*
+
+Черновой тезис: "Проведи ретроспективу и всё наладится."
+
+Проверка:
+* **Место:** "и всё наладится"
+  * **Проблема:** Критическая ошибка — причинно-следственная связь
+    не обоснована. Ретроспектива — инструмент рефлексии, а не
+    универсальное решение любой командной проблемы.
+
+Исправленный тезис: "Проведи ретроспективу, сфокусировав её на одной
+конкретной проблеме — это даст команде структуру для обсуждения
+и повысит шанс выйти с actionable-решением."
+
+### ПРИМЕР ОТВЕТА НА ПРИВЕТСТВИЕ ###
+
+Вопрос сотрудника: "Привет! Как провести ретроспективу?"
+
+Финальный ответ:
+Привет!
+Начни ретроспективу с выбора формата — например, Start/Stop/Continue
+или 4Ls. Зафиксируй не более 2-3 actionable-пунктов в конце встречи
+и назначь ответственных за каждый. Без конкретных договорённостей
+ретроспектива превращается в разговор ни о чём.
+
+### ПРИМЕР УТОЧНЯЮЩЕГО ВОПРОСА ###
+
+Вопрос сотрудника: "Как улучшить работу команды?"
+
+Финальный ответ:
+Чтобы дать точный совет, уточни: в какой методологии работает
+команда — Scrum, Kanban или что-то другое?
+
+---
+
+### ВОПРОС СОТРУДНИКА ###
+
+{question}
+
+---
+
+### НАПОМИНАНИЕ О ЗАДАЧЕ ###
+
+Твоя задача — действовать как Agile коуч в быстрой переписке.
+Сформируй внутренний набросок, пройди по чеклисту самопроверки,
+устрани критические ошибки и пробелы в обосновании, затем выдай
+только финальный ответ на русском языке."""
 
 # Short aliases for wide per-question table
 _SHORT = {
@@ -63,47 +233,93 @@ def _pipeline_config() -> dict:
 
 
 def _build_pipeline():
-    from hse_prom_prog.agents.rag_agent import RAGAgent
     from hse_prom_prog.llm.client import LLMClient
     from hse_prom_prog.rag.retriever import get_retriever
 
     llm_client = LLMClient()
     retriever = get_retriever()
-    rag_agent = RAGAgent(llm_client=llm_client, retriever=retriever)
-    return retriever, rag_agent
+    return retriever, llm_client
+
+
+def _truncate_context(docs) -> tuple[str, list[str]]:
+    """Build context string from docs with 4000 char limit (mirrors rag_agent.py)."""
+    parts: list[str] = []
+    total = 0
+    for doc in docs:
+        chunk = doc.page_content
+        if total + len(chunk) > _MAX_CONTEXT_CHARS:
+            remaining = _MAX_CONTEXT_CHARS - total
+            if remaining > 0:
+                parts.append(chunk[:remaining])
+            break
+        parts.append(chunk)
+        total += len(chunk) + 2  # account for "\n\n" separator
+
+    context = "\n\n".join(parts)
+
+    sources: list[str] = []
+    for doc in docs:
+        source = doc.metadata.get("source", "unknown")
+        category = doc.metadata.get("category", "")
+        label = f"{category}/{source}" if category else source
+        if label not in sources:
+            sources.append(label)
+
+    return context, sources
 
 
 # ── pipeline execution ───────────────────────────────────────
 
 
-def _run_pipeline(retriever, rag_agent, questions: list[dict]) -> list[dict]:
-    """Run RAG on every question; return list of dicts with answers + contexts."""
+def _run_pipeline(retriever, llm_client, questions: list[dict]) -> list[dict]:
+    """Run RAG on every question; return list of dicts with answers + contexts.
+
+    Mirrors production flow: retrieve → truncate context → send to LLM with
+    AGILE_COACH_PROMPT as system message and context+question as user message.
+    """
     results = []
     total = len(questions)
     for i, item in enumerate(questions, 1):
         question = item["question"]
         logger.info("[%d/%d] %s", i, total, question[:60])
 
-        # Retrieve
+        # Step 1: Retrieve (same as rag_agent.py)
         try:
             docs = retriever.invoke(question)
         except Exception:
             logger.exception("Retrieval failed for: %s", question[:60])
             docs = []
+
         contexts = [doc.page_content for doc in docs]
 
-        # Generate
-        state = {"original_query": question}
-        result = rag_agent.process(state)
+        # Step 2: Truncate context (same logic as rag_agent.py)
+        context, sources = _truncate_context(docs)
+
+        # Step 3: Generate with system prompt + context
+        # System message: AGILE_COACH_PROMPT with {question} substituted
+        # User message: context + question (same format as rag_agent._generate_answer)
+        system_prompt = AGILE_COACH_PROMPT.format(question=question)
+        user_message = (
+            f"Ответь на вопрос на основе контекста.\n\nКонтекст:\n{context}\n\nВопрос: {question}"
+        )
+
+        try:
+            response = llm_client.client.invoke(
+                [SystemMessage(content=system_prompt), HumanMessage(content=user_message)]
+            )
+            answer = response.content if hasattr(response, "content") else str(response)
+        except Exception:
+            logger.exception("LLM generation failed for: %s", question[:60])
+            answer = ""
 
         results.append(
             {
                 "question": question,
-                "answer": result.get("rag_response") or "",
+                "answer": answer,
                 "contexts": contexts,
                 "ground_truth": item["ground_truth"],
                 "category": item["category"],
-                "sources": result.get("rag_sources", []),
+                "sources": sources,
             }
         )
     return results
@@ -183,11 +399,11 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # 2. Build pipeline
-    retriever, rag_agent = _build_pipeline()
+    retriever, llm_client = _build_pipeline()
 
     # 3. Run pipeline on all questions
-    eval_results = _run_pipeline(retriever, rag_agent, eval_qs)
-    neg_results = _run_pipeline(retriever, rag_agent, neg_qs)
+    eval_results = _run_pipeline(retriever, llm_client, eval_qs)
+    neg_results = _run_pipeline(retriever, llm_client, neg_qs)
 
     # 4. RAGAS evaluation (non-negative only)
     samples = [

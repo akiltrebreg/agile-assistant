@@ -148,8 +148,9 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 ### LLM Backend
 
-- **Модель**: Qwen/Qwen2.5-3B-Instruct
-- **Backend**: vLLM с OpenAI-compatible API
+- **Модель**: avibe-gptq-4bit (GPTQ 4-bit квантизация, скачивается из Yandex
+  Cloud S3)
+- **Backend**: vLLM с OpenAI-compatible API, `--quantization=gptq`
 - **URL**: `http://localhost:8000/v1`
 
 ### База данных
@@ -409,7 +410,7 @@ cp .env.example .env
 ```bash
 # vLLM Configuration
 VLLM_BASE_URL=http://localhost:8000/v1
-VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+VLLM_MODEL=/models/avibe-gptq-4bit
 VLLM_API_KEY=EMPTY
 VLLM_TEMPERATURE=0.7
 VLLM_MAX_TOKENS=512
@@ -425,6 +426,14 @@ POSTGRES_DB=hse_jira_db
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=business_docs
 EMBEDDING_MODEL=intfloat/multilingual-e5-base
+
+# S3 Model Storage (Yandex Cloud Object Storage)
+S3_ENDPOINT=https://storage.yandexcloud.net
+S3_BUCKET=quant-models-agile
+S3_MODEL_PATH=models/avibe-gptq-4bit
+AWS_ACCESS_KEY_ID=your-yc-key-id
+AWS_SECRET_ACCESS_KEY=your-yc-secret-key
+AWS_DEFAULT_REGION=ru-central1
 
 # VSELLM (LLM-as-judge для RAGAS evaluation)
 VSELLM_API_KEY=your-vsellm-api-key
@@ -546,12 +555,25 @@ createdb -U postgres hse_jira_db
 psql -U postgres -d hse_jira_db -f database/init.sql
 ```
 
-### Шаг 3: Запуск vLLM
+### Шаг 3: Скачивание модели и запуск vLLM
+
+Модель `avibe-gptq-4bit` хранится в Yandex Cloud S3. Скачайте её локально:
+
+```bash
+# Установите AWS CLI (если ещё не установлен)
+pip install awscli
+
+# Скачайте модель из S3
+./scripts/download_model.sh /models/avibe-gptq-4bit
+```
+
+Запустите vLLM с квантизованной моделью:
 
 ```bash
 docker run -d --gpus all --name vllm-server -p 8000:8000 \
+    -v /models:/models \
     vllm/vllm-openai:v0.8.5 \
-    --model Qwen/Qwen2.5-3B-Instruct
+    --model /models/avibe-gptq-4bit --quantization gptq --dtype float16 --max-model-len 8192
 ```
 
 ### Шаг 4: Запуск приложения
@@ -926,7 +948,7 @@ k8s/
 ├── deployments/
 │   ├── qdrant.yaml               # Qdrant v1.13.2
 │   ├── redis.yaml                # Redis 7 (ephemeral)
-│   ├── vllm.yaml                 # vLLM (Qwen2.5-3B, GPU)
+│   ├── vllm.yaml                 # vLLM (avibe-gptq-4bit, GPU, S3 init)
 │   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
 │   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
 │   └── streamlit.yaml            # Streamlit UI
@@ -1079,7 +1101,7 @@ kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, 
 kubectl apply -f k8s/statefulsets/postgres-cluster.yaml   # CloudNativePG: 1 primary + 2 standby
 kubectl apply -f k8s/deployments/qdrant.yaml              # Qdrant v1.13.2
 kubectl apply -f k8s/deployments/redis.yaml               # Redis 7 (брокер Celery)
-kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + Qwen2.5-3B (GPU)
+kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + avibe-gptq-4bit (GPU, S3 download)
 ```
 
 **3.4. Ожидание готовности инфраструктуры:**
@@ -1270,7 +1292,7 @@ poetry run python -m eval.run_eval --experiment semantic_v2
   "experiment": "baseline",
   "timestamp": "20260310_143000",
   "config": {
-    "vllm_model": "Qwen/Qwen2.5-3B-Instruct",
+    "vllm_model": "/models/avibe-gptq-4bit",
     "embedding_model": "intfloat/multilingual-e5-base",
     "chunk_size": 1000,
     "chunk_overlap": 200,
@@ -1397,7 +1419,7 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | Переменная         | Описание              | По умолчанию               |
 | ------------------ | --------------------- | -------------------------- |
 | `VLLM_BASE_URL`    | URL vLLM API endpoint | `http://localhost:8000/v1` |
-| `VLLM_MODEL`       | Название модели       | `Qwen/Qwen2.5-3B-Instruct` |
+| `VLLM_MODEL`       | Название модели       | `/models/avibe-gptq-4bit`  |
 | `VLLM_API_KEY`     | API ключ для vLLM     | `EMPTY`                    |
 | `VLLM_TEMPERATURE` | Temperature для LLM   | `0.7`                      |
 | `VLLM_MAX_TOKENS`  | Максимум токенов      | `512`                      |

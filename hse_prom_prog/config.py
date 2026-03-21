@@ -49,8 +49,8 @@ class Settings(BaseSettings):
         description="Base URL for vLLM OpenAI-compatible endpoint",
     )
     vllm_model: str = Field(
-        default="Qwen/Qwen2.5-3B-Instruct",
-        description="Model name to use with vLLM",
+        default="/models/avibe-gptq-4bit",
+        description="Model name to use with vLLM (local path or HuggingFace ID)",
     )
     vllm_api_key: str = Field(
         default="EMPTY",

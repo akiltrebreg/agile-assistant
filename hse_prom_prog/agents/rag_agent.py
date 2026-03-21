@@ -22,7 +22,7 @@ class RAGAgent:
 
     Attributes:
         llm_client: LLM client for generating answers.
-        retriever: Qdrant vector store retriever (top-4, cosine similarity).
+        retriever: Qdrant retriever (top-4, cosine, 4000 chars limit).
     """
 
     def __init__(
@@ -68,8 +68,20 @@ class RAGAgent:
                 "rag_sources": [],
             }
 
-        # Step 2: Build context and collect sources
-        context = "\n\n".join(doc.page_content for doc in docs)
+        # Step 2: Build context and collect sources (limit to 4000 chars)
+        max_context_chars = 4000
+        parts: list[str] = []
+        total = 0
+        for doc in docs:
+            chunk = doc.page_content
+            if total + len(chunk) > max_context_chars:
+                remaining = max_context_chars - total
+                if remaining > 0:
+                    parts.append(chunk[:remaining])
+                break
+            parts.append(chunk)
+            total += len(chunk) + 2  # account for "\n\n" separator
+        context = "\n\n".join(parts)
         sources: list[str] = []
         for doc in docs:
             source = doc.metadata.get("source", "unknown")

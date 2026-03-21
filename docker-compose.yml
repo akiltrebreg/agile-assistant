@@ -80,7 +80,7 @@ services:
     networks:
       - hse-network
 
-  # vLLM service for serving the LLM model
+  # vLLM service for serving the LLM model (avibe-gptq-4bit from S3)
   vllm:
     image: vllm/vllm-openai:v0.8.5
     container_name: vllm-server
@@ -89,9 +89,12 @@ services:
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
     command:
-      - --model=Qwen/Qwen2.5-3B-Instruct
+      - --model=/models/avibe-gptq-4bit
+      - --quantization=gptq
+      - --dtype=float16
+      - --max-model-len=8192
     volumes:
-      - vllm-cache:/root/.cache/huggingface
+      - vllm-cache:/models
     ipc: host
     deploy:
       resources:
@@ -124,7 +127,7 @@ services:
         condition: service_healthy
     environment:
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_MODEL=/models/avibe-gptq-4bit
       - VLLM_API_KEY=EMPTY
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
@@ -178,7 +181,7 @@ services:
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_MODEL=/models/avibe-gptq-4bit
       - VLLM_API_KEY=EMPTY
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
@@ -227,7 +230,7 @@ services:
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_MODEL=/models/avibe-gptq-4bit
       - VLLM_API_KEY=EMPTY
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres

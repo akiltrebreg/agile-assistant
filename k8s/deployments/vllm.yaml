@@ -16,21 +16,51 @@ spec:
       labels:
         app: vllm
     spec:
+      # Init container: download GPTQ model from Yandex Cloud S3
+      initContainers:
+        - name: download-model
+          image: amazon/aws-cli:2.22.35
+          command:
+            - sh
+            - -c
+            - |
+              if [ -f /models/avibe-gptq-4bit/config.json ]; then
+                echo "Model already downloaded, skipping"
+                exit 0
+              fi
+              echo "Downloading avibe-gptq-4bit from S3..."
+              aws s3 sync \
+                s3://${S3_BUCKET}/${S3_MODEL_PATH}/ \
+                /models/avibe-gptq-4bit/ \
+                --endpoint-url ${S3_ENDPOINT}
+              echo "Download complete"
+              ls -lh /models/avibe-gptq-4bit/
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
       containers:
         - name: vllm
           image: vllm/vllm-openai:v0.8.5
           args:
-            - --model=Qwen/Qwen2.5-3B-Instruct
+            - --model=/models/avibe-gptq-4bit
+            - --quantization=gptq
+            - --dtype=float16
+            - --max-model-len=8192
           ports:
             - containerPort: 8000
           volumeMounts:
-            - name: hf-cache
-              mountPath: /root/.cache/huggingface
+            - name: model-cache
+              mountPath: /models
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 300
+            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 10
@@ -38,7 +68,7 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 600
+            initialDelaySeconds: 300
             periodSeconds: 60
             timeoutSeconds: 10
             failureThreshold: 5
@@ -51,6 +81,6 @@ spec:
               memory: 8Gi
               nvidia.com/gpu: "1"
       volumes:
-        - name: hf-cache
+        - name: model-cache
           persistentVolumeClaim:
             claimName: vllm-cache
