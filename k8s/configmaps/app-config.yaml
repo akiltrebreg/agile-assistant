@@ -10,7 +10,8 @@ data:
   VLLM_BASE_URL: "http://vllm-server:8000/v1"
   VLLM_MODEL: "/models/avibe-gptq-4bit"
   VLLM_TEMPERATURE: "0.7"
-  VLLM_MAX_TOKENS: "512"
+  VLLM_MAX_TOKENS: "2048"
+  VLLM_REPETITION_PENALTY: "1.15"
 
   # S3 Model Storage (Yandex Cloud)
   S3_ENDPOINT: "https://storage.yandexcloud.net"

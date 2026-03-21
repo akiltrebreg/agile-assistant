@@ -63,10 +63,16 @@ class Settings(BaseSettings):
         description="Temperature for LLM generation",
     )
     vllm_max_tokens: int = Field(
-        default=512,
+        default=2048,
         ge=1,
         le=4096,
         description="Maximum tokens for LLM responses",
+    )
+    vllm_repetition_penalty: float = Field(
+        default=1.15,
+        ge=1.0,
+        le=2.0,
+        description="Repetition penalty to avoid generation loops",
     )
 
     # PostgreSQL Configuration
