@@ -17,6 +17,8 @@ import argparse
 import json
 import logging
 import re
+import statistics
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -149,6 +151,47 @@ def _pipeline_config() -> dict:
     }
 
 
+def _chunk_stats() -> dict:
+    """Collect chunk-level statistics from Qdrant collection."""
+    from qdrant_client import QdrantClient
+
+    from hse_prom_prog.config import settings
+
+    client = QdrantClient(url=settings.qdrant_url)
+    collection = settings.qdrant_collection_name
+
+    info = client.get_collection(collection)
+    total_chunks = info.points_count
+
+    # Scroll through all points to compute length stats
+    lengths: list[int] = []
+    offset = None
+    while True:
+        points, offset = client.scroll(
+            collection,
+            limit=256,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for pt in points:
+            text = (pt.payload or {}).get("page_content", "")
+            lengths.append(len(text))
+        if offset is None:
+            break
+
+    if not lengths:
+        return {"total_chunks": total_chunks}
+
+    return {
+        "total_chunks": total_chunks,
+        "avg_chunk_chars": round(statistics.mean(lengths), 1),
+        "median_chunk_chars": round(statistics.median(lengths), 1),
+        "min_chunk_chars": min(lengths),
+        "max_chunk_chars": max(lengths),
+    }
+
+
 def _build_pipeline():
     from hse_prom_prog.llm.client import LLMClient
     from hse_prom_prog.rag.retriever import get_retriever
@@ -188,13 +231,14 @@ def _truncate_context(docs) -> tuple[str, list[str]]:
 # ── pipeline execution ───────────────────────────────────────
 
 
-def _run_pipeline(retriever, llm_client, questions: list[dict]) -> list[dict]:
-    """Run RAG on every question; return list of dicts with answers + contexts.
+def _run_pipeline(retriever, llm_client, questions: list[dict]) -> tuple[list[dict], list[float]]:
+    """Run RAG on every question; return results and per-query retrieval times.
 
-    Mirrors production flow: retrieve → truncate context → send to LLM with
+    Mirrors production flow: retrieve -> truncate context -> send to LLM with
     AGILE_COACH_PROMPT as system message and context+question as user message.
     """
     results = []
+    retrieval_times: list[float] = []
     total = len(questions)
     for i, item in enumerate(questions, 1):
         question = item["question"]
@@ -202,7 +246,9 @@ def _run_pipeline(retriever, llm_client, questions: list[dict]) -> list[dict]:
 
         # Step 1: Retrieve (same as rag_agent.py)
         try:
+            t0 = time.perf_counter()
             docs = retriever.invoke(question)
+            retrieval_times.append(time.perf_counter() - t0)
         except Exception:
             logger.exception("Retrieval failed for: %s", question[:60])
             docs = []
@@ -241,7 +287,7 @@ def _run_pipeline(retriever, llm_client, questions: list[dict]) -> list[dict]:
                 "sources": sources,
             }
         )
-    return results
+    return results, retrieval_times
 
 
 # ── display ──────────────────────────────────────────────────
@@ -317,14 +363,21 @@ def main(argv: list[str] | None = None) -> None:
         len(neg_qs),
     )
 
-    # 2. Build pipeline
+    # 2. Chunk statistics from Qdrant
+    logger.info("Collecting chunk statistics from Qdrant ...")
+    chunk_info = _chunk_stats()
+    logger.info("Chunk stats: %s", chunk_info)
+
+    # 3. Build pipeline
     retriever, llm_client = _build_pipeline()
 
-    # 3. Run pipeline on all questions
-    eval_results = _run_pipeline(retriever, llm_client, eval_qs)
-    neg_results = _run_pipeline(retriever, llm_client, neg_qs)
+    # 4. Run pipeline on all questions
+    eval_results, eval_ret_times = _run_pipeline(retriever, llm_client, eval_qs)
+    neg_results, neg_ret_times = _run_pipeline(retriever, llm_client, neg_qs)
+    all_ret_times = eval_ret_times + neg_ret_times
+    avg_retrieval_s = round(statistics.mean(all_ret_times), 4) if all_ret_times else 0
 
-    # 4. RAGAS evaluation (non-negative only)
+    # 6. RAGAS evaluation (non-negative only)
     samples = [
         RAGSample(
             question=r["question"],
@@ -337,7 +390,7 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Starting RAGAS evaluation …")
     ragas = evaluate_rag(samples)
 
-    # 5. Compose output
+    # 7. Compose output
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
 
     per_question = []
@@ -366,21 +419,25 @@ def main(argv: list[str] | None = None) -> None:
             }
         )
 
+    config = _pipeline_config()
+    config.update(chunk_info)
+    config["avg_retrieval_time_s"] = avg_retrieval_s
+
     output = {
         "experiment": args.experiment,
         "timestamp": timestamp,
-        "config": _pipeline_config(),
+        "config": config,
         "aggregate": ragas["scores"],
         "per_question": per_question,
     }
 
-    # 6. Save
+    # 8. Save
     _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _RESULTS_DIR / f"{args.experiment}_{timestamp}.json"
     out_path.write_text(json.dumps(output, ensure_ascii=False, indent=2))
     logger.info("Results saved → %s", out_path)
 
-    # 7. Print summary
+    # 9. Print summary
     ctx = {
         "experiment": args.experiment,
         "timestamp": timestamp,
