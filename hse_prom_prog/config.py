@@ -113,9 +113,35 @@ class Settings(BaseSettings):
         description="HuggingFace embedding model for RAG",
     )
     retriever_top_k: int = Field(
-        default=8,
+        default=3,
         ge=1,
-        description="Number of chunks returned by the retriever",
+        description="Final number of chunks after reranking",
+    )
+    retriever_initial_k: int = Field(
+        default=15,
+        ge=1,
+        description="Number of chunks fetched before reranking",
+    )
+
+    # Reranker Configuration
+    reranker_enabled: bool = Field(
+        default=True,
+        description="Enable cross-encoder reranking stage",
+    )
+    reranker_model: str = Field(
+        default="BAAI/bge-reranker-v2-m3",
+        description="Cross-encoder model for reranking",
+    )
+    reranker_threshold: float = Field(
+        default=0.01,
+        ge=0.0,
+        le=1.0,
+        description="Minimum reranker score to keep a document",
+    )
+    reranker_top_n: int = Field(
+        default=3,
+        ge=1,
+        description="Max documents to keep after reranking",
     )
 
     # Application mode

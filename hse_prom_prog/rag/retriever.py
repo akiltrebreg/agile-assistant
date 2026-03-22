@@ -59,10 +59,10 @@ def get_retriever() -> VectorStoreRetriever:
     global _retriever  # noqa: PLW0603
     if _retriever is None:
         store = get_vector_store()
-        top_k = settings.retriever_top_k
+        k = settings.retriever_initial_k if settings.reranker_enabled else settings.retriever_top_k
         _retriever = store.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": top_k},
+            search_kwargs={"k": k},
         )
-        logger.info("[Retriever] Retriever initialized (k=%d)", top_k)
+        logger.info("[Retriever] Initialized (k=%d, reranker=%s)", k, settings.reranker_enabled)
     return _retriever

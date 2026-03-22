@@ -147,7 +147,12 @@ def _pipeline_config() -> dict:
         "qdrant_collection": settings.qdrant_collection_name,
         "chunk_size": CHUNK_SIZE,
         "chunk_overlap": CHUNK_OVERLAP,
+        "retriever_initial_k": settings.retriever_initial_k,
         "retriever_top_k": settings.retriever_top_k,
+        "reranker_enabled": settings.reranker_enabled,
+        "reranker_model": settings.reranker_model if settings.reranker_enabled else None,
+        "reranker_threshold": settings.reranker_threshold if settings.reranker_enabled else None,
+        "reranker_top_n": settings.reranker_top_n if settings.reranker_enabled else None,
     }
 
 
@@ -193,12 +198,18 @@ def _chunk_stats() -> dict:
 
 
 def _build_pipeline():
+    from hse_prom_prog.config import settings
     from hse_prom_prog.llm.client import LLMClient
     from hse_prom_prog.rag.retriever import get_retriever
 
     llm_client = LLMClient()
     retriever = get_retriever()
-    return retriever, llm_client
+    reranker = None
+    if settings.reranker_enabled:
+        from hse_prom_prog.rag.reranker import get_reranker
+
+        reranker = get_reranker()
+    return retriever, reranker, llm_client
 
 
 def _truncate_context(docs) -> tuple[str, list[str]]:
@@ -231,20 +242,26 @@ def _truncate_context(docs) -> tuple[str, list[str]]:
 # ── pipeline execution ───────────────────────────────────────
 
 
-def _run_pipeline(retriever, llm_client, questions: list[dict]) -> tuple[list[dict], list[float]]:
-    """Run RAG on every question; return results and per-query retrieval times.
+def _run_pipeline(
+    retriever, reranker, llm_client, questions: list[dict]
+) -> tuple[list[dict], list[float], list[float]]:
+    """Run RAG on every question.
 
-    Mirrors production flow: retrieve -> truncate context -> send to LLM with
-    AGILE_COACH_PROMPT as system message and context+question as user message.
+    Returns:
+        results: per-question dicts with answer, contexts, etc.
+        retrieval_times: per-query retrieval latency (seconds).
+        e2e_times: per-query end-to-end latency (seconds).
     """
     results = []
     retrieval_times: list[float] = []
+    e2e_times: list[float] = []
     total = len(questions)
     for i, item in enumerate(questions, 1):
         question = item["question"]
         logger.info("[%d/%d] %s", i, total, question[:60])
+        t_start = time.perf_counter()
 
-        # Step 1: Retrieve (same as rag_agent.py)
+        # Step 1: Retrieve initial candidates
         try:
             t0 = time.perf_counter()
             docs = retriever.invoke(question)
@@ -253,14 +270,16 @@ def _run_pipeline(retriever, llm_client, questions: list[dict]) -> tuple[list[di
             logger.exception("Retrieval failed for: %s", question[:60])
             docs = []
 
+        # Step 2: Rerank with cross-encoder (if enabled)
+        if reranker:
+            docs = reranker.rerank(question, docs)
+
         contexts = [doc.page_content for doc in docs]
 
-        # Step 2: Truncate context (same logic as rag_agent.py)
+        # Step 3: Truncate context (same logic as rag_agent.py)
         context, sources = _truncate_context(docs)
 
-        # Step 3: Generate with system prompt + context
-        # System message: AGILE_COACH_PROMPT with {question} substituted
-        # User message: context + question (same format as rag_agent._generate_answer)
+        # Step 4: Generate with system prompt + context
         system_prompt = AGILE_COACH_PROMPT.format(question=question)
         user_message = (
             f"Ответь на вопрос на основе контекста.\n\nКонтекст:\n{context}\n\nВопрос: {question}"
@@ -277,6 +296,8 @@ def _run_pipeline(retriever, llm_client, questions: list[dict]) -> tuple[list[di
             logger.exception("LLM generation failed for: %s", question[:60])
             answer = ""
 
+        e2e_times.append(time.perf_counter() - t_start)
+
         results.append(
             {
                 "question": question,
@@ -287,7 +308,7 @@ def _run_pipeline(retriever, llm_client, questions: list[dict]) -> tuple[list[di
                 "sources": sources,
             }
         )
-    return results, retrieval_times
+    return results, retrieval_times, e2e_times
 
 
 # ── display ──────────────────────────────────────────────────
@@ -369,13 +390,25 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Chunk stats: %s", chunk_info)
 
     # 3. Build pipeline
-    retriever, llm_client = _build_pipeline()
+    retriever, reranker, llm_client = _build_pipeline()
 
     # 4. Run pipeline on all questions
-    eval_results, eval_ret_times = _run_pipeline(retriever, llm_client, eval_qs)
-    neg_results, neg_ret_times = _run_pipeline(retriever, llm_client, neg_qs)
+    eval_results, eval_ret_times, eval_e2e = _run_pipeline(retriever, reranker, llm_client, eval_qs)
+    neg_results, neg_ret_times, neg_e2e = _run_pipeline(retriever, reranker, llm_client, neg_qs)
     all_ret_times = eval_ret_times + neg_ret_times
+    all_e2e = eval_e2e + neg_e2e
     avg_retrieval_s = round(statistics.mean(all_ret_times), 4) if all_ret_times else 0
+    latency_stats = {}
+    if all_e2e:
+        sorted_e2e = sorted(all_e2e)
+        p95_idx = int(len(sorted_e2e) * 0.95)
+        latency_stats = {
+            "latency_avg_s": round(statistics.mean(all_e2e), 3),
+            "latency_median_s": round(statistics.median(all_e2e), 3),
+            "latency_p95_s": round(sorted_e2e[min(p95_idx, len(sorted_e2e) - 1)], 3),
+            "latency_min_s": round(min(all_e2e), 3),
+            "latency_max_s": round(max(all_e2e), 3),
+        }
 
     # 6. RAGAS evaluation (non-negative only)
     samples = [
@@ -423,11 +456,13 @@ def main(argv: list[str] | None = None) -> None:
     config.update(chunk_info)
     config["avg_retrieval_time_s"] = avg_retrieval_s
 
+    aggregate = {**ragas["scores"], **latency_stats}
+
     output = {
         "experiment": args.experiment,
         "timestamp": timestamp,
         "config": config,
-        "aggregate": ragas["scores"],
+        "aggregate": aggregate,
         "per_question": per_question,
     }
 
