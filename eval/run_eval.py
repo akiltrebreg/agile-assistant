@@ -147,7 +147,7 @@ def _pipeline_config() -> dict:
         "qdrant_collection": settings.qdrant_collection_name,
         "chunk_size": CHUNK_SIZE,
         "chunk_overlap": CHUNK_OVERLAP,
-        "retriever_top_k": 4,
+        "retriever_top_k": settings.retriever_top_k,
     }
 
 

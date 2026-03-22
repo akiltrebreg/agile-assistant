@@ -112,6 +112,11 @@ class Settings(BaseSettings):
         default="intfloat/multilingual-e5-base",
         description="HuggingFace embedding model for RAG",
     )
+    retriever_top_k: int = Field(
+        default=8,
+        ge=1,
+        description="Number of chunks returned by the retriever",
+    )
 
     # Application mode
     debug: bool = Field(

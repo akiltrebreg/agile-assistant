@@ -18,9 +18,6 @@ logger = logging.getLogger(__name__)
 _vector_store: QdrantVectorStore | None = None
 _retriever: VectorStoreRetriever | None = None
 
-# Number of relevant chunks to return
-_TOP_K = 4
-
 
 def _build_vector_store() -> QdrantVectorStore:
     """Create a QdrantVectorStore backed by the existing collection."""
@@ -62,9 +59,10 @@ def get_retriever() -> VectorStoreRetriever:
     global _retriever  # noqa: PLW0603
     if _retriever is None:
         store = get_vector_store()
+        top_k = settings.retriever_top_k
         _retriever = store.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": _TOP_K},
+            search_kwargs={"k": top_k},
         )
-        logger.info("[Retriever] Retriever initialized (k=%d)", _TOP_K)
+        logger.info("[Retriever] Retriever initialized (k=%d)", top_k)
     return _retriever
