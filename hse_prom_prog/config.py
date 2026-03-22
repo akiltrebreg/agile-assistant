@@ -57,19 +57,19 @@ class Settings(BaseSettings):
         description="API key for vLLM (use 'EMPTY' for local deployments)",
     )
     vllm_temperature: float = Field(
-        default=0.7,
+        default=0.05,
         ge=0.0,
         le=2.0,
         description="Temperature for LLM generation",
     )
     vllm_max_tokens: int = Field(
-        default=2048,
+        default=400,
         ge=1,
         le=4096,
         description="Maximum tokens for LLM responses",
     )
     vllm_repetition_penalty: float = Field(
-        default=1.15,
+        default=1.1,
         ge=1.0,
         le=2.0,
         description="Repetition penalty to avoid generation loops",
