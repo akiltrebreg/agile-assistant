@@ -1,4 +1,4 @@
-# HSE Prom Prog - Agile AI Assistant (Задание 6)
+# Agile AI Assistant
 
 Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM,
 PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
@@ -117,7 +117,10 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - Использует Qdrant как векторное хранилище для документов из `knowledge_base/`
 - Поиск релевантных фрагментов через HuggingFace-эмбеддинги
   (`intfloat/multilingual-e5-base`)
-- Ограничение контекста: до 4000 символов из top-4 релевантных чанков
+- Двухэтапный retrieval: извлечение top-15 чанков → cross-encoder reranking
+  (`BAAI/bge-reranker-v2-m3`) → top-3 наиболее релевантных
+- Ограничение контекста: до 4000 символов из top-3 релевантных чанков
+- Reranker можно отключить через `RERANKER_ENABLED=false` для A/B-экспериментов
 - Генерирует ответ через LLM строго на основе найденного контекста
 - Возвращает ответ с указанием источников (category/filename)
 - Graceful degradation: если Qdrant недоступен, workflow продолжает работать для
@@ -176,7 +179,7 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - **Метрика**: Cosine similarity
 - **Документы**: PDF и Markdown из `knowledge_base/` (Agile-практики, описания
   метрик, внутренние регламенты)
-- **Ingestion pipeline**: загрузка → chunking (1000 символов, overlap 200) →
+- **Ingestion pipeline**: загрузка → chunking (800 символов, overlap 200) →
   эмбеддинг → загрузка в Qdrant
 
 ## Структура проекта
@@ -221,6 +224,7 @@ hse-prom-prog/
 │   ├── rag/
 │   │   ├── __init__.py
 │   │   ├── ingest.py                  # Ingestion pipeline (load → chunk → embed → Qdrant)
+│   │   ├── reranker.py                # Cross-encoder reranker (bge-reranker-v2-m3)
 │   │   └── retriever.py               # Qdrant retriever (singleton)
 │   └── tasks/
 │       ├── __init__.py
@@ -294,8 +298,8 @@ cd hse-prom-prog
 # Скачайте все ветки
 git fetch --all
 
-# Переключитесь на ветку checkpoint_5
-git checkout checkpoint_5
+# Переключитесь на актуальную ветку
+git checkout checkpoint_10
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -416,8 +420,8 @@ cp .env.example .env
 VLLM_BASE_URL=http://localhost:8000/v1
 VLLM_MODEL=/models/avibe-gptq-4bit
 VLLM_API_KEY=EMPTY
-VLLM_TEMPERATURE=0.7
-VLLM_MAX_TOKENS=512
+VLLM_TEMPERATURE=0.05
+VLLM_MAX_TOKENS=400
 
 # PostgreSQL Configuration
 POSTGRES_HOST=localhost
@@ -507,7 +511,7 @@ poetry run python -m hse_prom_prog.rag.ingest /path/to/docs
 Pipeline выполняет:
 
 1. **Загрузка** — читает .pdf (PyPDFLoader) и .md (TextLoader)
-2. **Chunking** — разбивает на фрагменты (1000 символов, overlap 200)
+2. **Chunking** — разбивает на фрагменты (800 символов, overlap 200)
 3. **Эмбеддинг** — `intfloat/multilingual-e5-base` (CPU)
 4. **Загрузка в Qdrant** — пересоздаёт коллекцию и загружает все чанки
 
@@ -1306,7 +1310,7 @@ poetry run python -m eval.run_eval --experiment semantic_v2
 Скрипт выполняет:
 
 1. Загружает `golden_dataset.json`
-2. Прогоняет каждый вопрос через RAG-пайплайн (retrieve → generate)
+2. Прогоняет каждый вопрос через RAG-пайплайн (retrieve → rerank → generate)
 3. Вычисляет RAGAS-метрики (LLM-as-judge: GPT-5.2 через vsellm)
 4. Сохраняет результаты в `eval/results/{experiment}_{timestamp}.json`
 5. Выводит сводную таблицу в консоль
@@ -1320,14 +1324,28 @@ poetry run python -m eval.run_eval --experiment semantic_v2
   "config": {
     "vllm_model": "/models/avibe-gptq-4bit",
     "embedding_model": "intfloat/multilingual-e5-base",
-    "chunk_size": 1000,
+    "chunk_size": 800,
     "chunk_overlap": 200,
-    "retriever_top_k": 4
+    "retriever_initial_k": 15,
+    "retriever_top_k": 3,
+    "reranker_enabled": true,
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_threshold": 0.01,
+    "reranker_top_n": 3,
+    "total_chunks": 82,
+    "avg_chunk_chars": 650,
+    "median_chunk_chars": 680,
+    "min_chunk_chars": 120,
+    "max_chunk_chars": 800,
+    "avg_retrieval_time_s": 0.35
   },
   "aggregate": {
     "context_precision": 0.82,
     "faithfulness": 0.91,
-    "answer_correctness": 0.75
+    "answer_correctness": 0.75,
+    "latency_avg_s": 12.5,
+    "latency_median_s": 11.8,
+    "latency_p95_s": 18.3
   },
   "per_question": [...]
 }
@@ -1442,13 +1460,14 @@ poetry run pytest tests/ --cov=hse_prom_prog
 
 ### vLLM Configuration
 
-| Переменная         | Описание              | По умолчанию               |
-| ------------------ | --------------------- | -------------------------- |
-| `VLLM_BASE_URL`    | URL vLLM API endpoint | `http://localhost:8000/v1` |
-| `VLLM_MODEL`       | Название модели       | `/models/avibe-gptq-4bit`  |
-| `VLLM_API_KEY`     | API ключ для vLLM     | `EMPTY`                    |
-| `VLLM_TEMPERATURE` | Temperature для LLM   | `0.7`                      |
-| `VLLM_MAX_TOKENS`  | Максимум токенов      | `512`                      |
+| Переменная                | Описание                           | По умолчанию               |
+| ------------------------- | ---------------------------------- | -------------------------- |
+| `VLLM_BASE_URL`           | URL vLLM API endpoint              | `http://localhost:8000/v1` |
+| `VLLM_MODEL`              | Название модели                    | `/models/avibe-gptq-4bit`  |
+| `VLLM_API_KEY`            | API ключ для vLLM                  | `EMPTY`                    |
+| `VLLM_TEMPERATURE`        | Temperature для LLM                | `0.05`                     |
+| `VLLM_MAX_TOKENS`         | Максимум токенов                   | `400`                      |
+| `VLLM_REPETITION_PENALTY` | Штраф за повторы (vLLM extra_body) | `1.1`                      |
 
 ### PostgreSQL Configuration
 
@@ -1467,6 +1486,22 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `QDRANT_URL`             | URL Qdrant сервера | `http://localhost:6333`         |
 | `QDRANT_COLLECTION_NAME` | Название коллекции | `business_docs`                 |
 | `EMBEDDING_MODEL`        | Модель эмбеддингов | `intfloat/multilingual-e5-base` |
+
+### Retriever Configuration
+
+| Переменная            | Описание                               | По умолчанию |
+| --------------------- | -------------------------------------- | ------------ |
+| `RETRIEVER_TOP_K`     | Финальное число чанков (без реранкера) | `3`          |
+| `RETRIEVER_INITIAL_K` | Число чанков для первичного извлечения | `15`         |
+
+### Reranker Configuration
+
+| Переменная           | Описание                               | По умолчанию              |
+| -------------------- | -------------------------------------- | ------------------------- |
+| `RERANKER_ENABLED`   | Включить cross-encoder reranking       | `true`                    |
+| `RERANKER_MODEL`     | Модель реранкера                       | `BAAI/bge-reranker-v2-m3` |
+| `RERANKER_THRESHOLD` | Минимальный скор для фильтрации чанков | `0.01`                    |
+| `RERANKER_TOP_N`     | Число чанков после реранкинга          | `3`                       |
 
 ### Redis Configuration
 
