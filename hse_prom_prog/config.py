@@ -118,7 +118,7 @@ class Settings(BaseSettings):
         description="Final number of chunks after reranking",
     )
     retriever_initial_k: int = Field(
-        default=15,
+        default=20,
         ge=1,
         description="Number of chunks fetched before reranking",
     )
