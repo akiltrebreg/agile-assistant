@@ -49,7 +49,7 @@ class Settings(BaseSettings):
         description="Base URL for vLLM OpenAI-compatible endpoint",
     )
     vllm_model: str = Field(
-        default="/models/avibe-gptq-4bit",
+        default="/models/avibe-gptq-8bit",
         description="Model name to use with vLLM (local path or HuggingFace ID)",
     )
     vllm_api_key: str = Field(

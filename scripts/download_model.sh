@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Download avibe-gptq-4bit model from Yandex Cloud S3 to local directory.
+# Download avibe-gptq-8bit model from Yandex Cloud S3 to local directory.
 #
 # Usage:
 #   ./scripts/download_model.sh [target_dir]
@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-TARGET_DIR="${1:-/models/avibe-gptq-4bit}"
+TARGET_DIR="${1:-/models/avibe-gptq-8bit}"
 
 # Source .env if present
 if [ -f .env ]; then
@@ -22,7 +22,7 @@ fi
 
 S3_ENDPOINT="${S3_ENDPOINT:-https://storage.yandexcloud.net}"
 S3_BUCKET="${S3_BUCKET:-quant-models-agile}"
-S3_MODEL_PATH="${S3_MODEL_PATH:-models/avibe-gptq-4bit}"
+S3_MODEL_PATH="${S3_MODEL_PATH:-models/avibe-gptq-8bit}"
 
 echo "Downloading model from s3://${S3_BUCKET}/${S3_MODEL_PATH} → ${TARGET_DIR}"
 

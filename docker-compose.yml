@@ -80,7 +80,7 @@ services:
     networks:
       - hse-network
 
-  # Download avibe-gptq-4bit model from Yandex Cloud S3 into shared volume
+  # Download avibe-gptq-8bit model from Yandex Cloud S3 into shared volume
   download-model:
     image: amazon/aws-cli:2.22.35
     environment:
@@ -91,24 +91,24 @@ services:
     command:
       - -c
       - |
-        if [ -f /models/avibe-gptq-4bit/config.json ]; then
+        if [ -f /models/avibe-gptq-8bit/config.json ]; then
           echo "Model already downloaded, skipping"
           exit 0
         fi
-        echo "Downloading avibe-gptq-4bit from S3..."
+        echo "Downloading avibe-gptq-8bit from S3..."
         aws s3 sync \
-          s3://${S3_BUCKET:-quant-models-agile}/${S3_MODEL_PATH:-models/avibe-gptq-4bit}/ \
-          /models/avibe-gptq-4bit/ \
+          s3://${S3_BUCKET:-quant-models-agile}/${S3_MODEL_PATH:-models/avibe-gptq-8bit}/ \
+          /models/avibe-gptq-8bit/ \
           --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
-        test -f /models/avibe-gptq-4bit/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        test -f /models/avibe-gptq-8bit/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
         echo "Download complete"
-        ls -lh /models/avibe-gptq-4bit/
+        ls -lh /models/avibe-gptq-8bit/
     volumes:
       - vllm-cache:/models
     networks:
       - hse-network
 
-  # vLLM service for serving the LLM model (avibe-gptq-4bit from S3)
+  # vLLM service for serving the LLM model (avibe-gptq-8bit from S3)
   vllm:
     image: vllm/vllm-openai:v0.8.5
     container_name: vllm-server
@@ -120,7 +120,7 @@ services:
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
     command:
-      - --model=/models/avibe-gptq-4bit
+      - --model=/models/avibe-gptq-8bit
       - --quantization=gptq
       - --dtype=float16
       - --max-model-len=8192
@@ -158,7 +158,7 @@ services:
         condition: service_healthy
     environment:
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=/models/avibe-gptq-4bit
+      - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
@@ -213,7 +213,7 @@ services:
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=/models/avibe-gptq-4bit
+      - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
@@ -262,7 +262,7 @@ services:
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=/models/avibe-gptq-4bit
+      - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres

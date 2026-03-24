@@ -151,7 +151,7 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 ### LLM Backend
 
-- **Модель**: avibe-gptq-4bit (GPTQ 4-bit квантизация, скачивается из Yandex
+- **Модель**: avibe-gptq-8bit (GPTQ 4-bit квантизация, скачивается из Yandex
   Cloud S3)
 - **Backend**: vLLM с OpenAI-compatible API, `--quantization=gptq`
 - **URL**: `http://localhost:8000/v1`
@@ -321,7 +321,7 @@ docker compose up -d postgres qdrant redis vllm
 ```
 
 При первом запуске сервис `download-model` автоматически скачает модель
-`avibe-gptq-4bit` (~5GB) из Yandex Cloud S3 в Docker volume. При повторных
+`avibe-gptq-8bit` (~5GB) из Yandex Cloud S3 в Docker volume. При повторных
 запусках скачивание пропускается (модель уже на диске).
 
 Дождитесь, пока все сервисы станут healthy (vLLM загружает модель — это может
@@ -418,7 +418,7 @@ cp .env.example .env
 ```bash
 # vLLM Configuration
 VLLM_BASE_URL=http://localhost:8000/v1
-VLLM_MODEL=/models/avibe-gptq-4bit
+VLLM_MODEL=/models/avibe-gptq-8bit
 VLLM_API_KEY=EMPTY
 VLLM_TEMPERATURE=0.05
 VLLM_MAX_TOKENS=400
@@ -438,7 +438,7 @@ EMBEDDING_MODEL=intfloat/multilingual-e5-base
 # S3 Model Storage (Yandex Cloud Object Storage)
 S3_ENDPOINT=https://storage.yandexcloud.net
 S3_BUCKET=quant-models-agile
-S3_MODEL_PATH=models/avibe-gptq-4bit
+S3_MODEL_PATH=models/avibe-gptq-8bit
 AWS_ACCESS_KEY_ID=your-yc-key-id
 AWS_SECRET_ACCESS_KEY=your-yc-secret-key
 AWS_DEFAULT_REGION=ru-central1
@@ -565,14 +565,14 @@ psql -U postgres -d hse_jira_db -f database/init.sql
 
 ### Шаг 3: Скачивание модели и запуск vLLM
 
-Модель `avibe-gptq-4bit` хранится в Yandex Cloud S3. Скачайте её локально:
+Модель `avibe-gptq-8bit` хранится в Yandex Cloud S3. Скачайте её локально:
 
 ```bash
 # Установите AWS CLI (если ещё не установлен)
 pip install awscli
 
 # Скачайте модель из S3
-./scripts/download_model.sh /models/avibe-gptq-4bit
+./scripts/download_model.sh /models/avibe-gptq-8bit
 ```
 
 Запустите vLLM с квантизованной моделью:
@@ -581,7 +581,7 @@ pip install awscli
 docker run -d --gpus all --name vllm-server -p 8000:8000 \
     -v /models:/models \
     vllm/vllm-openai:v0.8.5 \
-    --model /models/avibe-gptq-4bit --quantization gptq --dtype float16 --max-model-len 8192
+    --model /models/avibe-gptq-8bit --quantization gptq --dtype float16 --max-model-len 8192
 ```
 
 ### Шаг 4: Запуск приложения
@@ -956,7 +956,7 @@ k8s/
 ├── deployments/
 │   ├── qdrant.yaml               # Qdrant v1.13.2
 │   ├── redis.yaml                # Redis 7 (ephemeral)
-│   ├── vllm.yaml                 # vLLM (avibe-gptq-4bit, GPU, S3 init)
+│   ├── vllm.yaml                 # vLLM (avibe-gptq-8bit, GPU, S3 init)
 │   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
 │   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
 │   └── streamlit.yaml            # Streamlit UI
@@ -1109,7 +1109,7 @@ kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, 
 kubectl apply -f k8s/statefulsets/postgres-cluster.yaml   # CloudNativePG: 1 primary + 2 standby
 kubectl apply -f k8s/deployments/qdrant.yaml              # Qdrant v1.13.2
 kubectl apply -f k8s/deployments/redis.yaml               # Redis 7 (брокер Celery)
-kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + avibe-gptq-4bit (GPU, S3 download)
+kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + avibe-gptq-8bit (GPU, S3 download)
 ```
 
 **3.4. Ожидание готовности инфраструктуры:**
@@ -1322,7 +1322,7 @@ poetry run python -m eval.run_eval --experiment semantic_v2
   "experiment": "baseline",
   "timestamp": "20260310_143000",
   "config": {
-    "vllm_model": "/models/avibe-gptq-4bit",
+    "vllm_model": "/models/avibe-gptq-8bit",
     "embedding_model": "intfloat/multilingual-e5-base",
     "chunk_size": 800,
     "chunk_overlap": 200,
@@ -1463,7 +1463,7 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | Переменная                | Описание                           | По умолчанию               |
 | ------------------------- | ---------------------------------- | -------------------------- |
 | `VLLM_BASE_URL`           | URL vLLM API endpoint              | `http://localhost:8000/v1` |
-| `VLLM_MODEL`              | Название модели                    | `/models/avibe-gptq-4bit`  |
+| `VLLM_MODEL`              | Название модели                    | `/models/avibe-gptq-8bit`  |
 | `VLLM_API_KEY`            | API ключ для vLLM                  | `EMPTY`                    |
 | `VLLM_TEMPERATURE`        | Temperature для LLM                | `0.05`                     |
 | `VLLM_MAX_TOKENS`         | Максимум токенов                   | `400`                      |

@@ -24,17 +24,17 @@ spec:
             - sh
             - -c
             - |
-              if [ -f /models/avibe-gptq-4bit/config.json ]; then
+              if [ -f /models/avibe-gptq-8bit/config.json ]; then
                 echo "Model already downloaded, skipping"
                 exit 0
               fi
-              echo "Downloading avibe-gptq-4bit from S3..."
+              echo "Downloading avibe-gptq-8bit from S3..."
               aws s3 sync \
                 s3://${S3_BUCKET}/${S3_MODEL_PATH}/ \
-                /models/avibe-gptq-4bit/ \
+                /models/avibe-gptq-8bit/ \
                 --endpoint-url ${S3_ENDPOINT}
               echo "Download complete"
-              ls -lh /models/avibe-gptq-4bit/
+              ls -lh /models/avibe-gptq-8bit/
           envFrom:
             - configMapRef:
                 name: app-config
@@ -47,7 +47,7 @@ spec:
         - name: vllm
           image: vllm/vllm-openai:v0.8.5
           args:
-            - --model=/models/avibe-gptq-4bit
+            - --model=/models/avibe-gptq-8bit
             - --quantization=gptq
             - --dtype=float16
             - --max-model-len=8192
