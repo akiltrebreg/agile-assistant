@@ -110,7 +110,7 @@ services:
 
   # vLLM service for serving the LLM model (avibe-gptq-8bit from S3)
   vllm:
-    image: vllm/vllm-openai:v0.8.5
+    image: vllm/vllm-openai:v0.9.1
     container_name: vllm-server
     depends_on:
       download-model:
