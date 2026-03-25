@@ -113,7 +113,7 @@ class Settings(BaseSettings):
         description="HuggingFace embedding model for RAG",
     )
     retriever_top_k: int = Field(
-        default=3,
+        default=4,
         ge=1,
         description="Final number of chunks after reranking",
     )
