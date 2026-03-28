@@ -133,13 +133,13 @@ class Settings(BaseSettings):
         description="Cross-encoder model for reranking",
     )
     reranker_threshold: float = Field(
-        default=0.01,
+        default=0.1,
         ge=0.0,
         le=1.0,
         description="Minimum reranker score to keep a document",
     )
     reranker_top_n: int = Field(
-        default=3,
+        default=4,
         ge=1,
         description="Max documents to keep after reranking",
     )
