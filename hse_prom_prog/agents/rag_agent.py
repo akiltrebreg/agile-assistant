@@ -15,7 +15,6 @@ from hse_prom_prog.rag.reranker import get_reranker
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
-    from langchain_core.vectorstores import VectorStoreRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class RAGAgent:
     def __init__(
         self,
         llm_client: LLMClient,
-        retriever: VectorStoreRetriever,
+        retriever: Any,
     ) -> None:
         self.llm_client = llm_client
         self.retriever = retriever

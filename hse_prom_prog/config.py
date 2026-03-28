@@ -4,6 +4,8 @@ This module contains Pydantic settings for configuring the application,
 including vLLM API endpoints and model parameters.
 """
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -121,6 +123,17 @@ class Settings(BaseSettings):
         default=20,
         ge=1,
         description="Number of chunks fetched before reranking",
+    )
+
+    # Search Configuration
+    search_type: Literal["dense", "sparse", "hybrid"] = Field(
+        default="dense",
+        description="Retrieval mode: 'dense' (cosine), 'sparse' (BM25), 'hybrid' (RRF fusion)",
+    )
+    rrf_k: int = Field(
+        default=60,
+        ge=1,
+        description="RRF fusion parameter k (used only when search_type='hybrid')",
     )
 
     # Reranker Configuration

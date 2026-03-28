@@ -38,7 +38,8 @@ _MAX_CONTEXT_CHARS = 4000
 AGILE_COACH_PROMPT = """Ты — Agile-коуч компании. Отвечай ТОЛЬКО на русском языке.
 
 ### ПРАВИЛА ###
-1. Отвечай СТРОГО на основе контекста ниже. Каждое утверждение в ответе должно следовать из контекста.
+1. Отвечай СТРОГО на основе контекста ниже.\
+ Каждое утверждение в ответе должно следовать из контекста.
 2. Перескажи факты близко к тексту контекста. Числа, названия, формулы, списки — приводи точно.
 3. НЕ добавляй выводов, интерпретаций и рекомендаций от себя. НЕ объясняй, почему что-то важно.
 4. Если в контексте НЕТ ответа — скажи только: "В моей базе знаний нет информации по этому вопросу."
@@ -88,6 +89,8 @@ def _pipeline_config() -> dict:
         "qdrant_collection": settings.qdrant_collection_name,
         "chunk_size": CHUNK_SIZE,
         "chunk_overlap": CHUNK_OVERLAP,
+        "search_type": settings.search_type,
+        "rrf_k": settings.rrf_k if settings.search_type == "hybrid" else None,
         "retriever_initial_k": settings.retriever_initial_k,
         "retriever_top_k": settings.retriever_top_k,
         "reranker_enabled": settings.reranker_enabled,

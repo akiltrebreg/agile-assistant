@@ -40,6 +40,7 @@ dependencies = [
     "pypdf>=5.0.0",
     # BM25 for hybrid search
     "rank-bm25>=0.2.2",
+    "fastembed>=0.4.0",
     # RAGAS evaluation framework
     "ragas>=0.2.0",
     "datasets>=3.0.0",
