@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_KB_DIR = Path(__file__).resolve().parents[2] / "knowledge_base"
 
 # Chunking parameters
-CHUNK_SIZE = 1000
+CHUNK_SIZE = 500
 CHUNK_OVERLAP = 200
 
 
