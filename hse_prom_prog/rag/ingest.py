@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 _DEFAULT_KB_DIR = Path(__file__).resolve().parents[2] / "knowledge_base"
 
 # Chunking parameters
-CHUNK_SIZE =  500
-CHUNK_OVERLAP = 200
+CHUNK_SIZE =  1500
+CHUNK_OVERLAP = 300
 
 
 def _load_documents(kb_dir: Path) -> list:
