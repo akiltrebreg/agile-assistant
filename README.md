@@ -151,7 +151,7 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 ### LLM Backend
 
-- **Модель**: avibe-gptq-8bit (GPTQ 4-bit квантизация, скачивается из Yandex
+- **Модель**: avibe-gptq-8bit (GPTQ 8-bit квантизация, скачивается из Yandex
   Cloud S3)
 - **Backend**: vLLM с OpenAI-compatible API, `--quantization=gptq`
 - **URL**: `http://localhost:8000/v1`
