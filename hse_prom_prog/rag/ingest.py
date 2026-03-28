@@ -10,6 +10,7 @@ Usage:
 """
 
 import logging
+import re
 import sys
 import uuid
 from datetime import UTC, datetime
@@ -94,6 +95,60 @@ def _enrich_metadata(doc, kb_dir: Path) -> None:
     doc.metadata["ingested_at"] = datetime.now(tz=UTC).isoformat()
 
 
+def _doc_title_from_source(source: str) -> str:
+    """Extract human-readable title from file path.
+
+    ``done_total.pdf`` → ``Done Total``
+    ``team_lead_time.pdf`` → ``Team Lead Time``
+    """
+    stem = Path(source).stem  # "done_total"
+    return stem.replace("_", " ").title()
+
+
+# Regex: lines that look like section headers in extracted PDF/MD text.
+# Matches "# Heading", "## Heading", or short ALL-CAPS / Title-like lines
+# that appear on their own (e.g. "Что это?", "Как считается?").
+_SECTION_RE = re.compile(
+    r"^(?:#{1,3}\s+(.+)|([А-ЯЁA-Z][А-ЯЁа-яёA-Za-z\s\-]{2,40}\?))\s*$",
+    re.MULTILINE,
+)
+
+
+def _find_last_section(text: str) -> str | None:
+    """Find the last section-like heading that appears in *text*."""
+    matches = list(_SECTION_RE.finditer(text))
+    if not matches:
+        return None
+    last = matches[-1]
+    return (last.group(1) or last.group(2)).strip()
+
+
+def _prepend_metadata(chunks: list) -> list:
+    """Add document title (and section if found) to the start of each chunk.
+
+    The prepend is added *on top of* the chunk text, intentionally exceeding
+    ``CHUNK_SIZE`` — this is a deliberate design decision so that the
+    splitter's semantic boundaries are preserved while the embedding model
+    gets the full context.
+    """
+    for chunk in chunks:
+        source = chunk.metadata.get("source", "")
+        doc_title = _doc_title_from_source(source)
+        chunk.metadata["doc_title"] = doc_title
+
+        section = _find_last_section(chunk.page_content)
+        chunk.metadata["section"] = section or ""
+
+        prefix = f"{doc_title}. {section}. " if section else f"{doc_title}. "
+        chunk.page_content = prefix + chunk.page_content
+
+    if chunks:
+        preview = chunks[0].page_content[:120].replace("\n", " ")
+        logger.info("[Ingest] Prepend example: %s...", preview)
+
+    return chunks
+
+
 def _split_documents(docs: list) -> list:
     """Split documents into chunks using RecursiveCharacterTextSplitter."""
     splitter = RecursiveCharacterTextSplitter(
@@ -102,6 +157,10 @@ def _split_documents(docs: list) -> list:
     )
     chunks = splitter.split_documents(docs)
     logger.info("[Ingest] Split into %d chunks", len(chunks))
+
+    chunks = _prepend_metadata(chunks)
+    logger.info("[Ingest] Prepended metadata to %d chunks", len(chunks))
+
     return chunks
 
 
