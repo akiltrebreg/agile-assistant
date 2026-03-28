@@ -21,7 +21,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from tabulate import tabulate
 
 from eval.metrics import RAGSample, evaluate_rag
@@ -35,22 +35,27 @@ _RESULTS_DIR = _EVAL_DIR / "results"
 # Max context length — must match production rag_agent.py
 _MAX_CONTEXT_CHARS = 4000
 
-AGILE_COACH_PROMPT = """Ты профессиональный Agile коуч. Отвечай ТОЛЬКО на русском языке.
- 
-ПРАВИЛА:
-1. Отвечай СТРОГО по контексту. Перескажи факты близко к тексту контекста.
-2. НЕ ОБЪЯСНЯЙ почему что-то важно. НЕ ДОБАВЛЯЙ выводов и интерпретаций от себя.
-3. Если в контексте указаны числа, списки, названия — приведи их точно как в контексте.
-4. Если информации нет в контексте — скажи: "В моей базе знаний нет информации по этому вопросу."
-5. Если в вопросе есть приветствие — начни с короткого приветствия.
-6. Ответ: 1-3 предложения. После ответа ОСТАНОВИСЬ.
- 
-### ВОПРОС СОТРУДНИКА ###
+AGILE_COACH_PROMPT = """Ты — Agile-коуч компании. Отвечай ТОЛЬКО на русском языке.
+
+### ЗАДАЧА ###
+Ответь на вопрос сотрудника, используя ТОЛЬКО предоставленный контекст.
+
+### ПРАВИЛА ###
+1. Используй ТОЛЬКО факты из контекста. Цифры, названия, формулы, списки —\
+ приводи точно как в контексте.
+2. Не добавляй собственных выводов, интерпретаций и рекомендаций, которых нет в контексте.
+3. Если контекст не содержит ответа — скажи: "В моей базе знаний нет информации по этому вопросу."
+4. Если вопрос содержит приветствие — начни с краткого ответного приветствия.
+5. Формат: 2–5 предложений. Структурируй ответ, если в контексте есть перечисление или этапы.
+
+### КОНТЕКСТ ###
+{context}
+
+### ВОПРОС ###
 {question}
- 
+
 ### ОТВЕТ ###
 """
- 
 
 # Short aliases for wide per-question table
 _SHORT = {
@@ -217,16 +222,11 @@ def _run_pipeline(
         # Step 3: Truncate context (same logic as rag_agent.py)
         context, sources = _truncate_context(docs)
 
-        # Step 4: Generate with system prompt + context
-        system_prompt = AGILE_COACH_PROMPT.format(question=question)
-        user_message = (
-            f"Ответь на вопрос на основе контекста.\n\nКонтекст:\n{context}\n\nВопрос: {question}"
-        )
+        # Step 4: Generate with prompt containing context + question
+        prompt = AGILE_COACH_PROMPT.format(context=context, question=question)
 
         try:
-            response = llm_client.client.invoke(
-                [SystemMessage(content=system_prompt), HumanMessage(content=user_message)]
-            )
+            response = llm_client.client.invoke([HumanMessage(content=prompt)])
             raw = response.content if hasattr(response, "content") else str(response)
             logger.info("[raw %d chars] %s", len(raw), raw[:120].replace("\n", " "))
             answer = raw.strip()
