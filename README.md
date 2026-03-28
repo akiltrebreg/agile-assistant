@@ -59,6 +59,7 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
   - [Code Quality](#code-quality)
   - [Тестирование](#тестирование)
 - [Конфигурация](#конфигурация)
+- [Текущая лучшая конфигурация RAG](#текущая-лучшая-конфигурация-rag)
 - [Лицензия](#лицензия)
 
 ## Архитектура
@@ -112,19 +113,24 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - Whitelist допустимых метрик (защита от невалидных колонок)
 - Параметризованные запросы через SQLAlchemy `text()` (защита от SQL-инъекций)
 
-**3. RAG Agent** (ответы на основе базы знаний)
+**3. RAG Agent** (ответ�� на основе базы знаний)
 
 - Использует Qdrant как векторное хранилище для документов из `knowledge_base/`
-- Поиск релевантных фрагментов через HuggingFace-эмбеддинги
-  (`intfloat/multilingual-e5-base`)
-- Двухэтапный retrieval: извлечение top-15 чанков → cross-encoder reranking
-  (`BAAI/bge-reranker-v2-m3`) → top-3 наиболее релевантных
-- Ограничение контекста: до 4000 символов из top-3 релевантных чанков
+- Три режима поиска (управляется через `SEARCH_TYPE`):
+  - `dense` (по умолчанию) — cosine similarity через
+    `intfloat/multilingual-e5-base`
+  - `sparse` — BM25 keyword search через Qdrant sparse vectors + fastembed
+  - `hybrid` — dense + sparse с нативным Qdrant RRF fusion (prefetch API)
+- Двухэтапный retrieval (при включённом реранкере): извлечение top-20 чанков →
+  cross-encoder reranking (`BAAI/bge-reranker-v2-m3`) → top-4 наиболее
+  релевантных
+- Ограничение контекста: до 4000 символов из top-k релевантных чанков
 - Reranker можно отключить через `RERANKER_ENABLED=false` для A/B-экспериментов
-- Генерирует ответ через LLM строго на основе найденного контекста
-- Возвращает ответ с указанием источников (category/filename)
+- Генерирует ответ через LLM строго на основе най��енного контекста
+- Возвращает ответ с указанием и��точников (category/filename)
 - Graceful degradation: если Qdrant недоступен, workflow продолжает работать для
-  SQL-запросов
+  SQL-запросов. Если sparse vectors отсутствуют в коллекции, hybrid/sparse
+  режимы автоматически откатываются на dense search
 
 **4. Validator Agent** (валидация результатов)
 
@@ -174,13 +180,14 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 - **Версия**: Qdrant v1.13.2
 - **Коллекция**: `business_docs` (настраивается через `QDRANT_COLLECTION_NAME`)
-- **Эмбеддинги**: `intfloat/multilingual-e5-base` (768-мерные, мультиязычные —
-  поддержка русского языка)
-- **Метрика**: Cosine similarity
+- **Dense vectors**: `intfloat/multilingual-e5-base` (768-мерные, cosine
+  similarity, мультиязычные — поддержка русского языка)
+- **Sparse vectors**: BM25 через `fastembed` (`Qdrant/bm25` модель, IDF
+  модификатор)
 - **Документы**: PDF и Markdown из `knowledge_base/` (Agile-практики, описания
   метрик, внутренние регламенты)
-- **Ingestion pipeline**: загрузка → chunking (800 символов, overlap 200) →
-  эмбеддинг → загрузка в Qdrant
+- **Ingestion pipeline**: загрузка → chunking (500 символов, overlap 200) →
+  dense embedding + BM25 sparse embedding → загрузка обоих типов в Qdrant
 
 ## Структура проекта
 
@@ -223,9 +230,11 @@ hse-prom-prog/
 │   │   └── task.py                    # TaskStatus enum, Task model
 │   ├── rag/
 │   │   ├── __init__.py
-│   │   ├── ingest.py                  # Ingestion pipeline (load → chunk → embed → Qdrant)
+│   │   ├── ingest.py                  # Ingestion pipeline (dense + sparse → Qdrant)
 │   │   ├── reranker.py                # Cross-encoder reranker (bge-reranker-v2-m3)
-│   │   └── retriever.py               # Qdrant retriever (singleton)
+│   │   ├── retriever.py               # Multi-mode retriever (dense/sparse/hybrid)
+│   │   ├── sparse.py                  # Shared BM25 sparse embedding (fastembed)
+│   │   └── tokenizer.py               # Deterministic text→SparseVector tokenizer
 │   └── tasks/
 │       ├── __init__.py
 │       ├── celery_app.py              # Celery application factory
@@ -299,7 +308,7 @@ cd hse-prom-prog
 git fetch --all
 
 # Переключитесь на актуальную ветку
-git checkout checkpoint_10
+git checkout checkpoint_12
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -421,7 +430,7 @@ VLLM_BASE_URL=http://localhost:8000/v1
 VLLM_MODEL=/models/avibe-gptq-8bit
 VLLM_API_KEY=EMPTY
 VLLM_TEMPERATURE=0.05
-VLLM_MAX_TOKENS=400
+VLLM_MAX_TOKENS=600
 
 # PostgreSQL Configuration
 POSTGRES_HOST=localhost
@@ -511,9 +520,11 @@ poetry run python -m hse_prom_prog.rag.ingest /path/to/docs
 Pipeline выполняет:
 
 1. **Загрузка** — читает .pdf (PyPDFLoader) и .md (TextLoader)
-2. **Chunking** — разбивает на фрагменты (800 символов, overlap 200)
-3. **Эмбеддинг** — `intfloat/multilingual-e5-base` (CPU)
-4. **Загрузка в Qdrant** — пересоздаёт коллекцию и загружает все чанки
+2. **Chunking** — разбивает на фрагменты (500 символов, overlap 200)
+3. **Dense embedding** — `intfloat/multilingual-e5-base` (768-d, CPU)
+4. **Sparse embedding** — BM25 через `fastembed` (`Qdrant/bm25`)
+5. **Загрузка в Qdrant** — пересоздаёт коллекцию с dense + sparse vectors и
+   загружает все чанки
 
 При повторном запуске коллекция пересоздаётся (идемпотентность).
 
@@ -1315,37 +1326,64 @@ poetry run python -m eval.run_eval --experiment semantic_v2
 4. Сохраняет результаты в `eval/results/{experiment}_{timestamp}.json`
 5. Выводит сводную таблицу в консоль
 
+**Примеры запуска экспериментов с разными режимами поиска:**
+
+```bash
+# Dense search (по умолчанию)
+docker compose run --rm \
+  -e RERANKER_ENABLED=false \
+  app python -m eval.run_eval --experiment dense_baseline
+
+# Sparse search (BM25 only)
+docker compose run --rm \
+  -e SEARCH_TYPE=sparse \
+  -e RERANKER_ENABLED=false \
+  app python -m eval.run_eval --experiment sparse_bm25
+
+# Hybrid search (dense + BM25, RRF fusion)
+docker compose run --rm \
+  -e SEARCH_TYPE=hybrid \
+  -e RERANKER_ENABLED=false \
+  app python -m eval.run_eval --experiment hybrid_rrf
+
+# Hybrid + reranker
+docker compose run --rm \
+  -e SEARCH_TYPE=hybrid \
+  app python -m eval.run_eval --experiment hybrid_reranker
+```
+
 Формат результата:
 
 ```json
 {
-  "experiment": "baseline",
-  "timestamp": "20260310_143000",
+  "experiment": "hybrid_rrf",
+  "timestamp": "20260328_120000",
   "config": {
     "vllm_model": "/models/avibe-gptq-8bit",
     "embedding_model": "intfloat/multilingual-e5-base",
-    "chunk_size": 800,
+    "chunk_size": 500,
     "chunk_overlap": 200,
-    "retriever_initial_k": 15,
-    "retriever_top_k": 3,
+    "search_type": "hybrid",
+    "rrf_k": 60,
+    "retriever_initial_k": 20,
+    "retriever_top_k": 4,
     "reranker_enabled": true,
     "reranker_model": "BAAI/bge-reranker-v2-m3",
     "reranker_threshold": 0.01,
-    "reranker_top_n": 3,
+    "reranker_top_n": 4,
     "total_chunks": 82,
     "avg_chunk_chars": 650,
-    "median_chunk_chars": 680,
-    "min_chunk_chars": 120,
-    "max_chunk_chars": 800,
-    "avg_retrieval_time_s": 0.35
+    "avg_retrieval_time_s": 0.05
   },
   "aggregate": {
     "context_precision": 0.82,
+    "context_recall": 0.72,
     "faithfulness": 0.91,
+    "answer_relevancy": 0.87,
     "answer_correctness": 0.75,
-    "latency_avg_s": 12.5,
-    "latency_median_s": 11.8,
-    "latency_p95_s": 18.3
+    "latency_avg_s": 2.5,
+    "latency_median_s": 2.1,
+    "latency_p95_s": 4.3
   },
   "per_question": [...]
 }
@@ -1373,17 +1411,18 @@ poetry run python -m eval.compare eval/results/*.json
 - Различия в конфигурациях пайплайна между экспериментами
 
 ```
-Metric             baseline           semantic_v2        delta (last − first)
+Metric             dense_baseline     hybrid_rrf         delta (last − first)
 -----------------  -----------------  -----------------  --------------------
 context_precision  0.8200             0.8900             +0.0700
+context_recall     0.7200             0.7800             +0.0600
 faithfulness       0.9100             0.9300             +0.0200
 answer_correctness 0.7500             0.7200             -0.0300
 
-Config differences
-param         baseline                 semantic_v2
-------------  -----------------------  -----------------------
-chunk_size    1000                     512
-chunk_overlap 200                      100
+Config differences:
+param        dense_baseline    hybrid_rrf
+-----------  ----------------  ----------------
+search_type  dense             hybrid
+rrf_k        None              60
 ```
 
 ## Разработка
@@ -1466,7 +1505,7 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `VLLM_MODEL`              | Название модели                    | `/models/avibe-gptq-8bit`  |
 | `VLLM_API_KEY`            | API ключ для vLLM                  | `EMPTY`                    |
 | `VLLM_TEMPERATURE`        | Temperature для LLM                | `0.05`                     |
-| `VLLM_MAX_TOKENS`         | Максимум токенов                   | `400`                      |
+| `VLLM_MAX_TOKENS`         | Максимум токенов                   | `600`                      |
 | `VLLM_REPETITION_PENALTY` | Штраф за повторы (vLLM extra_body) | `1.1`                      |
 
 ### PostgreSQL Configuration
@@ -1487,12 +1526,19 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `QDRANT_COLLECTION_NAME` | Название коллекции | `business_docs`                 |
 | `EMBEDDING_MODEL`        | Модель эмбеддингов | `intfloat/multilingual-e5-base` |
 
+### Search Configuration
+
+| Переменная    | Описание                                    | По умолчанию |
+| ------------- | ------------------------------------------- | ------------ |
+| `SEARCH_TYPE` | Режим поиска: `dense`, `sparse`, `hybrid`   | `dense`      |
+| `RRF_K`       | Параметр k для RRF fusion (только `hybrid`) | `60`         |
+
 ### Retriever Configuration
 
 | Переменная            | Описание                               | По умолчанию |
 | --------------------- | -------------------------------------- | ------------ |
-| `RETRIEVER_TOP_K`     | Финальное число чанков (без реранкера) | `3`          |
-| `RETRIEVER_INITIAL_K` | Число чанков для первичного извлечения | `15`         |
+| `RETRIEVER_TOP_K`     | Финальное число чанков (без реранкера) | `4`          |
+| `RETRIEVER_INITIAL_K` | Число чанков для первичного извлечения | `20`         |
 
 ### Reranker Configuration
 
@@ -1501,7 +1547,7 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `RERANKER_ENABLED`   | Включить cross-encoder reranking       | `true`                    |
 | `RERANKER_MODEL`     | Модель реранкера                       | `BAAI/bge-reranker-v2-m3` |
 | `RERANKER_THRESHOLD` | Минимальный скор для фильтрации чанков | `0.01`                    |
-| `RERANKER_TOP_N`     | Число чанков после реранкинга          | `3`                       |
+| `RERANKER_TOP_N`     | Число чанков после реранкинга          | `4`                       |
 
 ### Redis Configuration
 
@@ -1541,6 +1587,19 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | ----------- | ------------------------------------- | ------------ |
 | `DEBUG`     | Debug-режим (hot-reload, verbose log) | `false`      |
 | `LOG_LEVEL` | Уровень логирования                   | `INFO`       |
+
+## Текущая лучшая конфигурация RAG
+
+Все эксперименты сравниваются с этой конфигурацией:
+
+| Параметр               | Значение                                      |
+| ---------------------- | --------------------------------------------- |
+| `SEARCH_TYPE`          | `dense` (multilingual-e5-base)                |
+| `chunk_size / overlap` | 500 / 200                                     |
+| `RETRIEVER_INITIAL_K`  | 20                                            |
+| Reranker               | `bge-reranker-v2-m3`, top_n=4, threshold=0.01 |
+| Промпт                 | Prompt v2 (основные факты, 2-6 предложений)   |
+| `VLLM_MAX_TOKENS`      | 600                                           |
 
 ## Лицензия
 
