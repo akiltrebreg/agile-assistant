@@ -62,40 +62,42 @@ def _denormalize_table(
     source: str,
     page: int,
 ) -> list[Document]:
-    """Convert a table into self-contained text Documents (one per cell).
+    """Convert a table into self-contained text Documents (one per column).
 
-    Each non-empty cell becomes a statement:
-    ``{doc_title}. {header}: {cell_value}``
+    Collects all non-empty values in each column into a single Document:
+    ``{doc_title}. {header}: value1, value2, value3, ...``
 
-    For tables with a reverse-index structure (column = category, rows =
-    members), this produces statements like:
-    ``Jira Status Mapping. TO DO: Open``
+    For the jira_status_mapping table this produces documents like:
+    ``Jira Status Mapping. TO DO: Open, To Do, Planned, Queued, ...``
     """
     docs: list[Document] = []
     clean_headers = [(h or "").replace("\n", " ").strip() for h in headers]
-    table_idx = 0
-    for row_idx, row in enumerate(rows):
-        for col_idx, cell in enumerate(row):
+
+    for col_idx, header in enumerate(clean_headers):
+        if not header:
+            continue
+        values = []
+        for row in rows:
+            cell = row[col_idx] if col_idx < len(row) else None
             if not cell or not cell.strip():
                 continue
-            header = clean_headers[col_idx] if col_idx < len(clean_headers) else ""
             value = cell.replace("\n", " ").strip()
-            if not header or header == value:
-                continue
-            text = f"{doc_title}. {header}: {value}"
-            docs.append(
-                Document(
-                    page_content=text,
-                    metadata={
-                        "source": source,
-                        "page": page,
-                        "element_type": "table_denormalized",
-                        "table_reverse_index": f"row{row_idx}_col{col_idx}",
-                        "table_header": header,
-                    },
-                )
+            if value != header:
+                values.append(value)
+        if not values:
+            continue
+        text = f"{doc_title}. {header}: {', '.join(values)}"
+        docs.append(
+            Document(
+                page_content=text,
+                metadata={
+                    "source": source,
+                    "page": page,
+                    "element_type": "table_denormalized",
+                    "table_header": header,
+                },
             )
-            table_idx += 1
+        )
     return docs
 
 
