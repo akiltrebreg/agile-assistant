@@ -59,7 +59,7 @@ class Settings(BaseSettings):
         description="API key for vLLM (use 'EMPTY' for local deployments)",
     )
     vllm_temperature: float = Field(
-        default=0.05,
+        default=0.00, # 0.05
         ge=0.0,
         le=2.0,
         description="Temperature for LLM generation",
