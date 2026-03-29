@@ -292,7 +292,7 @@
   },
   {
     "question": "Какие резолюции используются для категории CANCELLED в маппинге статусов JIRA?",
-    "ground_truth": "Резолюции для CANCELLED: Won't Do, Cancelled, Duplicate, Won't Fix, Declined, Cannot Reproduce.",
+    "ground_truth": "Резолюции для CANCELLED: Won't Do, Cancelled, Duplicate, Won't Fix, Declined.",
     "query_type": "rag",
     "category": "agile",
     "expected_source": "metrics/jira_status_mapping.pdf",
@@ -393,7 +393,7 @@
   },
   {
     "question": "Какие резолюции исключаются из расчёта метрик Done Total и Backlog Dynamics?",
-    "ground_truth": "Из расчёта исключаются резолюции: Won't do, Cancelled, Duplicate, Won't Fix, Cannot Reproduce, Declined. Эти резолюции одинаковы для Done Total и Backlog Dynamics.",
+    "ground_truth": "Из расчёта исключаются резолюции: Won't do, Cancelled, Duplicate, Won't Fix, Declined. Эти резолюции одинаковы для Done Total и Backlog Dynamics.",
     "query_type": "rag",
     "category": "cross_doc",
     "expected_source": [
