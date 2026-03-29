@@ -4,6 +4,11 @@ Creates a collection with two vector types:
 - **dense** (``intfloat/multilingual-e5-base``, 768-d, cosine) — semantic search
 - **bm25** (Qdrant/bm25 via fastembed, sparse, IDF) — keyword search
 
+PDF loading uses pdfplumber for two-mode extraction:
+- **Text mode** — regular paragraphs, chunked via RecursiveCharacterTextSplitter
+- **Table mode** — tables are denormalized into self-contained statements
+  (one Document per row) and skip chunking entirely
+
 Usage:
     python -m hse_prom_prog.rag.ingest          # default: knowledge_base/
     python -m hse_prom_prog.rag.ingest /path     # custom directory
@@ -16,12 +21,10 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pdfplumber
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import (
-    DirectoryLoader,
-    PyPDFLoader,
-    TextLoader,
-)
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
@@ -49,11 +52,119 @@ DENSE_VECTOR_NAME = "dense"
 SPARSE_VECTOR_NAME = "bm25"
 
 
-def _load_documents(kb_dir: Path) -> list:
-    """Load .md and .pdf documents from *kb_dir* with metadata."""
-    docs = []
+# ── PDF loading with pdfplumber ──────────────────────────────
 
-    # Markdown files
+
+def _denormalize_table(
+    headers: list[str | None],
+    rows: list[list[str | None]],
+    doc_title: str,
+    source: str,
+    page: int,
+) -> list[Document]:
+    """Convert a table into self-contained text Documents (one per cell).
+
+    Each non-empty cell becomes a statement:
+    ``{doc_title}. {header}: {cell_value}``
+
+    For tables with a reverse-index structure (column = category, rows =
+    members), this produces statements like:
+    ``Jira Status Mapping. TO DO: Open``
+    """
+    docs: list[Document] = []
+    clean_headers = [(h or "").replace("\n", " ").strip() for h in headers]
+    table_idx = 0
+    for row_idx, row in enumerate(rows):
+        for col_idx, cell in enumerate(row):
+            if not cell or not cell.strip():
+                continue
+            header = clean_headers[col_idx] if col_idx < len(clean_headers) else ""
+            value = cell.replace("\n", " ").strip()
+            if not header or header == value:
+                continue
+            text = f"{doc_title}. {header}: {value}"
+            docs.append(
+                Document(
+                    page_content=text,
+                    metadata={
+                        "source": source,
+                        "page": page,
+                        "element_type": "table_denormalized",
+                        "table_reverse_index": f"row{row_idx}_col{col_idx}",
+                        "table_header": header,
+                    },
+                )
+            )
+            table_idx += 1
+    return docs
+
+
+def _load_pdf_pdfplumber(pdf_path: Path, kb_dir: Path) -> tuple[list[Document], list[Document]]:
+    """Load a single PDF via pdfplumber.
+
+    Returns:
+        (text_docs, table_docs) — text docs will be chunked later;
+        table docs are already self-contained and skip chunking.
+    """
+    text_docs: list[Document] = []
+    table_docs: list[Document] = []
+    source = str(pdf_path)
+    doc_title = _doc_title_from_source(source)
+
+    pdf = pdfplumber.open(str(pdf_path))
+    for page_num, page in enumerate(pdf.pages):
+        tables = page.extract_tables()
+
+        # Collect bounding boxes of all tables to exclude from text
+        table_bboxes = [t.bbox for t in page.find_tables()]
+
+        # Extract text outside tables
+        text_page = page
+        for bbox in table_bboxes:
+            text_page = text_page.outside_bbox(bbox)
+        page_text = (text_page.extract_text() or "").strip()
+
+        if page_text:
+            text_docs.append(
+                Document(
+                    page_content=page_text,
+                    metadata={
+                        "source": source,
+                        "page": page_num,
+                        "element_type": "text",
+                    },
+                )
+            )
+
+        # Denormalize tables (need at least header + 1 data row)
+        _min_table_rows = 2
+        for table in tables:
+            if not table or len(table) < _min_table_rows:
+                continue
+            headers = table[0]
+            rows = table[1:]
+            table_docs.extend(_denormalize_table(headers, rows, doc_title, source, page_num))
+
+    pdf.close()
+
+    # Enrich metadata
+    for doc in [*text_docs, *table_docs]:
+        _enrich_metadata(doc, kb_dir)
+
+    return text_docs, table_docs
+
+
+def _load_documents(kb_dir: Path) -> tuple[list[Document], list[Document]]:
+    """Load .md and .pdf documents from *kb_dir*.
+
+    Returns:
+        (text_docs, table_docs) — text_docs go through chunking,
+        table_docs are already self-contained.
+    """
+    text_docs: list[Document] = []
+    table_docs: list[Document] = []
+
+    # Markdown files → text only
     md_loader = DirectoryLoader(
         str(kb_dir),
         glob="**/*.md",
@@ -62,28 +173,39 @@ def _load_documents(kb_dir: Path) -> list:
     )
     md_docs = md_loader.load()
     for doc in md_docs:
+        doc.metadata["element_type"] = "text"
         _enrich_metadata(doc, kb_dir)
-    docs.extend(md_docs)
+    text_docs.extend(md_docs)
     logger.info("[Ingest] Loaded %d markdown documents", len(md_docs))
 
-    # PDF files
-    pdf_loader = DirectoryLoader(
-        str(kb_dir),
-        glob="**/*.pdf",
-        loader_cls=PyPDFLoader,
-        show_progress=True,
+    # PDF files → pdfplumber (two-mode: text + tables)
+    pdf_paths = sorted(kb_dir.rglob("*.pdf"))
+    pdf_text_count = 0
+    pdf_table_count = 0
+    for pdf_path in pdf_paths:
+        t_docs, tb_docs = _load_pdf_pdfplumber(pdf_path, kb_dir)
+        text_docs.extend(t_docs)
+        table_docs.extend(tb_docs)
+        pdf_text_count += len(t_docs)
+        pdf_table_count += len(tb_docs)
+    logger.info(
+        "[Ingest] Loaded %d PDF pages as text, %d table rows denormalized",
+        pdf_text_count,
+        pdf_table_count,
     )
-    pdf_docs = pdf_loader.load()
-    for doc in pdf_docs:
-        _enrich_metadata(doc, kb_dir)
-    docs.extend(pdf_docs)
-    logger.info("[Ingest] Loaded %d PDF documents", len(pdf_docs))
 
-    logger.info("[Ingest] Total documents loaded: %d", len(docs))
-    return docs
+    logger.info(
+        "[Ingest] Total: %d text docs (→ chunking), %d table docs (self-contained)",
+        len(text_docs),
+        len(table_docs),
+    )
+    return text_docs, table_docs
 
 
-def _enrich_metadata(doc, kb_dir: Path) -> None:
+# ── metadata helpers ─────────────────────────────────────────
+
+
+def _enrich_metadata(doc: Document, kb_dir: Path) -> None:
     """Add category (sub-folder name) and ingestion timestamp."""
     source = doc.metadata.get("source", "")
     try:
@@ -101,13 +223,13 @@ def _doc_title_from_source(source: str) -> str:
     ``done_total.pdf`` → ``Done Total``
     ``team_lead_time.pdf`` → ``Team Lead Time``
     """
-    stem = Path(source).stem  # "done_total"
+    stem = Path(source).stem
     return stem.replace("_", " ").title()
 
 
 # Regex: lines that look like section headers in extracted PDF/MD text.
-# Matches "# Heading", "## Heading", or short ALL-CAPS / Title-like lines
-# that appear on their own (e.g. "Что это?", "Как считается?").
+# Matches "# Heading", "## Heading", or short question-style headings
+# (e.g. "Что это?", "Как считается?").
 _SECTION_RE = re.compile(
     r"^(?:#{1,3}\s+(.+)|([А-ЯЁA-Z][А-ЯЁа-яёA-Za-z\s\-]{2,40}\?))\s*$",
     re.MULTILINE,
@@ -123,15 +245,16 @@ def _find_last_section(text: str) -> str | None:
     return (last.group(1) or last.group(2)).strip()
 
 
-def _prepend_metadata(chunks: list) -> list:
+def _prepend_metadata(chunks: list[Document]) -> list[Document]:
     """Add document title (and section if found) to the start of each chunk.
 
-    The prepend is added *on top of* the chunk text, intentionally exceeding
-    ``CHUNK_SIZE`` — this is a deliberate design decision so that the
-    splitter's semantic boundaries are preserved while the embedding model
-    gets the full context.
+    Skips table_denormalized docs — they already have the title prepended
+    during denormalization.
     """
     for chunk in chunks:
+        if chunk.metadata.get("element_type") == "table_denormalized":
+            continue
+
         source = chunk.metadata.get("source", "")
         doc_title = _doc_title_from_source(source)
         chunk.metadata["doc_title"] = doc_title
@@ -149,18 +272,17 @@ def _prepend_metadata(chunks: list) -> list:
     return chunks
 
 
-def _split_documents(docs: list) -> list:
-    """Split documents into chunks using RecursiveCharacterTextSplitter."""
+# ── chunking ─────────────────────────────────────────────────
+
+
+def _split_documents(docs: list[Document]) -> list[Document]:
+    """Split text documents into chunks using RecursiveCharacterTextSplitter."""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
     )
     chunks = splitter.split_documents(docs)
     logger.info("[Ingest] Split into %d chunks", len(chunks))
-
-    chunks = _prepend_metadata(chunks)
-    logger.info("[Ingest] Prepended metadata to %d chunks", len(chunks))
-
     return chunks
 
 
@@ -173,6 +295,9 @@ def _get_embeddings() -> HuggingFaceEmbeddings:
     )
 
 
+# ── main pipeline ────────────────────────────────────────────
+
+
 def run_ingestion(kb_dir: Path | None = None) -> int:
     """Run the full ingestion pipeline.
 
@@ -182,29 +307,44 @@ def run_ingestion(kb_dir: Path | None = None) -> int:
     kb_dir = kb_dir or _DEFAULT_KB_DIR
     logger.info("[Ingest] Starting ingestion from %s", kb_dir)
 
-    # 1. Load
-    docs = _load_documents(kb_dir)
-    if not docs:
+    # 1. Load (two-mode: text + table)
+    text_docs, table_docs = _load_documents(kb_dir)
+    if not text_docs and not table_docs:
         logger.warning("[Ingest] No documents found in %s", kb_dir)
         return 0
 
-    # 2. Chunk
-    chunks = _split_documents(docs)
-    texts = [chunk.page_content for chunk in chunks]
+    # 2. Chunk text docs only; table docs are already self-contained
+    text_chunks = _split_documents(text_docs)
+    all_chunks = text_chunks + table_docs
 
-    # 3. Dense embeddings
+    # 3. Prepend metadata (skips table_denormalized)
+    all_chunks = _prepend_metadata(all_chunks)
+    logger.info(
+        "[Ingest] Final: %d text chunks + %d table chunks = %d total",
+        len(text_chunks),
+        len(table_docs),
+        len(all_chunks),
+    )
+
+    if table_docs:
+        preview = table_docs[0].page_content[:120].replace("\n", " ")
+        logger.info("[Ingest] Table doc example: %s", preview)
+
+    texts = [chunk.page_content for chunk in all_chunks]
+
+    # 4. Dense embeddings
     embeddings = _get_embeddings()
     test_vec = embeddings.embed_query("test")
     dim = len(test_vec)
     logger.info("[Ingest] Generating dense embeddings (dim=%d) ...", dim)
     dense_vectors = embeddings.embed_documents(texts)
 
-    # 4. Sparse BM25 embeddings via fastembed
+    # 5. Sparse BM25 embeddings via fastembed
     logger.info("[Ingest] Generating BM25 sparse embeddings ...")
     sparse_vectors = embed_sparse_batch(texts)
     logger.info("[Ingest] Generated %d sparse vectors", len(sparse_vectors))
 
-    # 5. Recreate Qdrant collection (idempotent on re-run)
+    # 6. Recreate Qdrant collection (idempotent on re-run)
     client = QdrantClient(url=settings.qdrant_url, timeout=60)
     collection = settings.qdrant_collection_name
 
@@ -227,9 +367,9 @@ def run_ingestion(kb_dir: Path | None = None) -> int:
         dim,
     )
 
-    # 6. Build points with both vector types
+    # 7. Build points with both vector types
     points = []
-    for i, chunk in enumerate(chunks):
+    for i, chunk in enumerate(all_chunks):
         points.append(
             PointStruct(
                 id=str(uuid.uuid4()),
@@ -244,14 +384,14 @@ def run_ingestion(kb_dir: Path | None = None) -> int:
             )
         )
 
-    # 7. Upload (batch by 64 to avoid large payloads)
+    # 8. Upload (batch by 64 to avoid large payloads)
     batch_size = 64
     for start in range(0, len(points), batch_size):
         batch = points[start : start + batch_size]
         client.upsert(collection_name=collection, points=batch)
-    logger.info("[Ingest] Uploaded %d chunks (dense + sparse) to Qdrant", len(chunks))
+    logger.info("[Ingest] Uploaded %d chunks (dense + sparse) to Qdrant", len(all_chunks))
 
-    return len(chunks)
+    return len(all_chunks)
 
 
 # ── CLI entry point ──────────────────────────────────────────

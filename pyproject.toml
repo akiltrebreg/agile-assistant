@@ -38,6 +38,7 @@ dependencies = [
     "sentence-transformers>=3.0.0",
     # Document loaders for ingestion
     "pypdf>=5.0.0",
+    "pdfplumber>=0.11.0",
     # BM25 for hybrid search
     "rank-bm25>=0.2.2",
     "fastembed>=0.4.0",
