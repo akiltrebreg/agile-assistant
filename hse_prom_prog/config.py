@@ -114,6 +114,10 @@ class Settings(BaseSettings):
         default="intfloat/multilingual-e5-base",
         description="HuggingFace embedding model for RAG",
     )
+    embedding_sparse_model: str | None = Field(
+        default=None,
+        description="Sparse embedding model (e.g. 'BAAI/bge-m3'). None = fastembed BM25.",
+    )
     embedding_dimension: int | None = Field(
         default=None,
         description="Truncate embeddings to this dimension (Matryoshka). None = full model dim.",

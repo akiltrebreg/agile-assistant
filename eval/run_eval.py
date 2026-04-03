@@ -88,6 +88,7 @@ def _pipeline_config() -> dict:
         "vllm_base_url": settings.vllm_base_url,
         "embedding_model": settings.embedding_model,
         "embedding_dimension": settings.embedding_dimension,
+        "embedding_sparse_model": settings.embedding_sparse_model,
         "qdrant_url": settings.qdrant_url,
         "qdrant_collection": settings.qdrant_collection_name,
         "chunk_size": CHUNK_SIZE,

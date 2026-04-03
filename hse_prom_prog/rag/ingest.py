@@ -344,8 +344,9 @@ def run_ingestion(kb_dir: Path | None = None) -> int:
     dense_vectors = embeddings.embed_documents(texts)
     dense_vectors = truncate_vectors(dense_vectors, dim, full_dim)
 
-    # 5. Sparse BM25 embeddings via fastembed
-    logger.info("[Ingest] Generating BM25 sparse embeddings ...")
+    # 5. Sparse embeddings (fastembed BM25 or BGE-M3 learned sparse)
+    sparse_label = settings.embedding_sparse_model or "fastembed/bm25"
+    logger.info("[Ingest] Generating sparse embeddings (%s) ...", sparse_label)
     sparse_vectors = embed_sparse_batch(texts)
     logger.info("[Ingest] Generated %d sparse vectors", len(sparse_vectors))
 
