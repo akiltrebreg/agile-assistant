@@ -53,6 +53,7 @@ def _build_vector_store() -> QdrantVectorStore:
         collection_name=collection,
         embedding=embeddings,
         vector_name=DENSE_VECTOR_NAME,
+        validate_collection_config=False,
     )
     logger.info("[Retriever] Vector store initialized (collection=%s)", collection)
     return store
@@ -209,8 +210,12 @@ def get_retriever() -> MultiModeRetriever | VectorStoreRetriever:
     search_type = settings.search_type
     k = settings.retriever_initial_k if settings.reranker_enabled else settings.retriever_top_k
 
-    if search_type == "dense" and settings.reranker_enabled:
-        # Reranker pipeline expects LangChain retriever with initial_k
+    if (
+        search_type == "dense"
+        and settings.reranker_enabled
+        and settings.embedding_dimension is None
+    ):
+        # LangChain retriever only when no truncation (dim mismatch otherwise)
         store = get_vector_store()
         _retriever = store.as_retriever(
             search_type="similarity",
