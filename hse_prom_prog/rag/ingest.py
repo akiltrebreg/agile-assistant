@@ -25,7 +25,6 @@ import pdfplumber
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -36,6 +35,11 @@ from qdrant_client.models import (
 )
 
 from hse_prom_prog.config import settings
+from hse_prom_prog.rag.embeddings import (
+    get_embeddings,
+    get_target_dim,
+    truncate_vectors,
+)
 from hse_prom_prog.rag.sparse import embed_sparse_batch
 
 logger = logging.getLogger(__name__)
@@ -288,15 +292,6 @@ def _split_documents(docs: list[Document]) -> list[Document]:
     return chunks
 
 
-def _get_embeddings() -> HuggingFaceEmbeddings:
-    """Create embedding model instance."""
-    return HuggingFaceEmbeddings(
-        model_name=settings.embedding_model,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},
-    )
-
-
 # ── main pipeline ────────────────────────────────────────────
 
 
@@ -334,12 +329,20 @@ def run_ingestion(kb_dir: Path | None = None) -> int:
 
     texts = [chunk.page_content for chunk in all_chunks]
 
-    # 4. Dense embeddings
-    embeddings = _get_embeddings()
+    # 4. Dense embeddings (with optional Matryoshka truncation)
+    embeddings = get_embeddings()
     test_vec = embeddings.embed_query("test")
-    dim = len(test_vec)
-    logger.info("[Ingest] Generating dense embeddings (dim=%d) ...", dim)
+    full_dim = len(test_vec)
+    dim = get_target_dim(full_dim)
+    logger.info(
+        "[Ingest] model=%s, full_dim=%d, target_dim=%d%s",
+        settings.embedding_model,
+        full_dim,
+        dim,
+        " (truncated)" if dim < full_dim else "",
+    )
     dense_vectors = embeddings.embed_documents(texts)
+    dense_vectors = truncate_vectors(dense_vectors, dim, full_dim)
 
     # 5. Sparse BM25 embeddings via fastembed
     logger.info("[Ingest] Generating BM25 sparse embeddings ...")

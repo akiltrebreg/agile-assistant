@@ -45,7 +45,8 @@ AGILE_COACH_PROMPT = """Ты — Agile-коуч компании. Отвечай
 4. Если в контексте НЕТ ответа — скажи только: "В моей базе знаний нет информации по этому вопросу."
 5. Если вопрос содержит приветствие — начни с короткого приветствия.
 6. Приведи факты из контекста, отвечающие на вопрос. Отвечай кратко.
-   Каждое предложение должно следовать из контекста. НЕ ДОБАВЛЯЙ пояснений, выводов и рекомендаций от себя.
+   Каждое предложение должно следовать из контекста.\
+ НЕ ДОБАВЛЯЙ пояснений, выводов и рекомендаций от себя.
    После ответа ОСТАНОВИСЬ.
 
 ### КОНТЕКСТ ###
@@ -86,6 +87,7 @@ def _pipeline_config() -> dict:
         "vllm_model": settings.vllm_model,
         "vllm_base_url": settings.vllm_base_url,
         "embedding_model": settings.embedding_model,
+        "embedding_dimension": settings.embedding_dimension,
         "qdrant_url": settings.qdrant_url,
         "qdrant_collection": settings.qdrant_collection_name,
         "chunk_size": CHUNK_SIZE,

@@ -17,11 +17,11 @@ from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 
 from hse_prom_prog.config import settings
+from hse_prom_prog.rag.embeddings import get_embeddings, get_target_dim, truncate_vector
 from hse_prom_prog.rag.ingest import DENSE_VECTOR_NAME, SPARSE_VECTOR_NAME
 from hse_prom_prog.rag.sparse import embed_sparse
 
@@ -35,17 +35,9 @@ _retriever: MultiModeRetriever | VectorStoreRetriever | None = None
 # ── Dense vector store (used by dense & hybrid modes) ────────
 
 
-def _get_embeddings() -> HuggingFaceEmbeddings:
-    return HuggingFaceEmbeddings(
-        model_name=settings.embedding_model,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},
-    )
-
-
 def _build_vector_store() -> QdrantVectorStore:
     """Create a QdrantVectorStore backed by the existing collection."""
-    embeddings = _get_embeddings()
+    embeddings = get_embeddings()
     client = QdrantClient(url=settings.qdrant_url)
     collection = settings.qdrant_collection_name
 
@@ -101,7 +93,11 @@ class MultiModeRetriever:
         self.k = k
         self._client = QdrantClient(url=settings.qdrant_url)
         self._collection = settings.qdrant_collection_name
-        self._embeddings = _get_embeddings()
+        self._embeddings = get_embeddings()
+        # Cache dimensions for truncation
+        test_vec = self._embeddings.embed_query("test")
+        self._full_dim = len(test_vec)
+        self._target_dim = get_target_dim(self._full_dim)
 
     def invoke(self, query: str, **_kwargs: Any) -> list[Document]:
         if self.search_type == "dense":
@@ -117,6 +113,7 @@ class MultiModeRetriever:
 
     def _dense_search(self, query: str) -> list[Document]:
         vector = self._embeddings.embed_query(query)
+        vector = truncate_vector(vector, self._target_dim, self._full_dim)
         results = self._client.query_points(
             collection_name=self._collection,
             query=vector,
@@ -161,6 +158,7 @@ class MultiModeRetriever:
         Falls back to dense-only if sparse vectors are unavailable.
         """
         dense_vector = self._embeddings.embed_query(query)
+        dense_vector = truncate_vector(dense_vector, self._target_dim, self._full_dim)
         sparse_vector = embed_sparse(query)
 
         try:

@@ -114,6 +114,10 @@ class Settings(BaseSettings):
         default="intfloat/multilingual-e5-base",
         description="HuggingFace embedding model for RAG",
     )
+    embedding_dimension: Literal[64, 128, 256, 512, 768, 1024] | None = Field(
+        default=None,
+        description="Truncate embeddings to this dimension (Matryoshka). None = full model dim.",
+    )
     retriever_top_k: int = Field(
         default=4,
         ge=1,
