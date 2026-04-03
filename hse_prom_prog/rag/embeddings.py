@@ -25,7 +25,7 @@ def get_embeddings() -> HuggingFaceEmbeddings:
     """Create the HuggingFace embedding model instance."""
     return HuggingFaceEmbeddings(
         model_name=settings.embedding_model,
-        model_kwargs={"device": "cpu"},
+        model_kwargs={"device": "cpu", "trust_remote_code": True},
         encode_kwargs={"normalize_embeddings": True},
     )
 
