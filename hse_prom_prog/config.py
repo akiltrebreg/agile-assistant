@@ -6,7 +6,7 @@ including vLLM API endpoints and model parameters.
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
         description="API key for vLLM (use 'EMPTY' for local deployments)",
     )
     vllm_temperature: float = Field(
-        default=0.00, # 0.05
+        default=0.00,  # 0.05
         ge=0.0,
         le=2.0,
         description="Temperature for LLM generation",
@@ -114,10 +114,20 @@ class Settings(BaseSettings):
         default="intfloat/multilingual-e5-base",
         description="HuggingFace embedding model for RAG",
     )
-    embedding_dimension: Literal[64, 128, 256, 512, 768, 1024] | None = Field(
+    embedding_dimension: int | None = Field(
         default=None,
         description="Truncate embeddings to this dimension (Matryoshka). None = full model dim.",
     )
+
+    @field_validator("embedding_dimension")
+    @classmethod
+    def _check_embedding_dimension(cls, v: int | None) -> int | None:
+        allowed = {64, 128, 256, 512, 768, 1024}
+        if v is not None and v not in allowed:
+            msg = f"embedding_dimension must be one of {sorted(allowed)}, got {v}"
+            raise ValueError(msg)
+        return v
+
     retriever_top_k: int = Field(
         default=4,
         ge=1,
