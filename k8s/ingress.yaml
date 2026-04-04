@@ -1,0 +1,152 @@
+---
+# Ingress for /api/* — rewrites /api/X -> /X for FastAPI
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agile-assistant-api
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+---
+# Ingress for /static/*.svg — serves SVG with correct Content-Type
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agile-assistant-static-svg
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /app/static/$1
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_hide_header Content-Type;
+      add_header Content-Type "image/svg+xml";
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /static/(.*\.svg)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: streamlit
+                port:
+                  number: 8501
+---
+# Ingress for /static/*.css — serves CSS with correct Content-Type
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agile-assistant-static-css
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /app/static/$1
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_hide_header Content-Type;
+      add_header Content-Type "text/css";
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /static/(.*\.css)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: streamlit
+                port:
+                  number: 8501
+---
+# Ingress for Streamlit UI + Swagger + WebSocket
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agile-assistant-ui
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # WebSocket support for Streamlit (_stcore/stream)
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    nginx.ingress.kubernetes.io/websocket-services: "streamlit"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Agile AI Assistant"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Streamlit WebSocket endpoint
+          - path: /_stcore
+            pathType: Prefix
+            backend:
+              service:
+                name: streamlit
+                port:
+                  number: 8501
+          # Swagger UI (served directly by FastAPI, no rewrite needed)
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+          - path: /redoc
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+          - path: /openapi.json
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 8080
+          # Default — Streamlit UI
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: streamlit
+                port:
+                  number: 8501

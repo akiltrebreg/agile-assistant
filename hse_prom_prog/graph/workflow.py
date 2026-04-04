@@ -70,12 +70,22 @@ class AgileWorkflow:
 
         self.supervisor = SupervisorAgent(llm_client)
         self.sql_agent = SQLAgent(db_connection=self.db)
-        self.rag_agent = RAGAgent(llm_client, retriever) if retriever else None
+        self.rag_agent = self._build_rag_agent(llm_client, retriever)
         self.validator = ValidatorAgent()
         self.response_agent = ResponseAgent(llm_client)
 
         self.graph = self._build_graph()
         logger.info("[Workflow] Workflow graph built successfully")
+
+    @staticmethod
+    def _build_rag_agent(
+        llm_client: LLMClient,
+        retriever: Any | None,
+    ) -> RAGAgent | None:
+        """Build RAGAgent with a retriever."""
+        if retriever is None:
+            return None
+        return RAGAgent(llm_client, retriever)
 
     # ------------------------------------------------------------------
     # Node wrappers

@@ -1,0 +1,5 @@
+FROM postgres:16-alpine
+
+# Bake CSV data into the image so that init.sql COPY commands work
+# init.sql itself is mounted via ConfigMap
+COPY database/data/ /docker-entrypoint-initdb.d/data/

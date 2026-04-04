@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: agile-assistant
+  labels:
+    app: celery-worker
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      imagePullSecrets:
+        - name: registry-credentials
+      containers:
+        - name: celery-worker
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - hse_prom_prog.tasks.celery_app
+            - worker
+            - --loglevel=info
+            - --pool=threads
+            - --concurrency=4
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          readinessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import os; assert os.path.exists('/proc/1/status')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import os; assert os.path.exists('/proc/1/status')"
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi

@@ -38,9 +38,6 @@ htmlcov
 Dockerfile*
 docker-compose*.yml
 
-# Database data (mounted as volume)
-database/data/*.csv
-
 # Documentation (keep README.md — referenced by pyproject.toml)
 LICENSE
 docs/

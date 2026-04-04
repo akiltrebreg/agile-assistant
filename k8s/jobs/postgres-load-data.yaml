@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-load-data
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: registry-credentials
+      containers:
+        - name: load-data
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              PGCONN="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}"
+
+              echo "Loading report_agile_dashboard..."
+              psql "$PGCONN" -c "\COPY report_agile_dashboard FROM '/app/database/data/report_agile_dashboard.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', ENCODING 'UTF8', NULL '')"
+
+              echo "Loading report_agile_dashboard_metrics..."
+              psql "$PGCONN" -c "\COPY report_agile_dashboard_metrics FROM '/app/database/data/report_agile_dashboard_metrics.csv' WITH (FORMAT csv, HEADER true, DELIMITER ',', ENCODING 'UTF8', NULL '')"
+
+              echo "Data loading complete!"

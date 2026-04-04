@@ -38,6 +38,11 @@ dependencies = [
     "sentence-transformers>=3.0.0",
     # Document loaders for ingestion
     "pypdf>=5.0.0",
+    # BM25 for hybrid search
+    "rank-bm25>=0.2.2",
+    # RAGAS evaluation framework
+    "ragas>=0.2.0",
+    "datasets>=3.0.0",
 ]
 
 [dependency-groups]
@@ -99,6 +104,9 @@ ignore = ["RUF001"]
 "hse_prom_prog/api/routers/*.py" = ["B008"]
 # PLR2004: magic values like `len(sys.argv) < 2` are standard CLI patterns
 "hse_prom_prog/main.py" = ["PLR2004"]
+# PLR2004, PLC0415: tests use magic values in assertions and local imports with @patch
+"tests/*.py" = ["PLR2004", "PLC0415"]
+"eval/*.py" = ["PLC0415", "PLR2004"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["hse_prom_prog", "streamlit_app"]
+known-first-party = ["hse_prom_prog", "streamlit_app", "eval"]

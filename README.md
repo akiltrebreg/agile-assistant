@@ -1,7 +1,7 @@
-# HSE Prom Prog - Agile AI Assistant (Задание 4)
+# HSE Prom Prog - Agile AI Assistant (Задание 6)
 
 Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM,
-PostgreSQL, Qdrant, Celery, Redis, nginx.
+PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 ## Содержание
 
@@ -39,6 +39,21 @@ PostgreSQL, Qdrant, Celery, Redis, nginx.
   - [Маршруты nginx](#маршруты-nginx)
   - [Запуск production-стека](#запуск-production-стека)
   - [Проверка](#проверка)
+- [Kubernetes (minikube)](#kubernetes-minikube)
+  - [Требования](#требования-1)
+  - [Структура манифестов](#структура-манифестов)
+  - [Архитектурные решения](#архитектурные-решения)
+  - [Шаг 1: Запуск minikube с GPU](#шаг-1-запуск-minikube-с-gpu)
+  - [Шаг 2: Сборка образов в minikube](#шаг-2-сборка-образов-в-minikube)
+  - [Шаг 3: Развёртывание](#шаг-3-развёртывание)
+  - [Шаг 4: Проверка](#шаг-4-проверка)
+  - [Шаг 5: Использование](#шаг-5-использование)
+  - [Маршруты Ingress](#маршруты-ingress)
+  - [Полезные команды](#полезные-команды)
+- [Оценка RAG-пайплайна (RAGAS)](#оценка-rag-пайплайна-ragas)
+  - [Golden Dataset](#golden-dataset)
+  - [Запуск оценки](#запуск-оценки)
+  - [Сравнение экспериментов](#сравнение-экспериментов)
 - [Разработка](#разработка)
   - [Установка dev-зависимостей](#установка-dev-зависимостей)
   - [Code Quality](#code-quality)
@@ -242,6 +257,13 @@ hse-prom-prog/
 │   └── style.css                      # Custom CSS
 ├── .streamlit/
 │   └── config.toml                    # Streamlit theme
+├── eval/
+│   ├── __init__.py
+│   ├── golden_dataset.json            # 41 вопрос для оценки RAG
+│   ├── metrics.py                     # RAGAS-метрики (GPT-5.2 as judge)
+│   ├── run_eval.py                    # CLI: запуск оценки
+│   ├── compare.py                     # CLI: сравнение экспериментов
+│   └── results/                       # Результаты (gitignored)
 ├── tests/
 │   ├── __init__.py
 │   └── test_workflow.py               # 65 тестов (все агенты + workflow)
@@ -271,8 +293,8 @@ cd hse-prom-prog
 # Скачайте все ветки
 git fetch --all
 
-# Переключитесь на ветку checkpoint_3
-git checkout checkpoint_3
+# Переключитесь на ветку checkpoint_5
+git checkout checkpoint_5
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -404,6 +426,10 @@ QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=business_docs
 EMBEDDING_MODEL=intfloat/multilingual-e5-base
 
+# VSELLM (LLM-as-judge для RAGAS evaluation)
+VSELLM_API_KEY=your-vsellm-api-key
+VSELLM_BASE_URL=https://api.vsellm.ru/v1
+
 # Logging
 LOG_LEVEL=INFO
 ```
@@ -412,6 +438,9 @@ LOG_LEVEL=INFO
 
 - Для Docker Compose используйте `VLLM_BASE_URL=http://vllm:8000/v1`,
   `POSTGRES_HOST=postgres`, `QDRANT_URL=http://qdrant:6333`
+- Для Kubernetes сервис vLLM называется `vllm-server` (не `vllm`), чтобы
+  избежать конфликта с переменной `VLLM_PORT`, которую Kubernetes создаёт
+  автоматически. Используйте `VLLM_BASE_URL=http://vllm-server:8000/v1`
 - Для локальной разработки используйте `localhost` для всех сервисов
 - Значения по умолчанию подходят для большинства случаев использования
 
@@ -859,6 +888,438 @@ docker compose exec api ps aux | grep gunicorn
 curl http://localhost:6333/healthz
 ```
 
+## Kubernetes (minikube)
+
+Проект можно развернуть в Kubernetes с помощью minikube. Все манифесты находятся
+в `k8s/`.
+
+### Требования
+
+- [minikube](https://minikube.sigs.k8s.io/) v1.38+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- Docker (driver для minikube)
+- NVIDIA GPU + драйверы (для vLLM)
+- [CloudNativePG](https://cloudnative-pg.io/) v1.25+ (устанавливается на шаге 1)
+
+### Структура манифестов
+
+```
+k8s/
+├── namespace.yaml                # Namespace agile-assistant
+├── ingress.yaml                  # Ingress (API rewrite, static MIME fix, Streamlit/WebSocket)
+├── configmaps/
+│   ├── app-config.yaml           # Env vars (DNS names, credentials)
+│   └── postgres-init.yaml        # init.sql (schema + COPY)
+├── jobs/
+│   ├── migrate.yaml              # Job: Alembic migrations (backoffLimit: 3)
+│   ├── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
+│   └── postgres-load-data.yaml   # Job: load CSV data into HA PostgreSQL
+├── secrets/
+│   ├── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
+│   └── postgres-credentials.yaml # basic-auth Secret для CloudNativePG (username/password)
+│   # registry-credentials и basic-auth создаются через kubectl (шаг 2)
+├── statefulsets/
+│   └── postgres-cluster.yaml     # CloudNativePG Cluster (1 primary + 2 standby)
+├── storage/
+│   ├── qdrant-pvc.yaml           # PVC 2Gi
+│   └── vllm-cache-pvc.yaml      # PVC 10Gi (HuggingFace model cache)
+├── deployments/
+│   ├── qdrant.yaml               # Qdrant v1.13.2
+│   ├── redis.yaml                # Redis 7 (ephemeral)
+│   ├── vllm.yaml                 # vLLM (Qwen2.5-3B, GPU)
+│   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
+│   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
+│   └── streamlit.yaml            # Streamlit UI
+└── services/
+    ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
+    ├── redis-svc.yaml            # ClusterIP :6379
+    ├── vllm-svc.yaml             # ClusterIP :8000 (name: vllm-server)
+    ├── api-svc.yaml              # ClusterIP :8080
+    └── streamlit-svc.yaml        # ClusterIP :8501
+```
+
+### Архитектурные решения
+
+- **PostgreSQL HA** — управляется оператором CloudNativePG. Кластер из 3
+  инстансов (1 primary + 2 standby) со streaming replication и автоматическим
+  failover. Оператор создаёт Service-ы `postgres-cluster-rw` (запись) и
+  `postgres-cluster-ro` (чтение). Приложение подключается через
+  `postgres-cluster-rw`.
+- **Secrets** — пароли (`POSTGRES_PASSWORD`, `VLLM_API_KEY`) хранятся в
+  `k8s/secrets/app-secrets.yaml` (Secret типа Opaque), а не в ConfigMap.
+  `registry-credentials` (docker-registry) — аутентификация в GHCR. `basic-auth`
+  — защита Ingress паролем (Basic Auth).
+- **Docker Registry** — образы публикуются в GitHub Container Registry
+  (`ghcr.io/akiltrebreg/agile-assistant`). Deployment-ы и Job-ы используют
+  `imagePullPolicy: IfNotPresent` с `imagePullSecrets` вместо локальной сборки
+  через `minikube docker-env`.
+- **Basic Auth** — все Ingress-ресурсы защищены HTTP Basic Authentication. При
+  открытии в браузере запрашивается логин и пароль.
+- **Jobs** — миграции Alembic и загрузка данных (CSV в PostgreSQL, чанки в
+  Qdrant) запускаются как Job-ы с `backoffLimit` для автоматического повтора при
+  ошибках и `ttlSecondsAfterFinished: 3600` для автоочистки.
+- **Ingress** — snippet-аннотации для корректных MIME-типов статических файлов
+  (SVG, CSS). Требуют включения `allow-snippet-annotations` в
+  ingress-controller.
+- **vLLM** — Service называется `vllm-server` (не `vllm`), чтобы избежать
+  конфликта с переменной `VLLM_PORT`, которую Kubernetes автоматически создаёт
+  из имени Service.
+
+### Шаг 1: Запуск minikube с GPU
+
+```bash
+minikube start --driver=docker --gpus=all --cpus=8 --memory=13000 --disk-size=40g
+```
+
+Включите необходимые аддоны:
+
+```bash
+minikube addons enable ingress
+minikube addons enable metrics-server
+minikube addons enable nvidia-device-plugin
+```
+
+Настройте snippet-аннотации для ingress-controller (нужны для корректных
+MIME-типов статических файлов):
+
+```bash
+kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=120s
+kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
+  --type merge \
+  -p '{"data":{"allow-snippet-annotations":"true","annotations-risk-level":"Critical"}}'
+kubectl -n ingress-nginx rollout restart deployment ingress-nginx-controller
+kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
+```
+
+Установите CloudNativePG оператор для PostgreSQL HA:
+
+```bash
+kubectl apply --server-side -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
+kubectl -n cnpg-system wait --for=condition=ready pod -l app.kubernetes.io/name=cloudnative-pg --timeout=120s
+```
+
+### Шаг 2: Сборка и публикация образа
+
+Соберите и запушьте образ в GitHub Container Registry:
+
+```bash
+docker build -t ghcr.io/akiltrebreg/agile-assistant:latest .
+docker push ghcr.io/akiltrebreg/agile-assistant:latest
+```
+
+> **Для minikube** — образ ~2GB (CPU-only PyTorch, без CUDA). Чтобы ускорить
+> деплой, можно загрузить образ напрямую из локального Docker в minikube вместо
+> pull из GHCR:
+>
+> ```bash
+> minikube image load ghcr.io/akiltrebreg/agile-assistant:latest
+> ```
+
+> **Аутентификация в GHCR** (обязательна для push и pull):
+>
+> ```bash
+> echo "<GHCR_PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+> ```
+>
+> Создайте Personal Access Token (classic) с правами `read:packages` /
+> `write:packages`: https://github.com/settings/tokens → Generate new token
+> (classic). Контрибьюторы репозитория могут pull-ить образ, залогинившись со
+> своим PAT.
+
+Создайте Secret для аутентификации в registry:
+
+```bash
+kubectl create namespace agile-assistant 2>/dev/null || true
+kubectl -n agile-assistant create secret docker-registry registry-credentials \
+  --docker-server=ghcr.io \
+  --docker-username=akiltrebreg \
+  --docker-password=<GHCR_PAT> \
+  --docker-email=<ваш-email>
+```
+
+Создайте Secret для Basic Auth (защита UI/API паролем):
+
+```bash
+sudo apt install apache2-utils -y    # если ещё не установлен
+htpasswd -c auth admin               # введите пароль дважды
+kubectl -n agile-assistant create secret generic basic-auth --from-file=auth
+rm auth                              # локальный файл больше не нужен
+```
+
+### Шаг 3: Развёртывание
+
+Применяйте манифесты строго в указанном порядке — каждый следующий шаг зависит
+от предыдущего.
+
+**3.1. Базовые ресурсы** — конфигурация, секреты, PVC:
+
+```bash
+# Namespace уже создан на шаге 2, но на всякий случай:
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmaps/             # app-config (env vars) + postgres-init (SQL схема)
+kubectl apply -f k8s/secrets/                # app-secrets + postgres-credentials (для CloudNativePG)
+# registry-credentials и basic-auth уже созданы на шаге 2
+kubectl apply -f k8s/storage/                # PVC для Qdrant (2Gi) и vLLM model cache (10Gi)
+```
+
+**3.2. Service-ы** — создают DNS-имена для межсервисного взаимодействия:
+
+```bash
+kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, streamlit
+```
+
+> Service-ы применяются до Deployment-ов, чтобы DNS-имена были доступны при
+> старте контейнеров. PostgreSQL Service создаётся автоматически оператором
+> CloudNativePG.
+
+**3.3. Инфраструктура** — БД, векторное хранилище, кеш, LLM:
+
+```bash
+kubectl apply -f k8s/statefulsets/postgres-cluster.yaml   # CloudNativePG: 1 primary + 2 standby
+kubectl apply -f k8s/deployments/qdrant.yaml              # Qdrant v1.13.2
+kubectl apply -f k8s/deployments/redis.yaml               # Redis 7 (брокер Celery)
+kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + Qwen2.5-3B (GPU)
+```
+
+**3.4. Ожидание готовности инфраструктуры:**
+
+```bash
+# PostgreSQL HA: 3 пода поднимаются, настраивается replication (2-3 мин)
+kubectl -n agile-assistant wait --for=condition=ready cluster/postgres-cluster --timeout=300s
+
+kubectl -n agile-assistant wait --for=condition=ready pod -l app=qdrant --timeout=120s
+kubectl -n agile-assistant wait --for=condition=ready pod -l app=redis --timeout=60s
+```
+
+> vLLM не ждём — он загружает модель 10-15 минут при первом запуске (скачивание
+> ~6.5GB + компиляция CUDA-графов). При повторных запусках модель берётся из
+> PVC.
+
+**3.5. Инициализация данных** — три Job-а выполняются последовательно:
+
+```bash
+# Загрузка CSV-данных в PostgreSQL (report_agile_dashboard, report_agile_dashboard_metrics)
+kubectl apply -f k8s/jobs/postgres-load-data.yaml
+kubectl -n agile-assistant wait --for=condition=complete job/postgres-load-data --timeout=120s
+kubectl -n agile-assistant logs job/postgres-load-data
+
+# Alembic миграции (создаёт таблицу tasks для API)
+kubectl apply -f k8s/jobs/migrate.yaml
+kubectl -n agile-assistant wait --for=condition=complete job/migrate --timeout=120s
+kubectl -n agile-assistant logs job/migrate
+
+# Загрузка базы знаний в Qdrant (embedding-модель ~500MB + индексация 82 чанков, ~3-4 мин)
+kubectl apply -f k8s/jobs/qdrant-ingest.yaml
+kubectl -n agile-assistant wait --for=condition=complete job/qdrant-ingest --timeout=300s
+kubectl -n agile-assistant logs job/qdrant-ingest
+```
+
+> Все Job-ы имеют `backoffLimit` для автоповтора при ошибках и
+> `ttlSecondsAfterFinished: 3600` — автоудаление через 1 час после завершения.
+
+**3.6. Приложение:**
+
+```bash
+kubectl apply -f k8s/deployments/api.yaml            # FastAPI (2 реплики, gunicorn + uvicorn)
+kubectl apply -f k8s/deployments/celery-worker.yaml   # Celery worker (embedding-модель, 4Gi RAM)
+kubectl apply -f k8s/deployments/streamlit.yaml        # Streamlit UI
+```
+
+**3.7. Ingress** — маршрутизация внешнего трафика:
+
+```bash
+kubectl apply -f k8s/ingress.yaml    # 4 Ingress-ресурса: API, static-svg, static-css, UI
+```
+
+### Шаг 4: Проверка
+
+```bash
+# Статус всех подов
+kubectl -n agile-assistant get pods
+
+# Ожидаемый результат: все поды Running, READY 1/1
+# PostgreSQL HA: 3 пода (postgres-cluster-1, -2, -3)
+# vLLM может загружаться 10-15 минут при первом запуске (скачивание модели ~6.5GB + компиляция CUDA-графов)
+# При последующих запусках модель берётся из PVC (vllm-cache)
+
+# Статус PostgreSQL HA кластера
+kubectl -n agile-assistant get cluster postgres-cluster
+```
+
+### Шаг 5: Использование
+
+Узнайте IP minikube:
+
+```bash
+minikube ip
+```
+
+Откройте в браузере (при первом входе появится окно Basic Auth — логин `admin`):
+
+```bash
+# Streamlit UI
+open http://$(minikube ip)
+
+# Swagger UI
+open http://$(minikube ip)/docs
+```
+
+Создайте задачу через API (Basic Auth обязателен):
+
+```bash
+# Создание задачи
+curl -s -u admin:<пароль> -X POST http://$(minikube ip)/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Расскажи о задаче AL-38787"}'
+
+# Проверка статуса (подставьте task_id)
+curl -s -u admin:<пароль> http://$(minikube ip)/api/tasks/<task_id> | python3 -m json.tool
+```
+
+### Маршруты Ingress
+
+| Путь              | Сервис           | Особенности                                         |
+| ----------------- | ---------------- | --------------------------------------------------- |
+| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (rewrite-target)            |
+| `/static/*.svg`   | `streamlit:8501` | Content-Type: image/svg+xml (configuration-snippet) |
+| `/static/*.css`   | `streamlit:8501` | Content-Type: text/css (configuration-snippet)      |
+| `/docs`, `/redoc` | `api:8080`       | Swagger UI                                          |
+| `/_stcore`        | `streamlit:8501` | WebSocket-эндпоинт Streamlit                        |
+| `/` (default)     | `streamlit:8501` | Streamlit UI                                        |
+
+### Полезные команды
+
+```bash
+# Логи конкретного сервиса
+kubectl -n agile-assistant logs -l app=vllm --tail=50
+kubectl -n agile-assistant logs -l app=celery-worker --tail=50
+
+# Перезапуск деплоймента
+kubectl -n agile-assistant rollout restart deployment/api
+
+# Масштабирование API
+kubectl -n agile-assistant scale deployment/api --replicas=3
+
+# PostgreSQL HA: проверка кластера
+kubectl -n agile-assistant get cluster postgres-cluster
+
+# PostgreSQL HA: тест failover (удалить primary — standby промоутится)
+kubectl -n agile-assistant delete pod postgres-cluster-1
+
+# Остановка всего
+minikube stop
+
+# Удаление кластера
+minikube delete
+```
+
+## Оценка RAG-пайплайна (RAGAS)
+
+Модуль `eval/` реализует автоматическую оценку качества RAG-пайплайна с помощью
+фреймворка [RAGAS](https://docs.ragas.io/). В качестве LLM-as-judge используется
+GPT-5.2 через OpenAI-compatible API (vsellm).
+
+### Метрики
+
+| Метрика              | Что оценивает                                | Категория  |
+| -------------------- | -------------------------------------------- | ---------- |
+| `context_precision`  | Точность найденных чанков                    | Retrieval  |
+| `context_recall`     | Полнота найденных чанков                     | Retrieval  |
+| `faithfulness`       | Верность ответа контексту (без галлюцинаций) | Generation |
+| `answer_relevancy`   | Релевантность ответа вопросу                 | Generation |
+| `answer_correctness` | Корректность ответа (vs ground truth)        | End-to-end |
+
+### Golden Dataset
+
+Файл `eval/golden_dataset.json` содержит 41 вопрос с эталонными ответами,
+составленными строго по документам из `knowledge_base/`:
+
+| Категория | Вопросов | Описание                                                    |
+| --------- | -------- | ----------------------------------------------------------- |
+| metrics   | 25       | Вопросы по описаниям метрик (done_total, scope_drop и т.д.) |
+| agile     | 6        | Agile-практики, дашборды                                    |
+| cross_doc | 5        | Вопросы, требующие информации из нескольких документов      |
+| negative  | 5        | Вопросы, на которые в базе знаний **нет** ответа            |
+
+Негативные примеры прогоняются через пайплайн, но исключаются из RAGAS-оценки
+(нет ground truth для сравнения).
+
+### Запуск оценки
+
+```bash
+# Запуск с дефолтным именем эксперимента (baseline)
+poetry run python -m eval.run_eval
+
+# Запуск с пользовательским именем
+poetry run python -m eval.run_eval --experiment semantic_v2
+```
+
+Скрипт выполняет:
+
+1. Загружает `golden_dataset.json`
+2. Прогоняет каждый вопрос через RAG-пайплайн (retrieve → generate)
+3. Вычисляет RAGAS-метрики (LLM-as-judge: GPT-5.2 через vsellm)
+4. Сохраняет результаты в `eval/results/{experiment}_{timestamp}.json`
+5. Выводит сводную таблицу в консоль
+
+Формат результата:
+
+```json
+{
+  "experiment": "baseline",
+  "timestamp": "20260310_143000",
+  "config": {
+    "vllm_model": "Qwen/Qwen2.5-3B-Instruct",
+    "embedding_model": "intfloat/multilingual-e5-base",
+    "chunk_size": 1000,
+    "chunk_overlap": 200,
+    "retriever_top_k": 4
+  },
+  "aggregate": {
+    "context_precision": 0.82,
+    "faithfulness": 0.91,
+    "answer_correctness": 0.75
+  },
+  "per_question": [...]
+}
+```
+
+**Требования**: переменные `VSELLM_API_KEY` и `VSELLM_BASE_URL` должны быть
+заданы в `.env` (см. [Конфигурация](#конфигурация)). Qdrant должен быть запущен
+с загруженной базой знаний.
+
+### Сравнение экспериментов
+
+```bash
+# Сравнение двух экспериментов
+poetry run python -m eval.compare \
+  eval/results/baseline_20260310_143000.json \
+  eval/results/semantic_v2_20260310_150000.json
+
+# Сравнение трёх и более
+poetry run python -m eval.compare eval/results/*.json
+```
+
+Выводит:
+
+- Таблицу метрик с дельтами (зелёный — улучшение, красный — деградация)
+- Различия в конфигурациях пайплайна между экспериментами
+
+```
+Metric             baseline           semantic_v2        delta (last − first)
+-----------------  -----------------  -----------------  --------------------
+context_precision  0.8200             0.8900             +0.0700
+faithfulness       0.9100             0.9300             +0.0200
+answer_correctness 0.7500             0.7200             -0.0300
+
+Config differences
+param         baseline                 semantic_v2
+------------  -----------------------  -----------------------
+chunk_size    1000                     512
+chunk_overlap 200                      100
+```
+
 ## Разработка
 
 ### Установка dev-зависимостей
@@ -983,6 +1444,13 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `FASTAPI_HOST` | Хост FastAPI сервера     | `0.0.0.0`    |
 | `FASTAPI_PORT` | Порт FastAPI сервера     | `8080`       |
 | `CORS_ORIGINS` | Разрешённые CORS origins | `*`          |
+
+### VSELLM Configuration (LLM-as-judge)
+
+| Переменная        | Описание                    | По умолчанию               |
+| ----------------- | --------------------------- | -------------------------- |
+| `VSELLM_API_KEY`  | API ключ для vsellm (RAGAS) | —                          |
+| `VSELLM_BASE_URL` | URL vsellm API endpoint     | `https://api.vsellm.ru/v1` |
 
 ### Other
 

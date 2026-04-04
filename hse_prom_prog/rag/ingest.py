@@ -25,12 +25,12 @@ from hse_prom_prog.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Default knowledge base path (project root / knowledge_base)
+_DEFAULT_KB_DIR = Path(__file__).resolve().parents[2] / "knowledge_base"
+
 # Chunking parameters
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
-
-# Default knowledge base path (project root / knowledge_base)
-_DEFAULT_KB_DIR = Path(__file__).resolve().parents[2] / "knowledge_base"
 
 
 def _load_documents(kb_dir: Path) -> list:
@@ -80,7 +80,7 @@ def _enrich_metadata(doc, kb_dir: Path) -> None:
 
 
 def _split_documents(docs: list) -> list:
-    """Split documents into chunks."""
+    """Split documents into chunks using RecursiveCharacterTextSplitter."""
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,

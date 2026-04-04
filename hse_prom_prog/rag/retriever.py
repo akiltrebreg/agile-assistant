@@ -1,6 +1,6 @@
 """Qdrant retriever: connects to an existing collection and returns relevant docs.
 
-The retriever is created once and reused across requests.
+The vector store and retriever are created once and reused across requests.
 """
 
 import logging
@@ -14,15 +14,16 @@ from hse_prom_prog.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Module-level singleton
+# Module-level singletons
+_vector_store: QdrantVectorStore | None = None
 _retriever: VectorStoreRetriever | None = None
 
 # Number of relevant chunks to return
 _TOP_K = 4
 
 
-def _build_retriever() -> VectorStoreRetriever:
-    """Create a Qdrant retriever backed by the existing collection."""
+def _build_vector_store() -> QdrantVectorStore:
+    """Create a QdrantVectorStore backed by the existing collection."""
     embeddings = HuggingFaceEmbeddings(
         model_name=settings.embedding_model,
         model_kwargs={"device": "cpu"},
@@ -44,22 +45,26 @@ def _build_retriever() -> VectorStoreRetriever:
         collection_name=collection,
         embedding=embeddings,
     )
+    logger.info("[Retriever] Vector store initialized (collection=%s)", collection)
+    return store
 
-    retriever = store.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": _TOP_K},
-    )
-    logger.info(
-        "[Retriever] Initialized (collection=%s, k=%d)",
-        collection,
-        _TOP_K,
-    )
-    return retriever
+
+def get_vector_store() -> QdrantVectorStore:
+    """Return the module-level vector store singleton (lazy init)."""
+    global _vector_store  # noqa: PLW0603
+    if _vector_store is None:
+        _vector_store = _build_vector_store()
+    return _vector_store
 
 
 def get_retriever() -> VectorStoreRetriever:
     """Return the module-level retriever singleton (lazy init)."""
     global _retriever  # noqa: PLW0603
     if _retriever is None:
-        _retriever = _build_retriever()
+        store = get_vector_store()
+        _retriever = store.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": _TOP_K},
+        )
+        logger.info("[Retriever] Retriever initialized (k=%d)", _TOP_K)
     return _retriever

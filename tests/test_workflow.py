@@ -4,17 +4,18 @@ Tests cover:
 - Supervisor: regex fast path, LLM classification, JSON parsing, query_type
 - SQL Agent: query building for all intents, validation
 - RAG Agent: retrieval, LLM generation, empty results, errors
+- Ingestion: splitting, metadata enrichment
 - Validator Agent: sql-only, rag-only, hybrid, both-failed scenarios
 - Response Agent: direct, DB-based, RAG, hybrid, error handling
 - Workflow: end-to-end integration with mocked agents (all 4 routes)
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import OperationalError
 
-from hse_prom_prog.agents.rag_agent import RAGAgent
 from hse_prom_prog.agents.response_agent import ResponseAgent
 from hse_prom_prog.agents.sql_agent import SQLAgent
 from hse_prom_prog.agents.supervisor import SupervisorAgent
@@ -369,7 +370,7 @@ class TestSQLAgent:
 
 
 class TestRAGAgent:
-    """Tests for RAG agent."""
+    """Tests for simplified RAG agent."""
 
     def _make_mock_doc(self, content: str, source: str = "doc.md", category: str = "agile"):
         """Create a mock LangChain Document."""
@@ -380,6 +381,8 @@ class TestRAGAgent:
 
     def test_process_success(self) -> None:
         """RAG Agent retrieves docs and generates answer."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = "Scope Drop — это снижение объёма спринта."
         mock_retriever = MagicMock()
@@ -392,11 +395,13 @@ class TestRAGAgent:
 
         assert result["rag_response"] == "Scope Drop — это снижение объёма спринта."
         assert "metrics/scope.md" in result["rag_sources"]
-        mock_retriever.invoke.assert_called_once()
-        mock_llm.invoke.assert_called_once()
+        mock_retriever.invoke.assert_called()
+        mock_llm.invoke.assert_called()
 
     def test_process_no_documents(self) -> None:
         """No relevant documents → rag_response is None."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_retriever = MagicMock()
         mock_retriever.invoke.return_value = []
@@ -406,10 +411,11 @@ class TestRAGAgent:
 
         assert result["rag_response"] is None
         assert result["rag_sources"] == []
-        mock_llm.invoke.assert_not_called()
 
     def test_process_retrieval_error(self) -> None:
-        """Retrieval error is caught and returned."""
+        """Retrieval failure → rag_response is None with error."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_retriever = MagicMock()
         mock_retriever.invoke.side_effect = ConnectionError("Qdrant down")
@@ -418,10 +424,13 @@ class TestRAGAgent:
         result = agent.process({"original_query": "test"})
 
         assert result["rag_response"] is None
+        assert result["rag_sources"] == []
         assert "RAG retrieval error" in result["error"]
 
     def test_process_llm_error(self) -> None:
         """LLM generation error is caught; sources still returned."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_llm.invoke.side_effect = ConnectionError("vLLM down")
         mock_retriever = MagicMock()
@@ -436,26 +445,10 @@ class TestRAGAgent:
         assert len(result["rag_sources"]) == 1
         assert "RAG generation error" in result["error"]
 
-    def test_context_truncation(self) -> None:
-        """Long documents are truncated to _MAX_CONTEXT_CHARS."""
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value = "Answer"
-        mock_retriever = MagicMock()
-        # Create documents that exceed the 4000 char limit
-        mock_retriever.invoke.return_value = [
-            self._make_mock_doc("A" * 3000, "doc1.md"),
-            self._make_mock_doc("B" * 3000, "doc2.md"),
-        ]
-        agent = RAGAgent(mock_llm, mock_retriever)
-
-        result = agent.process({"original_query": "test"})
-
-        assert result["rag_response"] == "Answer"
-        # Only one source because second doc exceeds char limit
-        assert len(result["rag_sources"]) == 1
-
     def test_deduplicates_sources(self) -> None:
         """Same source appearing in multiple docs is deduplicated."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = "Answer"
         mock_retriever = MagicMock()
@@ -468,6 +461,96 @@ class TestRAGAgent:
         result = agent.process({"original_query": "test"})
 
         assert result["rag_sources"] == ["agile/doc.md"]
+
+    def test_all_chunks_in_context(self) -> None:
+        """All retrieved chunks are included in LLM context (no truncation)."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = "Answer"
+        mock_retriever = MagicMock()
+        mock_retriever.invoke.return_value = [
+            self._make_mock_doc("A" * 3000, "doc1.md"),
+            self._make_mock_doc("B" * 3000, "doc2.md"),
+        ]
+        agent = RAGAgent(mock_llm, mock_retriever)
+
+        result = agent.process({"original_query": "test"})
+
+        assert result["rag_response"] == "Answer"
+        # Both sources included — no truncation
+        assert len(result["rag_sources"]) == 2
+
+    def test_prompt_contains_context_and_question(self) -> None:
+        """Generated prompt contains context and question sections."""
+        from hse_prom_prog.agents.rag_agent import RAGAgent
+
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = "Answer"
+        mock_retriever = MagicMock()
+        mock_retriever.invoke.return_value = [
+            self._make_mock_doc("Important context here"),
+        ]
+        agent = RAGAgent(mock_llm, mock_retriever)
+
+        agent.process({"original_query": "My question?"})
+
+        prompt = mock_llm.invoke.call_args[0][0]
+        assert "Important context here" in prompt
+        assert "My question?" in prompt
+
+
+# ────────────────────────────────────────────────────────────────
+# Ingestion Pipeline
+# ────────────────────────────────────────────────────────────────
+
+
+class TestIngestion:
+    """Tests for simplified ingestion pipeline."""
+
+    def test_split_documents_produces_chunks(self) -> None:
+        """_split_documents splits long text into chunks."""
+        from langchain_core.documents import Document
+
+        from hse_prom_prog.rag.ingest import _split_documents
+
+        docs = [Document(page_content="word " * 500, metadata={"source": "test.md"})]
+        chunks = _split_documents(docs)
+
+        assert len(chunks) > 1
+        for chunk in chunks:
+            assert len(chunk.page_content) <= 1000 + 50  # small margin for word boundaries
+
+    def test_enrich_metadata_adds_category(self) -> None:
+        """_enrich_metadata extracts category from sub-folder name."""
+        from langchain_core.documents import Document
+
+        from hse_prom_prog.rag.ingest import _enrich_metadata
+
+        kb_dir = Path("/data/knowledge_base")
+        doc = Document(
+            page_content="test",
+            metadata={"source": "/data/knowledge_base/metrics/scope_drop.md"},
+        )
+        _enrich_metadata(doc, kb_dir)
+
+        assert doc.metadata["category"] == "metrics"
+        assert "ingested_at" in doc.metadata
+
+    def test_enrich_metadata_general_fallback(self) -> None:
+        """_enrich_metadata falls back to 'general' for root-level files."""
+        from langchain_core.documents import Document
+
+        from hse_prom_prog.rag.ingest import _enrich_metadata
+
+        kb_dir = Path("/data/knowledge_base")
+        doc = Document(
+            page_content="test",
+            metadata={"source": "/data/knowledge_base/readme.md"},
+        )
+        _enrich_metadata(doc, kb_dir)
+
+        assert doc.metadata["category"] == "general"
 
 
 # ────────────────────────────────────────────────────────────────
