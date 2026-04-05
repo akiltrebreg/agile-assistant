@@ -15,8 +15,10 @@ Usage:
 """
 
 import logging
+import os
 import re
 import sys
+import tempfile
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +48,57 @@ logger = logging.getLogger(__name__)
 
 # Default knowledge base path (project root / knowledge_base)
 _DEFAULT_KB_DIR = Path(__file__).resolve().parents[2] / "knowledge_base"
+
+
+# ── S3 knowledge base download ──────────────────────────────
+
+
+def _download_kb_from_s3() -> Path:
+    """Download knowledge base from S3 to a temp directory.
+
+    Uses ``S3_KB_BUCKET`` and ``S3_KB_PATH`` settings plus standard
+    AWS env vars (``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``).
+
+    Returns:
+        Path to the local directory containing downloaded files.
+    """
+    import boto3  # noqa: PLC0415
+
+    bucket = settings.s3_kb_bucket
+    prefix = settings.s3_kb_path.rstrip("/") + "/"
+    endpoint = settings.s3_endpoint
+
+    logger.info(
+        "[Ingest] Downloading knowledge base from s3://%s/%s ...",
+        bucket,
+        prefix,
+    )
+
+    session = boto3.session.Session(
+        aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.environ.get("AWS_DEFAULT_REGION", "ru-central1"),
+    )
+    s3 = session.client("s3", endpoint_url=endpoint)
+
+    local_dir = Path(tempfile.mkdtemp(prefix="kb_s3_"))
+    paginator = s3.get_paginator("list_objects_v2")
+    count = 0
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            # Skip "directory" markers
+            if key.endswith("/"):
+                continue
+            rel = key[len(prefix) :]
+            local_path = local_dir / rel
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            s3.download_file(bucket, key, str(local_path))
+            count += 1
+
+    logger.info("[Ingest] Downloaded %d files from S3 → %s", count, local_dir)
+    return local_dir
+
 
 # Chunking parameters
 CHUNK_SIZE = 500
@@ -301,7 +354,10 @@ def run_ingestion(kb_dir: Path | None = None) -> int:
     Returns:
         Number of chunks uploaded to Qdrant.
     """
-    kb_dir = kb_dir or _DEFAULT_KB_DIR
+    if kb_dir is None and settings.s3_kb_bucket:
+        kb_dir = _download_kb_from_s3()
+    else:
+        kb_dir = kb_dir or _DEFAULT_KB_DIR
     logger.info("[Ingest] Starting ingestion from %s", kb_dir)
 
     # 1. Load (two-mode: text + table)

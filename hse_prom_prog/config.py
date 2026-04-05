@@ -101,6 +101,20 @@ class Settings(BaseSettings):
         description="PostgreSQL database name",
     )
 
+    # S3 Knowledge Base (Yandex Cloud Object Storage)
+    s3_kb_bucket: str | None = Field(
+        default="knowledge-base",
+        description="S3 bucket for knowledge base. None = use local knowledge_base/ dir.",
+    )
+    s3_kb_path: str = Field(
+        default="knowledge_base",
+        description="Path prefix inside S3 bucket (e.g. 'knowledge_base')",
+    )
+    s3_endpoint: str = Field(
+        default="https://storage.yandexcloud.net",
+        description="S3 endpoint URL (Yandex Cloud Object Storage)",
+    )
+
     # Qdrant Configuration
     qdrant_url: str = Field(
         default="http://localhost:6333",

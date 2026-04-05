@@ -44,6 +44,8 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "fastembed>=0.4.0",
     "FlagEmbedding>=1.2.0",
+    # S3 access for knowledge base
+    "boto3>=1.35.0",
     # RAGAS evaluation framework
     "ragas>=0.2.0",
     "datasets>=3.0.0",
