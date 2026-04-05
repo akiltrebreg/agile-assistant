@@ -100,9 +100,9 @@ def _download_kb_from_s3() -> Path:
     return local_dir
 
 
-# Chunking parameters
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 200
+# Chunking parameters (re-exported for eval/run_eval.py config snapshot)
+CHUNK_SIZE = settings.chunk_size
+CHUNK_OVERLAP = settings.chunk_overlap
 
 # Vector names used in Qdrant collection
 DENSE_VECTOR_NAME = "dense"

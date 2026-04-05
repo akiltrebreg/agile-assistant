@@ -157,6 +157,23 @@ class Settings(BaseSettings):
         description="Number of chunks fetched before reranking",
     )
 
+    # Chunking Configuration
+    chunk_size: int = Field(
+        default=500,
+        ge=100,
+        description="Chunk size for RecursiveCharacterTextSplitter",
+    )
+    chunk_overlap: int = Field(
+        default=200,
+        ge=0,
+        description="Chunk overlap for RecursiveCharacterTextSplitter",
+    )
+    max_context_chars: int = Field(
+        default=4000,
+        ge=500,
+        description="Max characters of context passed to LLM",
+    )
+
     # Search Configuration
     search_type: Literal["dense", "sparse", "hybrid"] = Field(
         default="dense",

@@ -38,7 +38,6 @@ SPOT_QUESTIONS = [
 ]
 
 _GOLDEN = Path(__file__).resolve().parent / "golden_dataset.json"
-_MAX_CONTEXT_CHARS = 4000
 _CHUNK_PREVIEW_LEN = 120
 
 
@@ -52,6 +51,8 @@ def _load_ground_truths() -> dict[str, str]:
 def main() -> None:
     from hse_prom_prog.config import settings
     from hse_prom_prog.rag.retriever import get_retriever
+
+    max_context = settings.max_context_chars
 
     reranker = None
     if settings.reranker_enabled:
@@ -87,8 +88,8 @@ def main() -> None:
         total = 0
         for doc in docs:
             chunk = doc.page_content
-            if total + len(chunk) > _MAX_CONTEXT_CHARS:
-                remaining = _MAX_CONTEXT_CHARS - total
+            if total + len(chunk) > max_context:
+                remaining = max_context - total
                 if remaining > 0:
                     parts.append(chunk[:remaining])
                 break

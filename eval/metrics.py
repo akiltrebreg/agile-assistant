@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 JUDGE_MODEL = "openai/gpt-5.2"
 JUDGE_BASE_URL = "https://api.vsellm.ru/v1"
-EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
+EMBEDDING_MODEL: str | None = None  # lazy: set from settings in _build_embeddings()
 
 METRIC_NAMES = (
     "context_precision",
@@ -79,9 +79,11 @@ def _build_embeddings():
     from langchain_huggingface import HuggingFaceEmbeddings
     from ragas.embeddings import LangchainEmbeddingsWrapper
 
+    from hse_prom_prog.config import settings
+
     emb = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={"device": "cpu"},
+        model_name=settings.embedding_model,
+        model_kwargs={"device": "cpu", "trust_remote_code": True},
         encode_kwargs={"normalize_embeddings": True},
     )
     return LangchainEmbeddingsWrapper(emb)

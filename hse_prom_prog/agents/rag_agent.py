@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _EMPTY = {"rag_response": None, "rag_sources": []}
-_MAX_CONTEXT_CHARS = 4000
+_MAX_CONTEXT_CHARS = settings.max_context_chars
 
 
 class RAGAgent:

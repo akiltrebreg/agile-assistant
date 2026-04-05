@@ -32,8 +32,7 @@ _EVAL_DIR = Path(__file__).resolve().parent
 _GOLDEN_DATASET = _EVAL_DIR / "golden_dataset.json"
 _RESULTS_DIR = _EVAL_DIR / "results"
 
-# Max context length — must match production rag_agent.py
-_MAX_CONTEXT_CHARS = 4000
+_MAX_CONTEXT_CHARS: int | None = None  # lazy: set from settings in _build_pipeline()
 
 AGILE_COACH_PROMPT = """Ты — Agile-коуч компании. Отвечай ТОЛЬКО на русском языке.
 
@@ -149,6 +148,9 @@ def _build_pipeline():
     from hse_prom_prog.config import settings
     from hse_prom_prog.llm.client import LLMClient
     from hse_prom_prog.rag.retriever import get_retriever
+
+    global _MAX_CONTEXT_CHARS  # noqa: PLW0603
+    _MAX_CONTEXT_CHARS = settings.max_context_chars
 
     llm_client = LLMClient()
     retriever = get_retriever()

@@ -36,9 +36,9 @@ class Reranker:
 
     def __init__(
         self,
-        model_name: str = "BAAI/bge-reranker-base",
-        threshold: float = 0.3,
-        top_n: int = 5,
+        model_name: str,
+        threshold: float,
+        top_n: int,
     ) -> None:
         self._model = CrossEncoder(model_name)
         self._threshold = threshold
