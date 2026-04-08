@@ -81,13 +81,16 @@ class SupervisorAgent:
             '    "cluster": "Logistics" или null\n'
             "  }\n"
             "}\n\n"
+            "ВАЖНО: если запрос содержит приветствие И вопрос — ИГНОРИРУЙ "
+            "приветствие, классифицируй по СУТИ вопроса.\n\n"
             "Правила для intent:\n"
             '- intent="task" — запрос о конкретной задаче по ключу\n'
             '- intent="tasks_filter" — поиск задач по фильтрам '
             "(команда, спринт, тип, статус, кластер)\n"
             '- intent="metric" — запрос метрик команды/спринта '
             "(done_total, scope_drop, velocity и т.д.)\n"
-            '- intent="general" — общий вопрос, приветствие, или вопрос о практиках\n\n'
+            '- intent="general" — ТОЛЬКО приветствие БЕЗ вопроса, '
+            "или вопрос о теории/практиках без привязки к данным БД\n\n"
             "Правила для query_type:\n"
             '- query_type="sql" — нужны данные из БД '
             "(конкретная задача, список задач, метрики)\n"
@@ -98,6 +101,10 @@ class SupervisorAgent:
             '- query_type="simple" — приветствие, общий вопрос без данных\n\n'
             f"{SUPERVISOR_FEW_SHOT_EXAMPLES}\n\n"
             "Дополнительные примеры query_type:\n\n"
+            'Запрос: "Привет! Подскажи Done Total в спринте 26Q1.1 Конь не валялся"\n'
+            '{"intent": "metric", "query_type": "sql", '
+            '"entities": {"sprint_name": "26Q1.1 Конь не валялся", '
+            '"metric_name": "done_total"}}\n\n'
             'Запрос: "Как снизить Scope Drop?"\n'
             '{"intent": "general", "query_type": "rag", "entities": {}}\n\n'
             'Запрос: "Что такое Definition of Done?"\n'
