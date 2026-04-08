@@ -119,6 +119,7 @@ class SupervisorAgent:
         )
 
         llm_response = self.llm_client.invoke(prompt)
+        logger.info("[Supervisor] Raw LLM response: %s", llm_response[:300])
         return self._parse_llm_json(llm_response)
 
     def _parse_llm_json(self, raw: str) -> dict[str, Any]:
