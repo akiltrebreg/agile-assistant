@@ -53,8 +53,7 @@ RUN ln -s /app/static /app/streamlit_app/static
 
 # Knowledge base is downloaded from S3 at ingestion time (see hse_prom_prog/rag/ingest.py)
 
-# Copy database CSV data (for k8s postgres-load-data Job)
-COPY database/data ./database/data
+# CSV data is downloaded from S3 by hse_prom_prog/database/load_csv.py
 
 # Copy eval module (RAGAS evaluation)
 COPY eval ./eval
