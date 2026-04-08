@@ -71,7 +71,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./database/data:/docker-entrypoint-initdb.d/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hse_user}"]
       interval: 10s
@@ -171,8 +170,10 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
-      - S3_KB_BUCKET=${S3_KB_BUCKET:-knowledge-base-agile}
+      - S3_KB_BUCKET=${S3_KB_BUCKET:-knowledge-base}
       - S3_KB_PATH=${S3_KB_PATH:-knowledge_base}
+      - S3_DATA_BUCKET=${S3_DATA_BUCKET:-database-agile}
+      - S3_DATA_PATH=${S3_DATA_PATH:-data}
       - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
@@ -354,6 +355,33 @@ services:
       - ./alembic.ini:/app/alembic.ini
       - ./.env:/app/.env
     command: alembic upgrade head
+    networks:
+      - hse-network
+
+  # One-shot job: download CSVs from S3 and load into PostgreSQL
+  load-data:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+      - S3_DATA_BUCKET=${S3_DATA_BUCKET:-database-agile}
+      - S3_DATA_PATH=${S3_DATA_PATH:-data}
+      - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    command: python -m hse_prom_prog.database.load_csv
     networks:
       - hse-network
 

@@ -116,66 +116,10 @@ CREATE INDEX IF NOT EXISTS idx_metrics_feature_teams ON report_agile_dashboard_m
 CREATE INDEX IF NOT EXISTS idx_metrics_launch_id ON report_agile_dashboard_metrics(launch_id);
 CREATE INDEX IF NOT EXISTS idx_metrics_sprint_state ON report_agile_dashboard_metrics(sprint_state);
 
--- Load data from CSV files using COPY command
--- Note: Empty strings are treated as NULL values, encoding is UTF-8
+-- CSV data is loaded from S3 by hse_prom_prog/database/load_csv.py
+-- (run via: docker compose run --rm load-data)
 
-\echo 'Loading data into report_agile_dashboard...'
-COPY report_agile_dashboard (
-    launch_id, issue_key, jirasprint_id, sprint_name, start_date, end_date,
-    complete_date, activation_date, sprint_state, issue_department, issue_project,
-    unit, cluster, issue_type, feature_teams, storypoints_act, reporter,
-    create_time, resolution_time, summary, resolution, issue_status_act, labels,
-    issue_unit, added_until_sprint_start, sprint_change_date_until_start,
-    sprint_change_date_until_end, num_of_current_sprint_for_task,
-    issue_status_end_of_sprint, storypoints_end_of_sprint,
-    storypoints_start_of_sprint, storypoints_next_sprint,
-    original_estimate_end_of_sprint, original_estimate_start_of_sprint,
-    original_estimate_act, assignee_name, issue_priority_for_bug,
-    time_h_not_fixed, time_h_in_progress, merged_pr_count, last_comment_body,
-    issue_touch_time, feature_teams_start_of_sprint, feature_teams_end_of_sprint,
-    issue_potential_removal_date, removal_status, version_id, is_report,
-    is_tech_debt, estimate_sprint_end, dev_approach, feature_teams_resolution,
-    dev_approach_resolution, drop_team, is_pr, epic_issue_key, actual_resolution,
-    last_cancelled_date
-)
-FROM '/docker-entrypoint-initdb.d/data/report_agile_dashboard.csv'
-WITH (
-    FORMAT csv,
-    HEADER true,
-    DELIMITER ',',
-    ENCODING 'UTF8',
-    NULL ''
-);
-
-\echo 'Loading data into report_agile_dashboard_metrics...'
-COPY report_agile_dashboard_metrics (
-    launch_id, cluster_name, unit_name, feature_teams, jirasprint_id,
-    sprint_name, activation_date, complete_date, initial_commitment_sp,
-    added_work_sp, final_commitment_sp, undone_sp, complete_sp,
-    dev_potential_sp, scope_drop, done_total, sprint_goal,
-    complete_initial_sp, complete_count_sg, count_sg, sprint_state,
-    version_id, count_retro_ai, dev_approach, initial_commitment_issues,
-    added_work_issues, final_commitment_issues, undone_issues,
-    cancel_issues, complete_issues, scope_drop_issues,
-    done_total_issues, done_issues, complete_initial_issues, cancel_rate
-)
-FROM '/docker-entrypoint-initdb.d/data/report_agile_dashboard_metrics.csv'
-WITH (
-    FORMAT csv,
-    HEADER true,
-    DELIMITER ',',
-    ENCODING 'UTF8',
-    NULL ''
-);
-
-\echo 'Database initialization complete!'
+\echo 'Schema initialization complete!'
 \echo 'Tables created:'
 \echo '  - report_agile_dashboard'
 \echo '  - report_agile_dashboard_metrics'
-
--- Display row counts
-SELECT 'report_agile_dashboard' AS table_name, COUNT(*) AS row_count
-FROM report_agile_dashboard
-UNION ALL
-SELECT 'report_agile_dashboard_metrics' AS table_name, COUNT(*) AS row_count
-FROM report_agile_dashboard_metrics;

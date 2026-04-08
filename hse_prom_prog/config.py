@@ -110,6 +110,14 @@ class Settings(BaseSettings):
         default="knowledge_base",
         description="Path prefix inside S3 bucket (e.g. 'knowledge_base')",
     )
+    s3_data_bucket: str | None = Field(
+        default="database-agile",
+        description="S3 bucket for CSV data. None = use local database/data/ dir.",
+    )
+    s3_data_path: str = Field(
+        default="data",
+        description="Path prefix inside S3 data bucket",
+    )
     s3_endpoint: str = Field(
         default="https://storage.yandexcloud.net",
         description="S3 endpoint URL (Yandex Cloud Object Storage)",
