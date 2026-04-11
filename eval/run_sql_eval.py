@@ -278,7 +278,7 @@ def _print_summary(results: list[dict], experiment: str) -> None:
         for r in failed_items:
             q = r["question"] if len(r["question"]) <= 50 else r["question"][:47] + "..."
             print(f"  #{r['id']} [{r['category']}] {q}")
-            print(f"    SQL: {r['generated_sql'][:80]}...")
+            print(f"    SQL: {(r['generated_sql'] or '')[:80]}...")
             print(f"    {r['detail']}")
 
     # Latency
