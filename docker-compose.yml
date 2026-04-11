@@ -137,7 +137,7 @@ services:
 
   # vLLM for text2sql (arctic-7b, port 8001)
   vllm-sql:
-    image: vllm/vllm-openai:v0.9.1
+    image: vllm/vllm-openai:v0.8.5
     container_name: vllm-sql-server
     depends_on:
       download-sql-model:
