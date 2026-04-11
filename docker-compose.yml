@@ -107,7 +107,70 @@ services:
     networks:
       - hse-network
 
-  # vLLM service for serving the LLM model (avibe-gptq-8bit from S3)
+  # Download arctic-text2sql-gptq-8bit from S3 into shared volume
+  download-sql-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/arctic-text2sql-gptq-8bit/config.json ]; then
+          echo "SQL model already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading arctic-text2sql-gptq-8bit from S3..."
+        aws s3 sync \
+          s3://${S3_BUCKET:-quant-models-agile}/models/arctic-text2sql-gptq-8bit/ \
+          /models/arctic-text2sql-gptq-8bit/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/arctic-text2sql-gptq-8bit/config.json || { echo "ERROR: config.json not found"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/arctic-text2sql-gptq-8bit/
+    volumes:
+      - vllm-cache:/models
+    networks:
+      - hse-network
+
+  # vLLM for text2sql (arctic-7b, port 8001)
+  vllm-sql:
+    image: vllm/vllm-openai:v0.9.1
+    container_name: vllm-sql-server
+    depends_on:
+      download-sql-model:
+        condition: service_completed_successfully
+    ports:
+      - "8001:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    command:
+      - --model=/models/arctic-text2sql-gptq-8bit
+      - --quantization=gptq
+      - --dtype=float16
+      - --max-model-len=4096
+    volumes:
+      - vllm-cache:/models
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    networks:
+      - hse-network
+
+  # vLLM service for serving the main LLM (avibe-gptq-8bit from S3)
   vllm:
     image: vllm/vllm-openai:v0.9.1
     container_name: vllm-server
@@ -153,12 +216,16 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      vllm-sql:
+        condition: service_healthy
       qdrant:
         condition: service_healthy
     environment:
       - VLLM_BASE_URL=http://vllm:8000/v1
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
+      - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
+      - SQL_VLLM_MODEL=/models/arctic-text2sql-gptq-8bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -217,11 +284,15 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      vllm-sql:
+        condition: service_healthy
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
+      - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
+      - SQL_VLLM_MODEL=/models/arctic-text2sql-gptq-8bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -264,6 +335,8 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      vllm-sql:
+        condition: service_healthy
       qdrant:
         condition: service_healthy
     environment:
@@ -271,6 +344,8 @@ services:
       - VLLM_BASE_URL=http://vllm:8000/v1
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
+      - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
+      - SQL_VLLM_MODEL=/models/arctic-text2sql-gptq-8bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

@@ -1,28 +1,55 @@
-"""SQL agent for querying Jira data from PostgreSQL.
+"""SQL Agent: text-to-SQL generation and execution via arctic-7b.
 
-This agent builds SQL queries from structured intent + entities
-(provided by the Supervisor) using safe, template-based construction.
-No raw LLM-generated SQL is executed — all queries are assembled in code.
+The model:
+- extracts entities from the user question (team, sprint, issue key)
+- picks the right table
+- generates the SQL query
+
+Schema is loaded from PostgreSQL via schema_loader (not hardcoded).
 """
+
+from __future__ import annotations
 
 import logging
 from typing import Any
 
+from openai import OpenAI
 from sqlalchemy.exc import SQLAlchemyError
 
-from hse_prom_prog.agents.schema_description import SQL_MAX_ROWS
+from hse_prom_prog.agents.schema_loader import get_schema
+from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
 
 logger = logging.getLogger(__name__)
 
+# ── Prompt ───────────────────────────────────────────────────
+
+_SYSTEM_PROMPT = """\
+You are a PostgreSQL SQL generator. Output ONLY a valid SQL query.
+
+RULES:
+1. Think: FROM which table → WHERE filters → SELECT columns
+2. Use ILIKE '%value%' for all text filters
+3. Add LIMIT 100 unless using COUNT, SUM, AVG, GROUP BY, or ORDER BY ... LIMIT N
+4. Output ONLY SQL. No explanations, no markdown."""
+
+_USER_TEMPLATE = """\
+SCHEMA:
+{schema}
+
+QUESTION: {question}
+
+SQL:"""
+
+
+# ── Agent ────────────────────────────────────────────────────
+
 
 class SQLAgent:
-    """Agent that builds and executes SQL queries based on intent + entities.
+    """Agent that generates SQL via text2sql LLM and executes it.
 
-    Supports three intent types:
-    - task: lookup a single task by issue_key
-    - tasks_filter: search tasks by filters (team, sprint, type, status, ...)
-    - metric: retrieve aggregated metrics from the metrics table
+    Uses arctic-7b (or any OpenAI-compatible text2sql model) served
+    by a separate vLLM instance (``SQL_VLLM_BASE_URL``).
 
     Attributes:
         db: Database connection instance.
@@ -30,157 +57,89 @@ class SQLAgent:
 
     def __init__(self, db_connection: DatabaseConnection | None = None) -> None:
         self.db = db_connection
-        logger.info("[SQL Agent] Initialized")
+        self._sql_client = OpenAI(
+            base_url=settings.sql_vllm_base_url,
+            api_key=settings.vllm_api_key,
+        )
+        self._sql_model = settings.sql_vllm_model
+        logger.info(
+            "[SQL Agent] Initialized (model=%s, url=%s)",
+            self._sql_model,
+            settings.sql_vllm_base_url,
+        )
 
     def _ensure_db(self) -> None:
         if not self.db:
             self.db = get_database()
             logger.info("[SQL Agent] Created new database connection")
 
-    # ------------------------------------------------------------------
-    # Query builders — each returns (sql_string, params_dict)
-    # ------------------------------------------------------------------
+    # ── SQL generation ───────────────────────────────────────
 
-    def _build_task_query(self, entities: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        """SELECT * FROM report_agile_dashboard WHERE issue_key = :key."""
-        issue_key = entities.get("issue_key", "UNKNOWN")
-        sql = (
-            "SELECT * FROM report_agile_dashboard "
-            "WHERE issue_key = :issue_key "
-            f"LIMIT {SQL_MAX_ROWS}"
+    def _generate_sql(self, question: str) -> str:
+        """Generate SQL from user question using text2sql LLM."""
+        self._ensure_db()
+        schema = get_schema(self.db.engine)
+
+        response = self._sql_client.chat.completions.create(
+            model=self._sql_model,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": _USER_TEMPLATE.format(schema=schema, question=question),
+                },
+            ],
+            temperature=0.0,
+            max_tokens=256,
         )
-        return sql, {"issue_key": issue_key}
+        raw = response.choices[0].message.content.strip()
+        sql = _clean_sql(raw)
+        logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
+        return sql
 
-    def _build_tasks_filter_query(self, entities: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        """Build a filtered SELECT on report_agile_dashboard."""
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
-
-        entity_to_column = {
-            "team_name": "feature_teams",
-            "sprint_name": "sprint_name",
-            "issue_type": "issue_type",
-            "status": "issue_status_act",
-            "assignee": "assignee_name",
-            "cluster": "cluster",
-        }
-
-        for entity_key, column in entity_to_column.items():
-            value = entities.get(entity_key)
-            if value:
-                # Use ILIKE for fuzzy text matching
-                conditions.append(f"{column} ILIKE :p_{entity_key}")
-                params[f"p_{entity_key}"] = f"%{value}%"
-
-        where = " AND ".join(conditions) if conditions else "TRUE"
-        sql = (
-            f"SELECT * FROM report_agile_dashboard WHERE {where} "
-            f"ORDER BY create_time DESC LIMIT {SQL_MAX_ROWS}"
-        )
-        return sql, params
-
-    def _build_metric_query(self, entities: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        """Build a SELECT on report_agile_dashboard_metrics."""
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
-
-        if entities.get("team_name"):
-            conditions.append("feature_teams ILIKE :p_team")
-            params["p_team"] = f"%{entities['team_name']}%"
-
-        if entities.get("sprint_name"):
-            conditions.append("sprint_name ILIKE :p_sprint")
-            params["p_sprint"] = f"%{entities['sprint_name']}%"
-
-        if entities.get("cluster"):
-            conditions.append("cluster_name ILIKE :p_cluster")
-            params["p_cluster"] = f"%{entities['cluster']}%"
-
-        where = " AND ".join(conditions) if conditions else "TRUE"
-
-        # Select specific metric column if requested, otherwise all
-        metric_name = entities.get("metric_name")
-        allowed_metrics = {
-            "initial_commitment_sp",
-            "added_work_sp",
-            "final_commitment_sp",
-            "undone_sp",
-            "complete_sp",
-            "dev_potential_sp",
-            "scope_drop",
-            "done_total",
-            "sprint_goal",
-            "complete_initial_sp",
-            "complete_count_sg",
-            "count_sg",
-            "cancel_rate",
-            "done_total_issues",
-            "scope_drop_issues",
-        }
-        if metric_name and metric_name in allowed_metrics:
-            select = f"feature_teams, sprint_name, sprint_state, {metric_name}"
-        else:
-            select = "*"
-
-        sql = (
-            f"SELECT {select} FROM report_agile_dashboard_metrics "
-            f"WHERE {where} "
-            f"ORDER BY activation_date DESC LIMIT {SQL_MAX_ROWS}"
-        )
-        return sql, params
-
-    # ------------------------------------------------------------------
-    # Main entry point
-    # ------------------------------------------------------------------
+    # ── Main entry point ─────────────────────────────────────
 
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Build SQL from intent+entities, execute, return results.
+        """Generate SQL from question, validate, execute.
 
         Args:
-            state: Workflow state with 'intent', 'entities', 'original_query'.
+            state: Workflow state with 'original_query'.
 
         Returns:
             State update with sql_query, sql_result, error.
         """
-        intent = state.get("intent", "task")
-        entities = state.get("entities", {})
         original_query = state.get("original_query", "")
-
-        logger.info(f"[SQL Agent] Processing intent={intent}, entities={entities}")
+        logger.info("[SQL Agent] Processing: %s", original_query[:80])
 
         self._ensure_db()
 
-        # Build query
+        # 1. Generate SQL
         try:
-            if intent == "task":
-                sql, params = self._build_task_query(entities)
-            elif intent == "tasks_filter":
-                sql, params = self._build_tasks_filter_query(entities)
-            elif intent == "metric":
-                sql, params = self._build_metric_query(entities)
-            else:
-                return {
-                    "original_query": original_query,
-                    "sql_query": None,
-                    "sql_result": None,
-                    "error": f"Unknown intent: {intent}",
-                }
+            sql = self._generate_sql(original_query)
         except Exception as e:
-            logger.error(f"[SQL Agent] Error building query: {e}")
+            logger.error("[SQL Agent] SQL generation failed: %s", e)
             return {
                 "original_query": original_query,
                 "sql_query": None,
                 "sql_result": None,
-                "error": f"Error building query: {e}",
+                "error": f"SQL generation failed: {e}",
             }
 
-        logger.info(f"[SQL Agent] SQL: {sql} | params: {params}")
+        # 2. Validate
+        if not _is_safe(sql):
+            logger.warning("[SQL Agent] Unsafe SQL rejected: %s", sql[:200])
+            return {
+                "original_query": original_query,
+                "sql_query": sql,
+                "sql_result": None,
+                "error": "Unsafe SQL rejected (only SELECT allowed)",
+            }
 
-        # Execute query
+        # 3. Execute
         try:
-            results = self.db.execute_query(sql, params)
+            results = self.db.execute_query(sql)
         except SQLAlchemyError as e:
-            logger.error(f"[SQL Agent] Database error: {e}")
+            logger.error("[SQL Agent] Database error: %s", e)
             return {
                 "original_query": original_query,
                 "sql_query": sql,
@@ -190,17 +149,45 @@ class SQLAgent:
 
         if not results:
             logger.warning("[SQL Agent] Query returned no results")
-            return {
-                "original_query": original_query,
-                "sql_query": sql,
-                "sql_result": [],
-                "error": None,
-            }
 
-        logger.info(f"[SQL Agent] Returned {len(results)} row(s)")
+        logger.info("[SQL Agent] Returned %d row(s)", len(results))
         return {
             "original_query": original_query,
             "sql_query": sql,
             "sql_result": results,
             "error": None,
         }
+
+
+# ── Utilities ────────────────────────────────────────────────
+
+
+def _clean_sql(raw: str) -> str:
+    """Strip markdown wrappers and extra text around SQL."""
+    sql = raw.strip()
+    if sql.startswith("```"):
+        sql = sql.split("\n", 1)[-1]
+    if sql.endswith("```"):
+        sql = sql.rsplit("```", 1)[0]
+    return sql.split(";")[0].strip()
+
+
+_FORBIDDEN = frozenset(
+    {
+        "DROP",
+        "DELETE",
+        "UPDATE",
+        "INSERT",
+        "ALTER",
+        "TRUNCATE",
+        "CREATE",
+        "GRANT",
+        "REVOKE",
+    }
+)
+
+
+def _is_safe(sql: str) -> bool:
+    """Only allow SELECT statements."""
+    first_word = sql.strip().split()[0].upper() if sql.strip() else ""
+    return first_word == "SELECT" and first_word not in _FORBIDDEN

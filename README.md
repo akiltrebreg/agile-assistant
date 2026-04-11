@@ -119,7 +119,8 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - Три режима поиска (управляется через `SEARCH_TYPE`):
   - `dense` (по умолчанию) — cosine similarity через
     `intfloat/multilingual-e5-base`
-  - `sparse` — BM25 keyword search через Qdrant sparse vectors + fastembed
+  - `sparse` — BM25 через fastembed или BGE-M3 learned sparse (управляется
+    `EMBEDDING_SPARSE_MODEL`)
   - `hybrid` — dense + sparse с нативным Qdrant RRF fusion (prefetch API)
 - Двухэтапный retrieval (при включённом реранкере): извлечение top-20 чанков →
   cross-encoder reranking (`BAAI/bge-reranker-v2-m3`) → top-4 наиболее
@@ -182,12 +183,14 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - **Коллекция**: `business_docs` (настраивается через `QDRANT_COLLECTION_NAME`)
 - **Dense vectors**: `intfloat/multilingual-e5-base` (768-мерные, cosine
   similarity, мультиязычные — поддержка русского языка)
-- **Sparse vectors**: BM25 через `fastembed` (`Qdrant/bm25` модель, IDF
-  модификатор)
+- **Sparse vectors**: BM25 через `fastembed` (по умолчанию) или BGE-M3 learned
+  sparse (`EMBEDDING_SPARSE_MODEL=BAAI/bge-m3`)
 - **Документы**: PDF и Markdown из `knowledge_base/` (Agile-практики, описания
   метрик, внутренние регламенты)
-- **Ingestion pipeline**: загрузка → chunking (500 символов, overlap 200) →
-  dense embedding + BM25 sparse embedding → загрузка обоих типов в Qdrant
+- **Ingestion pipeline**: загрузка из S3 (или локальной `knowledge_base/`) →
+  pdfplumber (текст + таблицы) → chunking (500 символов, overlap 200) → prepend
+  metadata (заголовок документа + секция) → dense embedding + sparse embedding →
+  загрузка обоих типов в Qdrant
 
 ## Структура проекта
 
@@ -218,6 +221,7 @@ hse-prom-prog/
 │   ├── database/
 │   │   ├── __init__.py
 │   │   ├── connection.py              # PostgreSQL connection manager
+│   │   ├── load_csv.py                # Load CSV data from S3 into PostgreSQL
 │   │   └── task_repository.py         # Task CRUD (raw SQL)
 │   ├── graph/
 │   │   ├── __init__.py
@@ -230,16 +234,18 @@ hse-prom-prog/
 │   │   └── task.py                    # TaskStatus enum, Task model
 │   ├── rag/
 │   │   ├── __init__.py
-│   │   ├── ingest.py                  # Ingestion pipeline (dense + sparse → Qdrant)
+│   │   ├── bm25_index.py              # BM25 keyword index (rank-bm25)
+│   │   ├── embeddings.py              # Shared embedding utils (truncation, Matryoshka)
+│   │   ├── ingest.py                  # Ingestion pipeline (S3 → pdfplumber → Qdrant)
 │   │   ├── reranker.py                # Cross-encoder reranker (bge-reranker-v2-m3)
 │   │   ├── retriever.py               # Multi-mode retriever (dense/sparse/hybrid)
-│   │   ├── sparse.py                  # Shared BM25 sparse embedding (fastembed)
+│   │   ├── sparse.py                  # Sparse embeddings (fastembed BM25 / BGE-M3)
 │   │   └── tokenizer.py               # Deterministic text→SparseVector tokenizer
 │   └── tasks/
 │       ├── __init__.py
 │       ├── celery_app.py              # Celery application factory
 │       └── workflow_task.py           # Celery task (wraps workflow)
-├── knowledge_base/
+├── knowledge_base/                    # Загружается из S3 (S3_KB_BUCKET)
 │   ├── agile/                         # Agile-практики, дашборды
 │   ├── metrics/                       # Описания метрик
 │   └── internal/                      # Внутренние регламенты
@@ -250,10 +256,9 @@ hse-prom-prog/
 │       ├── 001_add_tasks_table.py
 │       └── 002_add_cleanup_function.py
 ├── database/
-│   ├── init.sql                       # PostgreSQL schema
-│   └── data/
-│       ├── report_agile_dashboard.csv
-│       └── report_agile_dashboard_metrics.csv
+│   └── init.sql                       # PostgreSQL schema (данные загружаются из S3)
+├── scripts/
+│   └── download_model.sh              # Download avibe-gptq-8bit from S3
 ├── streamlit_app/
 │   ├── app.py                         # Streamlit entrypoint (chat UI)
 │   ├── api_client.py                  # HTTP client for FastAPI
@@ -277,6 +282,7 @@ hse-prom-prog/
 │   ├── metrics.py                     # RAGAS-метрики (GPT-5.2 as judge)
 │   ├── run_eval.py                    # CLI: запуск оценки
 │   ├── compare.py                     # CLI: сравнение экспериментов
+│   ├── spot_check.py                  # Точечная проверка retrieval без RAGAS
 │   └── results/                       # Результаты (gitignored)
 ├── tests/
 │   ├── __init__.py
@@ -308,7 +314,7 @@ cd hse-prom-prog
 git fetch --all
 
 # Переключитесь на актуальную ветку
-git checkout checkpoint_12
+git checkout checkpoint_13
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -351,14 +357,19 @@ docker compose run --rm migrate
 Создаёт таблицу `tasks` в PostgreSQL для хранения статусов и результатов
 асинхронных запросов.
 
-### Шаг 4: Загрузка базы знаний в Qdrant
+### Шаг 4: Загрузка данных
 
 ```bash
+# 4a. Загрузить CSV-данные из S3 в PostgreSQL
+docker compose run --rm load-data
+
+# 4b. Загрузить базу знаний из S3 в Qdrant
 docker compose run --rm app python -m hse_prom_prog.rag.ingest
 ```
 
-Загружает PDF и Markdown документы из `knowledge_base/` в Qdrant. Без этого шага
-RAG-запросы (вопросы о метриках, практиках, регламентах) не будут работать.
+`load-data` скачивает CSV из S3 (`S3_DATA_BUCKET`) и загружает в PostgreSQL.
+`ingest` скачивает PDF/Markdown из S3 (`S3_KB_BUCKET`) и индексирует в Qdrant.
+Без этих шагов SQL-запросы и RAG-запросы не будут работать.
 
 ### Шаг 5: Запуск сервисов приложения
 
@@ -452,6 +463,14 @@ AWS_ACCESS_KEY_ID=your-yc-key-id
 AWS_SECRET_ACCESS_KEY=your-yc-secret-key
 AWS_DEFAULT_REGION=ru-central1
 
+# S3 Knowledge Base
+S3_KB_BUCKET=knowledge-base
+S3_KB_PATH=knowledge_base
+
+# S3 CSV Data
+S3_DATA_BUCKET=database-agile
+S3_DATA_PATH=data
+
 # VSELLM (LLM-as-judge для RAGAS evaluation)
 VSELLM_API_KEY=your-vsellm-api-key
 VSELLM_BASE_URL=https://api.vsellm.ru/v1
@@ -473,8 +492,9 @@ LOG_LEVEL=INFO
 ## База знаний и RAG
 
 RAG Agent использует базу знаний для ответов на вопросы о теории, практиках и
-регламентах. Документы хранятся в `knowledge_base/` и загружаются в Qdrant через
-ingestion pipeline.
+регламентах. Документы хранятся в S3 (бакет `S3_KB_BUCKET`, по умолчанию
+`knowledge-base`) и загружаются в Qdrant через ingestion pipeline. При
+отсутствии S3-конфигурации используется локальная папка `knowledge_base/`.
 
 ### Структура knowledge_base/
 
@@ -503,27 +523,30 @@ knowledge_base/
 
 ### Загрузка документов в Qdrant
 
-После добавления или обновления документов в `knowledge_base/` необходимо
-запустить ingestion pipeline для загрузки в Qdrant:
+После обновления документов в S3 необходимо запустить ingestion pipeline для
+загрузки в Qdrant:
 
 ```bash
-# Через Docker Compose (Qdrant должен быть запущен)
+# Через Docker Compose (скачивает из S3, Qdrant должен быть запущен)
 docker compose run --rm app python -m hse_prom_prog.rag.ingest
 
-# Локально (Qdrant на localhost:6333)
-poetry run python -m hse_prom_prog.rag.ingest
-
-# С указанием пользовательского пути к документам
-poetry run python -m hse_prom_prog.rag.ingest /path/to/docs
+# С указанием локальной папки (вместо S3)
+docker compose run --rm -e S3_KB_BUCKET= \
+  app python -m hse_prom_prog.rag.ingest /path/to/docs
 ```
 
 Pipeline выполняет:
 
-1. **Загрузка** — читает .pdf (PyPDFLoader) и .md (TextLoader)
-2. **Chunking** — разбивает на фрагменты (500 символов, overlap 200)
-3. **Dense embedding** — `intfloat/multilingual-e5-base` (768-d, CPU)
-4. **Sparse embedding** — BM25 через `fastembed` (`Qdrant/bm25`)
-5. **Загрузка в Qdrant** — пересоздаёт коллекцию с dense + sparse vectors и
+1. **Загрузка** — скачивает из S3 (или локальной папки), читает .pdf
+   (pdfplumber: текст + денормализация таблиц) и .md (TextLoader)
+2. **Chunking** — текстовые документы разбиваются на фрагменты (500 символов,
+   overlap 200); таблицы уже самодостаточны и не чанкируются
+3. **Prepend metadata** — в начало каждого чанка добавляется заголовок документа
+   и секция для улучшения retrieval
+4. **Dense embedding** — `intfloat/multilingual-e5-base` (768-d, CPU), с
+   опциональной Matryoshka-truncation (`EMBEDDING_DIMENSION`)
+5. **Sparse embedding** — BM25 через `fastembed` или BGE-M3 learned sparse
+6. **Загрузка в Qdrant** — пересоздаёт коллекцию с dense + sparse vectors и
    загружает все чанки
 
 При повторном запуске коллекция пересоздаётся (идемпотентность).
@@ -713,8 +736,9 @@ docker compose up -d postgres qdrant redis vllm
 # 2. Дождаться готовности и применить миграции Alembic
 docker compose run --rm migrate
 
-# 3. (Опционально) Загрузить документы в Qdrant
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
+# 3. Загрузить данные из S3
+docker compose run --rm load-data                              # CSV → PostgreSQL
+docker compose run --rm app python -m hse_prom_prog.rag.ingest # KB → Qdrant
 
 # 4. Запустить API и Celery-воркер
 docker compose up -d api celery-worker
@@ -892,7 +916,8 @@ Nginx выступает единой точкой входа (порт 80). Fas
 # 1. Запустить всё
 docker compose up -d
 
-# 2. (Опционально) Загрузить документы в Qdrant для RAG
+# 2. Загрузить данные из S3 (при первом запуске)
+docker compose run --rm load-data
 docker compose run --rm app python -m hse_prom_prog.rag.ingest
 
 # 3. Открыть в браузере
@@ -1504,7 +1529,7 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `VLLM_BASE_URL`           | URL vLLM API endpoint              | `http://localhost:8000/v1` |
 | `VLLM_MODEL`              | Название модели                    | `/models/avibe-gptq-8bit`  |
 | `VLLM_API_KEY`            | API ключ для vLLM                  | `EMPTY`                    |
-| `VLLM_TEMPERATURE`        | Temperature для LLM                | `0.05`                     |
+| `VLLM_TEMPERATURE`        | Temperature для LLM                | `0.0`                      |
 | `VLLM_MAX_TOKENS`         | Максимум токенов                   | `600`                      |
 | `VLLM_REPETITION_PENALTY` | Штраф за повторы (vLLM extra_body) | `1.1`                      |
 
@@ -1525,6 +1550,33 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `QDRANT_URL`             | URL Qdrant сервера | `http://localhost:6333`         |
 | `QDRANT_COLLECTION_NAME` | Название коллекции | `business_docs`                 |
 | `EMBEDDING_MODEL`        | Модель эмбеддингов | `intfloat/multilingual-e5-base` |
+
+### S3 Configuration
+
+| Переменная              | Описание                    | По умолчанию                      |
+| ----------------------- | --------------------------- | --------------------------------- |
+| `S3_ENDPOINT`           | S3 endpoint URL             | `https://storage.yandexcloud.net` |
+| `S3_KB_BUCKET`          | S3 bucket для базы знаний   | `knowledge-base`                  |
+| `S3_KB_PATH`            | Путь внутри bucket для KB   | `knowledge_base`                  |
+| `S3_DATA_BUCKET`        | S3 bucket для CSV данных    | `database-agile`                  |
+| `S3_DATA_PATH`          | Путь внутри bucket для CSV  | `data`                            |
+| `AWS_ACCESS_KEY_ID`     | Ключ доступа Yandex Cloud   | —                                 |
+| `AWS_SECRET_ACCESS_KEY` | Секретный ключ Yandex Cloud | —                                 |
+
+### Embedding Configuration
+
+| Переменная               | Описание                                        | По умолчанию |
+| ------------------------ | ----------------------------------------------- | ------------ |
+| `EMBEDDING_SPARSE_MODEL` | Sparse модель: `None` (BM25) или `BAAI/bge-m3`  | —            |
+| `EMBEDDING_DIMENSION`    | Matryoshka-truncation (64/128/256/512/768/1024) | —            |
+
+### Chunking Configuration
+
+| Переменная          | Описание                          | По умолчанию |
+| ------------------- | --------------------------------- | ------------ |
+| `CHUNK_SIZE`        | Размер чанка для разбиения текста | `500`        |
+| `CHUNK_OVERLAP`     | Перекрытие между чанками          | `200`        |
+| `MAX_CONTEXT_CHARS` | Макс. символов контекста для LLM  | `4000`       |
 
 ### Search Configuration
 

@@ -77,6 +77,16 @@ class Settings(BaseSettings):
         description="Repetition penalty to avoid generation loops",
     )
 
+    # SQL LLM (arctic-7b text2sql, separate from main vLLM)
+    sql_vllm_base_url: str = Field(
+        default="http://localhost:8001/v1",
+        description="Base URL for text2sql vLLM endpoint (arctic-7b)",
+    )
+    sql_vllm_model: str = Field(
+        default="/models/arctic-text2sql-gptq-8bit",
+        description="Text2SQL model name",
+    )
+
     # PostgreSQL Configuration
     postgres_host: str = Field(
         default="localhost",
