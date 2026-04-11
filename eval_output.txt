@@ -1,0 +1,1390 @@
+17:52:56  Loaded 46 SQL test cases
+17:52:57  Initializing database connection to postgresql://hse_user:****@postgres:5432/hse_jira_db
+17:52:57  Database connection initialized successfully
+17:52:58  [SQL Agent] Initialized (model=/models/arctic-text2sql-gptq-8bit, url=http://vllm-sql:8000/v1)
+17:52:58  [1/46] #1 Расскажи о задаче AL-38787
+17:52:58  [SQL Agent] Processing: Расскажи о задаче AL-38787
+17:52:58  [EntityExtractor] Loaded 359 distinct values across 9 columns
+17:52:58  [EntityExtractor] Extracted: issue_key = AL-38787
+17:52:58  [SQL Agent] Entities: issue_key = AL-38787
+17:52:58  [SchemaLoader] Loaded DDL schema: 2 tables, 3484 chars
+17:53:05  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:05  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the task step-by step:
+
+### Step 1: Understand the Question
+The question asks for information about a specific task identified by its key ` issue_key = 'AL-38787'`.
+
+### Step 2 Identify relevant table and co
+17:53:05  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = :issue_key
+17:53:05  [SQL Agent] Returned 2 row(s)
+17:53:05    PASS: all fields match (7.3s)
+17:53:05  [2/46] #2 Покажи данные по задаче AL-38799
+17:53:05  [SQL Agent] Processing: Покажи данные по задаче AL-38799
+17:53:05  [EntityExtractor] Extracted: issue_key = AL-38799
+17:53:05  [SQL Agent] Entities: issue_key = AL-38799
+17:53:09  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:09  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the task step-by step:
+
+### Step 1: Understand the Question
+The question asks for data related to a specific task identified by its key ` issue_key = 'AL-38799'`.
+
+### Step 2 Identify relevant table(s)
+From 
+17:53:09  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = :issue_key
+17:53:09  [SQL Agent] Returned 2 row(s)
+17:53:09    PASS: all fields match (4.5s)
+17:53:09  [3/46] #3 Информация о задаче AL-99999
+17:53:09  [SQL Agent] Processing: Информация о задаче AL-99999
+17:53:09  [EntityExtractor] Extracted: issue_key = AL-99999
+17:53:09  [SQL Agent] Entities: issue_key = AL-99999
+17:53:16  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:16  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the task step-by step:
+
+1 **Identify the required information**:
+   - The question asks for information about a specific task identified by its key ` issue_key = ' 'Al-99999' '`.
+
+2 ** determine the relevant ta
+17:53:16  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = :issue_key Al-9-9-9 ' '
+17:53:16  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "Al"
+LINE 1: ...port_agile_dashboard WHERE issue_key = 'AL-99999' Al-9-9-9 '...
+                                                             ^
+
+[SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = %(issue_key)s Al-9-9-9 ' ']
+[parameters: {'issue_key': 'AL-99999'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:53:16  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "Al"
+LINE 1: ...port_agile_dashboard WHERE issue_key = 'AL-99999' Al-9-9-9 '...
+                                                             ^
+
+[SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = %(issue_key)s Al-9-9-9 ' ']
+[parameters: {'issue_key': 'AL-99999'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:53:16  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "Al"
+LINE 1: ...port_agile_dashboard WHERE issue_key = 'AL-99999' Al-9-9-9 '...
+                                                             ^
+
+[SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = %(issue_key)s Al-9-9-9 ' ']
+[parameters: {'issue_key': 'AL-99999'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = :issue_key Al-9-9-9 ' ' | params: {'issue_key': 'AL-99999'}
+17:53:16    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "Al (6.8s)
+17:53:16  [4/46] #4 Все задачи команды cthulhu
+17:53:16  [SQL Agent] Processing: Все задачи команды cthulhu
+17:53:16  [EntityExtractor] Extracted: project = Cthulhu, team = cthulhu
+17:53:16  [SQL Agent] Entities: project = Cthulhu, team = cthulhu
+17:53:22  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:22  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the requirements step by step:
+
+### Step-by-Step reasoning:
+
+1 **Understand the question:
+   - The question asks for all tasks assigned to the team named "cthulhu".
+
+2Identify relevant table(s:
+   - From the
+17:53:22  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:53:22  [SQL Agent] Returned 2 row(s)
+17:53:22    FAIL: rows: 2 (expected 70) (5.4s)
+17:53:22  [5/46] #5 Задачи команды lpop в спринте #1 Q1'26
+17:53:22  [SQL Agent] Processing: Задачи команды lpop в спринте #1 Q1'26
+17:53:22  [EntityExtractor] Extracted: team = lpop, sprint = #1 Q1'26
+17:53:22  [SQL Agent] Entities: team = lpop, sprint = #1 Q1'26
+17:53:26  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:26  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The table ` report_agile Dashboard Metrics` contains information about tasks assigned to different teams within specific sprint cycles.
+
+2
+17:53:26  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND sprint_name ILIKE :sprint 26'
+17:53:26  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "26"
+LINE 1: ...teams ILIKE '%lpop%' AND sprint_name ILIKE '%#1 Q1''26%' 26'
+                                                                    ^
+
+[SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_name ILIKE %(sprint)s 26']
+[parameters: {'team': '%lpop%', 'sprint': "%#1 Q1'26%"}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:53:26  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "26"
+LINE 1: ...teams ILIKE '%lpop%' AND sprint_name ILIKE '%#1 Q1''26%' 26'
+                                                                    ^
+
+[SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_name ILIKE %(sprint)s 26']
+[parameters: {'team': '%lpop%', 'sprint': "%#1 Q1'26%"}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:53:26  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "26"
+LINE 1: ...teams ILIKE '%lpop%' AND sprint_name ILIKE '%#1 Q1''26%' 26'
+                                                                    ^
+
+[SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_name ILIKE %(sprint)s 26']
+[parameters: {'team': '%lpop%', 'sprint': "%#1 Q1'26%"}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND sprint_name ILIKE :sprint 26' | params: {'team': '%lpop%', 'sprint': "%#1 Q1'26%"}
+17:53:26    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "26 (4.3s)
+17:53:26  [6/46] #6 Покажи все баги
+17:53:26  [SQL Agent] Processing: Покажи все баги
+17:53:26  [EntityExtractor] Extracted: none
+17:53:26  [SQL Agent] Entities: none
+17:53:31  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:31  [SQL Agent] Raw LLM output: To translate the natural language question "Show all bugs" into an executable SQLite query, follow these steps:
+
+### Step 1: Understand the Question
+The question asks for all " bugs" present in the database. 
+
+### Step 2 Identify relevant table(s)
+From the schema provided, the table ` report_agile D
+17:53:31  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE issue_type = ' bug'
+17:53:31  [SQL Agent] Query returned no results
+17:53:31  [SQL Agent] Returned 0 row(s)
+17:53:31    FAIL: rows: 0 (expected 118) (5.4s)
+17:53:31  [7/46] #7 Баги в кластере Logistics
+17:53:31  [SQL Agent] Processing: Баги в кластере Logistics
+17:53:31  [EntityExtractor] Extracted: project = DeepMind Logistics, cluster = Logistics, unit = Logistics Platform
+17:53:31  [SQL Agent] Entities: project = DeepMind Logistics, cluster = Logistics, unit = Logistics Platform
+17:53:38  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:38  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question talk about " bugs" within a specific " cluster".
+   - Based on the schema provided, the table ` report_agile Dashboard Metric
+17:53:38  [SQL Agent] Generated SQL: To translate the natural language question into an executable SQL query , let's break down the requirements step by step: 1 * * Identify the relevant table * * : - The question talk about bugs within 
+17:53:38  [SQL Agent] Unsafe SQL rejected: To translate the natural language question into an executable SQL query , let's break down the requirements step by step: 1 * * Identify the relevant table * * : - The question talk about bugs within 
+17:53:38    FAIL: error: Unsafe SQL rejected (only SELECT allowed) (6.7s)
+17:53:38  [8/46] #8 Задачи со статусом In Progress
+17:53:38  [SQL Agent] Processing: Задачи со статусом In Progress
+17:53:38  [EntityExtractor] Extracted: status = In Progress, team = rint
+17:53:38  [SQL Agent] Entities: status = In Progress, team = rint
+17:53:42  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:42  [SQL Agent] Raw LLM output: ### Step-by- step solution:
+
+#### Step 1: Understand the question
+The question asks us to retrieve tasks ( rows) from the ` report_agile Dashboard` table where the task status is " In progress".
+
+#### Step 2: Identify relevant table and columns
+From the schema provided:
+- The table name is ` report_
+17:53:42  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE issue_status_act ILIKE :status
+17:53:42  [SQL Agent] Returned 78 row(s)
+17:53:42    PASS: rows: 78 (expected 78) (3.4s)
+17:53:42  [9/46] #9 Задачи исполнителя yuvpetrov
+17:53:42  [SQL Agent] Processing: Задачи исполнителя yuvpetrov
+17:53:42  [EntityExtractor] Extracted: assignee = yuvpetrov
+17:53:42  [SQL Agent] Entities: assignee = yuvpetrov
+17:53:47  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:47  [SQL Agent] Raw LLM output: ### Step-by-Step Solution:
+
+#### Step 1: Understand the Question
+The question asks for tasks assigned to the assignee named `yuv petrov`. 
+
+#### Step 2 Identify relevant table and columns
+From the schema provided:
+- The table ` report_agile Dashboard` contains information about tasks, including the 
+17:53:47  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE assignee_name ILIKE :assignee
+17:53:47  [SQL Agent] Returned 19 row(s)
+17:53:47    PASS: rows: 19 (expected 19) (5.4s)
+17:53:47  [10/46] #10 Закрытые баги команды lpop
+17:53:47  [SQL Agent] Processing: Закрытые баги команды lpop
+17:53:47  [EntityExtractor] Extracted: team = lpop
+17:53:47  [SQL Agent] Entities: team = lpop
+17:53:53  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:53:53  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify closed bugs**:
+   - closed bugs means ` issue_status end_of_s sprint end_of_s sprint end_of_s sprint end_of_s sprint end_of_s sprint end_of_s sprint end_of_s sprint 
+17:53:53  [SQL Agent] Generated SQL: To translate the natural language question into an executable SQL query , let's break down the requirements step by step: 1 * * Identify closed bugs * * : - closed bugs means ` issue_status end_of_s s
+17:53:53  [SQL Agent] Unsafe SQL rejected: To translate the natural language question into an executable SQL query , let's break down the requirements step by step: 1 * * Identify closed bugs * * : - closed bugs means ` issue_status end_of_s s
+17:53:53    FAIL: error: Unsafe SQL rejected (only SELECT allowed) (6.6s)
+17:53:53  [11/46] #11 Какой scope drop у команды cthulhu?
+17:53:53  [SQL Agent] Processing: Какой scope drop у команды cthulhu?
+17:53:54  [EntityExtractor] Extracted: project = Cthulhu, assignee = daprokop, status = Open, team = cthulhu
+17:53:54  [SQL Agent] Entities: project = Cthulhu, assignee = daprokop, status = Open, team = cthulhu
+17:54:00  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:00  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by-Step breakdown:
+
+1 **Identify the key elements of the question:
+   - ** scope drop**: This is the metric we need to retrieve.
+   - **Command/ team**: The question spec
+17:54:00  [SQL Agent] Generated SQL: To translate the natural language question into an executable SQLite query , let's break down the question step by step: ### Step-by-Step breakdown: 1 * * Identify the key elements of the question: - 
+17:54:00  [SQL Agent] Unsafe SQL rejected: To translate the natural language question into an executable SQLite query , let's break down the question step by step: ### Step-by-Step breakdown: 1 * * Identify the key elements of the question: - 
+17:54:00    FAIL: error: Unsafe SQL rejected (only SELECT allowed) (6.7s)
+17:54:00  [12/46] #12 Done total команды lpop
+17:54:00  [SQL Agent] Processing: Done total команды lpop
+17:54:00  [EntityExtractor] Extracted: status = Done, team = lpop
+17:54:00  [SQL Agent] Entities: status = Done, team = lpop
+17:54:05  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:05  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by- Step breakdown:
+
+1 **Identify the key elements:
+   - ** done total**: This refers to the ` done total Issues` column in the schema provided.
+   - ** team**: The quest
+17:54:05  [SQL Agent] Generated SQL: SELECT done_total_issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND done_total_issues > 0
+17:54:05  [SQL Agent] Returned 2 row(s)
+17:54:05    FAIL: 2 row(s) missing or different (5.0s)
+17:54:05  [13/46] #13 Метрики спринта #1 Q1'26
+17:54:05  [SQL Agent] Processing: Метрики спринта #1 Q1'26
+17:54:05  [EntityExtractor] Extracted: sprint = #1 Q1'26
+17:54:05  [SQL Agent] Entities: sprint = #1 Q1'26
+17:54:09  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:09  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the task step-by-step:
+
+### Step 1: Understand the Question
+The question asks for metrics related to a specific sprint named " #1 Q1'26". 
+
+### Step 2 Identify relevant table and columns
+From the schema prov
+17:54:09  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard_metrics WHERE sprint_name ILIKE :sprint
+17:54:09  [SQL Agent] Returned 2 row(s)
+17:54:09    FAIL: rows: 2 (expected 1) (3.8s)
+17:54:09  [14/46] #14 Velocity команды linehaul
+17:54:09  [SQL Agent] Processing: Velocity команды linehaul
+17:54:09  [EntityExtractor] Extracted: team = linehaul
+17:54:09  [SQL Agent] Entities: team = linehaul
+17:54:15  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:15  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the problem step by step:
+
+### Step 1: Understand the Question
+The question asks for the ** velocity** of the team named ** linehaul**.
+
+### Step 2 Identify relevant table and columns
+From the schema provide
+17:54:15  [SQL Agent] Generated SQL: SELECT complete_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:54:15  [SQL Agent] Returned 3 row(s)
+17:54:15    FAIL: 3 row(s) missing or different (6.5s)
+17:54:15  [15/46] #15 Sprint goal команды lpop
+17:54:15  [SQL Agent] Processing: Sprint goal команды lpop
+17:54:15  [EntityExtractor] Extracted: issue_type = Sprint Goal, team = lpop
+17:54:15  [SQL Agent] Entities: issue_type = Sprint Goal, team = lpop
+17:54:20  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:20  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the question step by step:
+
+1 **Identify key elements:
+   - " S sprint goal" indicates we are looking for entries where the ` issue_type` is " S sprint goal".
+   - " команды lpop" indicates we are looking for e
+17:54:20  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard WHERE issue_type ILIKE :issue_type AND feature_teams ILIKE :team
+17:54:20  [SQL Agent] Returned 5 row(s)
+17:54:20    FAIL: row count: 5 != 2 (5.0s)
+17:54:20  [16/46] #16 Cancel rate команды marketplace
+17:54:20  [SQL Agent] Processing: Cancel rate команды marketplace
+17:54:20  [EntityExtractor] Extracted: project = Travel, status = Cancelled, cluster = Marketplace, unit = Marketplace Buyer, team = marketplace
+17:54:20  [SQL Agent] Entities: project = Travel, status = Cancelled, cluster = Marketplace, unit = Marketplace Buyer, team = marketplace
+17:54:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:27  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by-Step breakdown:
+
+1 **Identify the key elements of the question:
+   - ** metric**: cancel rate
+   - ** filter criteria**: 
+     - ` feature teams = ' marketplace'`
+   -
+17:54:27  [SQL Agent] Generated SQL: SELECT cancel_rate FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:54:27  [SQL Agent] Returned 3 row(s)
+17:54:27    FAIL: 3 row(s) missing or different (6.4s)
+17:54:27  [17/46] #17 Сколько всего story points у команды cthulhu?
+17:54:27  [SQL Agent] Processing: Сколько всего story points у команды cthulhu?
+17:54:27  [EntityExtractor] Extracted: project = Cthulhu, issue_type = Story, team = cthulhu
+17:54:27  [SQL Agent] Entities: project = Cthulhu, issue_type = Story, team = cthulhu
+17:54:30  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:30  [SQL Agent] Raw LLM output: To answer the question " how many total story points are there for the team ' Cthulhu'?" we need to focus on the following points:
+
+1 **Identify the relevant table**: The table ` report_agile Dashboard Metrics` contains information about story points (` final Commitment_SP` and ` complete_SP`), whic
+17:54:30  [SQL Agent] Generated SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:54:30  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total story points FROM report_agi...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:54:30  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total story points FROM report_agi...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:54:30  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total story points FROM report_agi...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team | params: {'project': '%Cthulhu%', 'issue_type': '%Story%', 'team': '%cthulhu%'}
+17:54:30    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS (2.9s)
+17:54:30  [18/46] #18 Сколько задач каждого типа у команды lpop?
+17:54:30  [SQL Agent] Processing: Сколько задач каждого типа у команды lpop?
+17:54:30  [EntityExtractor] Extracted: team = lpop
+17:54:30  [SQL Agent] Entities: team = lpop
+17:54:34  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:34  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the question step by step:
+
+1 **Identify the key elements of the question:
+   - " tasks each type" implies we need to count tasks grouped by their type.
+   - " team lpop" means we need to filter tasks based on 
+17:54:34  [SQL Agent] Generated SQL: SELECT issue_type AS issue_type , COUNT ( * ) AS task_count FROM report_agile_dashboard WHERE feature_teams ILIKE :team GROUP BY issue_type
+17:54:34  [SQL Agent] Returned 6 row(s)
+17:54:34    PASS: 6 groups match (4.5s)
+17:54:34  [19/46] #19 Распределение задач по статусам у команды cthulhu
+17:54:34  [SQL Agent] Processing: Распределение задач по статусам у команды cthulhu
+17:54:34  [EntityExtractor] Extracted: project = Cthulhu, team = cthulhu
+17:54:34  [SQL Agent] Entities: project = Cthulhu, team = cthulhu
+17:54:37  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:37  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question is about tasks distribution by status for a specific team.
+   - The table ` report_agile Dashboard Metrics` contains informat
+17:54:37  [SQL Agent] Generated SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team GROUP BY issue_status_end_of_sprint
+17:54:37  Database session error: (psycopg2.errors.UndefinedColumn) column "issue_status_end_of_sprint" does not exist
+LINE 1: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS...
+               ^
+
+[SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s GROUP BY issue_status_end_of_sprint]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:54:37  Query execution failed: (psycopg2.errors.UndefinedColumn) column "issue_status_end_of_sprint" does not exist
+LINE 1: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS...
+               ^
+
+[SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s GROUP BY issue_status_end_of_sprint]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:54:37  [SQL Agent] Database error: (psycopg2.errors.UndefinedColumn) column "issue_status_end_of_sprint" does not exist
+LINE 1: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS...
+               ^
+
+[SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s GROUP BY issue_status_end_of_sprint]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team GROUP BY issue_status_end_of_sprint | params: {'project': '%Cthulhu%', 'team': '%cthulhu%'}
+17:54:37    FAIL: error: Database error: (psycopg2.errors.UndefinedColumn) column "issue_status_en (3.3s)
+17:54:37  [20/46] #20 У какой команды самый высокий done_total?
+17:54:37  [SQL Agent] Processing: У какой команды самый высокий done_total?
+17:54:38  [EntityExtractor] Extracted: status = Done
+17:54:38  [SQL Agent] Entities: status = Done
+17:54:44  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:44  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the question step by step:
+
+1 **Identify the key elements of the question:
+   - "Which team" implies we need to select the ` feature teams` column.
+   - " highest done_total" means we need to order by ` done_to
+17:54:44  [SQL Agent] Generated SQL: SELECT feature_teams FROM report_agile_dashboard_metrics ORDER BY done_total DESC limit 1
+17:54:44  [SQL Agent] Returned 1 row(s)
+17:54:44    FAIL: feature_teams: 'linehaul' != 'legal tech' (6.7s)
+17:54:44  [21/46] #21 У какой команды самый большой scope drop?
+17:54:44  [SQL Agent] Processing: У какой команды самый большой scope drop?
+17:54:44  [EntityExtractor] Extracted: assignee = daprokop, status = Open
+17:54:44  [SQL Agent] Entities: assignee = daprokop, status = Open
+17:54:51  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:51  [SQL Agent] Raw LLM output: To answer the question " У哪一个 team having the largest scope drop issues among all teams?", we need to focus on the ` scope_drop issues` column in the ` report_agile Dashboard Metrics` table. our goal is to find the team with the highest value in this column.
+
+Here's how we can construct the query st
+17:54:51  [SQL Agent] Generated SQL: SELECT feature_teams FROM report_agile_dashboard_metrics ORDER BY scope_drop_issues DESC limit 1
+17:54:51  [SQL Agent] Returned 1 row(s)
+17:54:51    FAIL: feature_teams: 'shopping cart' != 'horizontal ml technologies' (6.8s)
+17:54:51  [22/46] #22 Топ-3 команды по количеству задач
+17:54:51  [SQL Agent] Processing: Топ-3 команды по количеству задач
+17:54:51  [EntityExtractor] Extracted: none
+17:54:51  [SQL Agent] Entities: none
+17:54:58  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:54:58  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question asks for information about teams and their tasks. The table ` report_agile Dashboard Metrics` contains information about feat
+17:54:58  [SQL Agent] Generated SQL: SELECT feature_teams AS team_name , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY task_count DESC LIMIT 3
+17:54:58  [SQL Agent] Returned 3 row(s)
+17:54:58    FAIL: shopping cart: 4 != 196; missing: testops; rint: 4 != 131 (6.7s)
+17:54:58  [23/46] #23 Покажи scope drop команды cthulhu и их задачи со статусом Ca
+17:54:58  [SQL Agent] Processing: Покажи scope drop команды cthulhu и их задачи со статусом Cancelled
+17:54:58  [EntityExtractor] Extracted: project = Cthulhu, assignee = daprokop, status = Cancelled, team = cthulhu
+17:54:58  [SQL Agent] Entities: project = Cthulhu, assignee = daprokop, status = Cancelled, team = cthulhu
+17:55:02  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:02  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 ** scope drop commands team cthulu**:
+   - We need to fetch the ` scope_drop issues` for tasks with status Cancelled belonging to team ` Cthulu`.
+   - Additionally, we ne
+17:55:02  [SQL Agent] Generated SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metrics AS T1 WHERE feature_teams ILIKE :team AND issue_status_act ILIKE :status
+17:55:02  Database session error: (psycopg2.errors.UndefinedColumn) column "issue_status_act" does not exist
+LINE 1: ...s AS T1 WHERE feature_teams ILIKE '%cthulhu%' AND issue_stat...
+                                                             ^
+
+[SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metrics AS T1 WHERE feature_teams ILIKE %(team)s AND issue_status_act ILIKE %(status)s]
+[parameters: {'team': '%cthulhu%', 'status': '%Cancelled%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:02  Query execution failed: (psycopg2.errors.UndefinedColumn) column "issue_status_act" does not exist
+LINE 1: ...s AS T1 WHERE feature_teams ILIKE '%cthulhu%' AND issue_stat...
+                                                             ^
+
+[SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metrics AS T1 WHERE feature_teams ILIKE %(team)s AND issue_status_act ILIKE %(status)s]
+[parameters: {'team': '%cthulhu%', 'status': '%Cancelled%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:02  [SQL Agent] Database error: (psycopg2.errors.UndefinedColumn) column "issue_status_act" does not exist
+LINE 1: ...s AS T1 WHERE feature_teams ILIKE '%cthulhu%' AND issue_stat...
+                                                             ^
+
+[SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metrics AS T1 WHERE feature_teams ILIKE %(team)s AND issue_status_act ILIKE %(status)s]
+[parameters: {'team': '%cthulhu%', 'status': '%Cancelled%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metrics AS T1 WHERE feature_teams ILIKE :team AND issue_status_act ILIKE :status | params: {'project': '%Cthulhu%', 'assignee': '%daprokop%', 'status': '%Cancelled%', 'team': '%cthulhu%'}
+17:55:02    FAIL: error: Database error: (psycopg2.errors.UndefinedColumn) column "issue_status_ac (4.8s)
+17:55:02  [24/46] #24 Задачи команды несуществующая_команда
+17:55:02  [SQL Agent] Processing: Задачи команды несуществующая_команда
+17:55:02  [EntityExtractor] Extracted: none
+17:55:02  [SQL Agent] Entities: none
+17:55:07  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:07  [SQL Agent] Raw LLM output: ### Step-by-Step Solution:
+
+#### Step 1: Understand the Question
+The question asks for tasks assigned to a specific feature team named "不存在的团队" ( translation: " non existent team").
+
+#### Step 2 Identify relevant table(s)
+From the schema provided:
+- The ` report_agile Dashboard Metrics` table contai
+17:55:07  [SQL Agent] Generated SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams = '不存在的 team'
+17:55:07  [SQL Agent] Query returned no results
+17:55:07  [SQL Agent] Returned 0 row(s)
+17:55:07    PASS: rows: 0 (expected 0) (4.9s)
+17:55:07  [25/46] #25 Среднее значение done total у команды cthulhu
+17:55:07  [SQL Agent] Processing: Среднее значение done total у команды cthulhu
+17:55:07  [EntityExtractor] Extracted: project = Cthulhu, status = Done, team = cthulhu
+17:55:07  [SQL Agent] Entities: project = Cthulhu, status = Done, team = cthulhu
+17:55:14  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:14  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the target metric**: The question asks for the average value of " done total".
+
+2 **Identify the filter criteria**:
+   - The team name should match " Cthulhu" 
+17:55:14  [SQL Agent] Generated SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND sprint_state = ' closed' AND done_total_issues IS NOT null
+17:55:14  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total FROM re...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_state = ' closed' AND done_total_issues IS NOT null]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:14  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total FROM re...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_state = ' closed' AND done_total_issues IS NOT null]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:14  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total FROM re...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_state = ' closed' AND done_total_issues IS NOT null]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND sprint_state = ' closed' AND done_total_issues IS NOT null | params: {'project': '%Cthulhu%', 'status': '%Done%', 'team': '%cthulhu%'}
+17:55:14    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")" (6.6s)
+17:55:14  [26/46] #26 Среднее done total команды marketplace за все спринты
+17:55:14  [SQL Agent] Processing: Среднее done total команды marketplace за все спринты
+17:55:14  [EntityExtractor] Extracted: project = Marketplace Area of Effect, status = Done, cluster = Marketplace, unit = Marketplace Buyer, team = marketplace
+17:55:14  [SQL Agent] Entities: project = Marketplace Area of Effect, status = Done, cluster = Marketplace, unit = Marketplace Buyer, team = marketplace
+17:55:21  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:21  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the required columns**:
+   - We need to calculate the average value of ` done_total` for the specified team.
+
+2 ** specify the conditions**:
+   - The team name shoul
+17:55:21  [SQL Agent] Generated SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:55:21  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG.done_total ) AS average done total FROM report_ag...
+                              ^
+
+[SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%marketplace%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:21  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG.done_total ) AS average done total FROM report_ag...
+                              ^
+
+[SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%marketplace%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:21  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG.done_total ) AS average done total FROM report_ag...
+                              ^
+
+[SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%marketplace%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team | params: {'project': '%Marketplace Area of Effect%', 'status': '%Done%', 'cluster': '%Marketplace%', 'unit': '%Marketplace Buyer%', 'team': '%marketplace%'}
+17:55:21    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")" (6.8s)
+17:55:21  [27/46] #27 Средняя velocity команды linehaul
+17:55:21  [SQL Agent] Processing: Средняя velocity команды linehaul
+17:55:21  [EntityExtractor] Extracted: team = linehaul
+17:55:21  [SQL Agent] Entities: team = linehaul
+17:55:25  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:25  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by- Step breakdown:
+
+1 **Identify the key elements:
+   - ** metric**: velocity ( represented by ` complete_sp` in the schema)
+   - ** operation**: average ( represented b
+17:55:25  [SQL Agent] Generated SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:55:25  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG complete_sp ) AS average velocity FROM report_agi...
+                               ^
+
+[SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%linehaul%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:25  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG complete_sp ) AS average velocity FROM report_agi...
+                               ^
+
+[SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%linehaul%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:25  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG complete_sp ) AS average velocity FROM report_agi...
+                               ^
+
+[SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%linehaul%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team | params: {'team': '%linehaul%'}
+17:55:25    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")" (3.9s)
+17:55:25  [28/46] #28 Средний scope drop у команды shopping cart
+17:55:25  [SQL Agent] Processing: Средний scope drop у команды shopping cart
+17:55:25  [EntityExtractor] Extracted: project = Shopping cart, assignee = daprokop, status = Open, team = shopping cart
+17:55:25  [SQL Agent] Entities: project = Shopping cart, assignee = daprokop, status = Open, team = shopping cart
+17:55:31  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:31  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by- Step breakdown:
+
+1 **Identify the metric to calculate:
+   - The question asks for the average "scope drop" value.
+
+2 Identify the relevant table:
+   - The table ` rep
+17:55:31  [SQL Agent] Generated SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND status = ' Open' AND assignee_name ILIKE :assignee
+17:55:31  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG scope_drop_issues ) AS average scope drop FROM re...
+                                     ^
+
+[SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND status = ' Open' AND assignee_name ILIKE %(assignee)s]
+[parameters: {'team': '%shopping cart%', 'assignee': '%daprokop%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:31  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG scope_drop_issues ) AS average scope drop FROM re...
+                                     ^
+
+[SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND status = ' Open' AND assignee_name ILIKE %(assignee)s]
+[parameters: {'team': '%shopping cart%', 'assignee': '%daprokop%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:31  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG scope_drop_issues ) AS average scope drop FROM re...
+                                     ^
+
+[SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND status = ' Open' AND assignee_name ILIKE %(assignee)s]
+[parameters: {'team': '%shopping cart%', 'assignee': '%daprokop%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND status = ' Open' AND assignee_name ILIKE :assignee | params: {'project': '%Shopping cart%', 'assignee': '%daprokop%', 'status': '%Open%', 'team': '%shopping cart%'}
+17:55:31    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")" (6.7s)
+17:55:31  [29/46] #29 Средний done total по каждой команде
+17:55:31  [SQL Agent] Processing: Средний done total по каждой команде
+17:55:31  [EntityExtractor] Extracted: status = Done, team = travolta
+17:55:31  [SQL Agent] Entities: status = Done, team = travolta
+17:55:38  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:38  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the requirements step by step:
+
+1 **Identify the required columns**:
+   - We need to calculate the average ` done total issues` for each ` feature teams`.
+
+2 **Identify the table**:
+   - The required data is
+17:55:38  [SQL Agent] Generated SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS average done total issues per team FROM report_agile_dashboard_metrics WHERE feature feature teams = 'travolta' GROUP BY f
+17:55:38  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "total"
+LINE 1: ...ECT feature_teams AS feature_teams , average done total issu...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS average done total issues per team FROM report_agile_dashboard_metrics WHERE feature feature teams = 'travolta' GROUP BY feature feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:38  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "total"
+LINE 1: ...ECT feature_teams AS feature_teams , average done total issu...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS average done total issues per team FROM report_agile_dashboard_metrics WHERE feature feature teams = 'travolta' GROUP BY feature feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:38  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "total"
+LINE 1: ...ECT feature_teams AS feature_teams , average done total issu...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS average done total issues per team FROM report_agile_dashboard_metrics WHERE feature feature teams = 'travolta' GROUP BY feature feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS average done total issues per team FROM report_agile_dashboard_metrics WHERE feature feature teams = 'travolta' GROUP BY feature feature teams | params: {'status': '%Done%', 'team': '%travolta%'}
+17:55:38    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "to (6.8s)
+17:55:38  [30/46] #30 Средний scope drop по каждой команде
+17:55:38  [SQL Agent] Processing: Средний scope drop по каждой команде
+17:55:38  [EntityExtractor] Extracted: assignee = daprokop, status = Open
+17:55:38  [SQL Agent] Entities: assignee = daprokop, status = Open
+17:55:45  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:45  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the requirements step by step:
+
+1 **Identify the required columns**:
+   - We need to calculate the average `scope_drop` value.
+   - We also need to group this average by ` feature teams`.
+
+2 **Identify the t
+17:55:45  [SQL Agent] Generated SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams IS not null group by feature_teams
+17:55:45  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT feature_teams , AVG scope_drop real AS average scope ...
+                                              ^
+
+[SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams IS not null group by feature_teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:45  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT feature_teams , AVG scope_drop real AS average scope ...
+                                              ^
+
+[SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams IS not null group by feature_teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:45  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT feature_teams , AVG scope_drop real AS average scope ...
+                                              ^
+
+[SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams IS not null group by feature_teams]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams IS not null group by feature_teams | params: {'assignee': '%daprokop%', 'status': '%Open%'}
+17:55:45    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "re (6.9s)
+17:55:45  [31/46] #31 Какой максимальный story points у одной задачи?
+17:55:45  [SQL Agent] Processing: Какой максимальный story points у одной задачи?
+17:55:45  [EntityExtractor] Extracted: issue_type = Story, team = rint
+17:55:45  [SQL Agent] Entities: issue_type = Story, team = rint
+17:55:52  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:52  [SQL Agent] Raw LLM output: To answer the question " what is the maximum number of story points for one task?", we need to focus on the ` report_agile Dashboard` table specifically look at the ` story points act actual story points` column.
+
+ However, since the question specifically asks for the maximum number of story points 
+17:55:52  [SQL Agent] Generated SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report_agile_dashboard
+17:55:52  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "actual"
+LINE 1: SELECT MAX storypoints_act actual story points ) AS max stor...
+                                   ^
+
+[SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report_agile_dashboard]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:52  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "actual"
+LINE 1: SELECT MAX storypoints_act actual story points ) AS max stor...
+                                   ^
+
+[SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report_agile_dashboard]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:52  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "actual"
+LINE 1: SELECT MAX storypoints_act actual story points ) AS max stor...
+                                   ^
+
+[SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report_agile_dashboard]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report_agile_dashboard | params: {'issue_type': '%Story%', 'team': '%rint%'}
+17:55:52    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "ac (6.9s)
+17:55:52  [32/46] #32 Какой минимальный done total среди всех команд и спринтов?
+17:55:52  [SQL Agent] Processing: Какой минимальный done total среди всех команд и спринтов?
+17:55:52  [EntityExtractor] Extracted: status = Done, team = travolta
+17:55:52  [SQL Agent] Entities: status = Done, team = travolta
+17:55:59  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:55:59  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by-Step breakdown:
+
+1 **Identify the target metric:
+   - The question asks for the minimum value of ` done total`.
+   - This metric is found in the table ` report_agile D
+17:55:59  [SQL Agent] Generated SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboard_metrics
+17:55:59  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "done"
+LINE 1: SELECT MIN ( done_total_issues ) AS minimum done total FROM ...
+                                                    ^
+
+[SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboard_metrics]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:59  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "done"
+LINE 1: SELECT MIN ( done_total_issues ) AS minimum done total FROM ...
+                                                    ^
+
+[SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboard_metrics]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:55:59  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "done"
+LINE 1: SELECT MIN ( done_total_issues ) AS minimum done total FROM ...
+                                                    ^
+
+[SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboard_metrics]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboard_metrics | params: {'status': '%Done%', 'team': '%travolta%'}
+17:55:59    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "do (6.8s)
+17:55:59  [33/46] #33 В каком спринте был самый большой scope drop?
+17:55:59  [SQL Agent] Processing: В каком спринте был самый большой scope drop?
+17:55:59  [EntityExtractor] Extracted: assignee = daprokop, status = Open
+17:55:59  [SQL Agent] Entities: assignee = daprokop, status = Open
+17:56:06  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:06  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the problem step-by step:
+
+### Step-by-Step reasoning:
+
+1 **Identify the key elements of the question:
+   - " most large scope drop" implies we need to find the maximum value of `scope_drop`.
+   - " In wh
+17:56:06  [SQL Agent] Generated SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_drop FROM report_agile_dashboard_metrics ) limit 1
+17:56:06  Database session error: (psycopg2.errors.UndefinedColumn) column "max" does not exist
+LINE 1: ...ile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_...
+                                                             ^
+
+[SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_drop FROM report_agile_dashboard_metrics ) limit 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:06  Query execution failed: (psycopg2.errors.UndefinedColumn) column "max" does not exist
+LINE 1: ...ile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_...
+                                                             ^
+
+[SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_drop FROM report_agile_dashboard_metrics ) limit 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:06  [SQL Agent] Database error: (psycopg2.errors.UndefinedColumn) column "max" does not exist
+LINE 1: ...ile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_...
+                                                             ^
+
+[SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_drop FROM report_agile_dashboard_metrics ) limit 1]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_drop FROM report_agile_dashboard_metrics ) limit 1 | params: {'assignee': '%daprokop%', 'status': '%Open%'}
+17:56:06    FAIL: error: Database error: (psycopg2.errors.UndefinedColumn) column "max" does not e (6.8s)
+17:56:06  [34/46] #34 Сколько задач в каждом кластере?
+17:56:06  [SQL Agent] Processing: Сколько задач в каждом кластере?
+17:56:06  [EntityExtractor] Extracted: none
+17:56:06  [SQL Agent] Entities: none
+17:56:13  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:13  [SQL Agent] Raw LLM output: To answer the question " how many tasks are there in each cluster?", we need to focus on two main pieces of information:
+
+1 ** tasks**: tasks are represented by rows in the ` report_agile Dashboard Metrics` table. Each row represents a task within a specific unit or cluster.
+
+2 ** clusters**: cluste
+17:56:13  [SQL Agent] Generated SQL: SELECT unit_name AS cluster_name , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics GROUP BY unit_name
+17:56:13  [SQL Agent] Returned 16 row(s)
+17:56:13    FAIL: missing: AI Lab; missing: Architecture; missing: FinTech; missing: Internal Auto (6.9s)
+17:56:13  [35/46] #35 Сколько задач со статусом Done в каждом кластере?
+17:56:13  [SQL Agent] Processing: Сколько задач со статусом Done в каждом кластере?
+17:56:13  [EntityExtractor] Extracted: status = Done
+17:56:13  [SQL Agent] Entities: status = Done
+17:56:20  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:20  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question asks about tasks with status " Done" grouped by clusters.
+   - The table ` report_agile Dashboard Metrics` contains col
+17:56:20  [SQL Agent] Generated SQL: To translate the given natural language question into an executable SQL query , let 's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question asks about tasks 
+17:56:20  [SQL Agent] Unsafe SQL rejected: To translate the given natural language question into an executable SQL query , let 's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question asks about tasks 
+17:56:20    FAIL: error: Unsafe SQL rejected (only SELECT allowed) (7.1s)
+17:56:20  [36/46] #36 Сколько задач у команды shopping cart в каждом спринте?
+17:56:20  [SQL Agent] Processing: Сколько задач у команды shopping cart в каждом спринте?
+17:56:20  [EntityExtractor] Extracted: project = Shopping cart, assignee = ikshorin, team = shopping cart
+17:56:20  [SQL Agent] Entities: project = Shopping cart, assignee = ikshorin, team = shopping cart
+17:56:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:27  [SQL Agent] Raw LLM output: To answer the question " how many tasks does the team ' shopping cart' have in each sprint?", we need to focus on the following points:
+
+1 **Identify the relevant table**: The table ` report_agile Dashboard Metrics` contains information about tasks per team per sprint.
+
+2 ** filter by team name**: W
+17:56:27  [SQL Agent] Generated SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams featu
+17:56:27  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "feature"
+LINE 1: SELECT sprint_name , COUNT feature_teams feature teams featu...
+                                                 ^
+
+[SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:27  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "feature"
+LINE 1: SELECT sprint_name , COUNT feature_teams feature teams featu...
+                                                 ^
+
+[SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:27  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "feature"
+LINE 1: SELECT sprint_name , COUNT feature_teams feature teams featu...
+                                                 ^
+
+[SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams | params: {'project': '%Shopping cart%', 'assignee': '%ikshorin%', 'team': '%shopping cart%'}
+17:56:27    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "fe (7.0s)
+17:56:27  [37/46] #37 Суммарная velocity команды rint за все спринты
+17:56:27  [SQL Agent] Processing: Суммарная velocity команды rint за все спринты
+17:56:27  [EntityExtractor] Extracted: team = rint
+17:56:27  [SQL Agent] Entities: team = rint
+17:56:31  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:31  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by- Step breakdown:
+
+1 **Identify the key elements:
+   - **Summarize** velocity.
+   - **Command** named `int`.
+   - across all ** sprint**s.
+
+2 ** Determine the relevant 
+17:56:31  [SQL Agent] Generated SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:56:31  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total velocity FROM report_agile_d...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:31  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total velocity FROM report_agile_d...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:31  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total velocity FROM report_agile_d...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team | params: {'team': '%rint%'}
+17:56:31    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS (4.2s)
+17:56:31  [38/46] #38 Сколько всего SP было добавлено в спринты команды shopping c
+17:56:31  [SQL Agent] Processing: Сколько всего SP было добавлено в спринты команды shopping cart?
+17:56:31  [EntityExtractor] Extracted: project = Shopping cart, assignee = ikshorin, team = shopping cart
+17:56:31  [SQL Agent] Entities: project = Shopping cart, assignee = ikshorin, team = shopping cart
+17:56:35  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:35  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the question step by step:
+
+1 **Identify the key elements of the question:
+   - what we need to calculate: total added work in terms of story points (SP).
+   - filter criteria:
+     - team name: " shoppin
+17:56:35  [SQL Agent] Generated SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team cart
+17:56:35  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "cart"
+LINE 1: ...ard_metrics WHERE feature_teams ILIKE '%shopping cart%' cart
+                                                                   ^
+
+[SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s cart]
+[parameters: {'team': '%shopping cart%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:35  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "cart"
+LINE 1: ...ard_metrics WHERE feature_teams ILIKE '%shopping cart%' cart
+                                                                   ^
+
+[SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s cart]
+[parameters: {'team': '%shopping cart%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:35  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "cart"
+LINE 1: ...ard_metrics WHERE feature_teams ILIKE '%shopping cart%' cart
+                                                                   ^
+
+[SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s cart]
+[parameters: {'team': '%shopping cart%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team cart | params: {'project': '%Shopping cart%', 'assignee': '%ikshorin%', 'team': '%shopping cart%'}
+17:56:35    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "ca (4.6s)
+17:56:35  [39/46] #39 Какие команды имеют средний done total ниже 80%?
+17:56:35  [SQL Agent] Processing: Какие команды имеют средний done total ниже 80%?
+17:56:36  [EntityExtractor] Extracted: status = Done, team = travolta
+17:56:36  [SQL Agent] Entities: status = Done, team = travolta
+17:56:42  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:42  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the problem step-by step:
+
+1 **Identify the relevant table**:
+   - The question is about teams and their done total percentage.
+   - The table ` report_agile Dashboard Metrics` contains columns related to
+17:56:42  [SQL Agent] Generated SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG done_total < 8
+17:56:42  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "done_total"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG done_total...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG done_total < 8]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:42  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "done_total"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG done_total...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG done_total < 8]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:42  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "done_total"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG done_total...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG done_total < 8]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG done_total < 8 | params: {'status': '%Done%', 'team': '%travolta%'}
+17:56:42    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "do (6.8s)
+17:56:42  [40/46] #40 Команды со средним scope drop больше 25%
+17:56:42  [SQL Agent] Processing: Команды со средним scope drop больше 25%
+17:56:42  [EntityExtractor] Extracted: assignee = daprokop, status = Open
+17:56:42  [SQL Agent] Entities: assignee = daprokop, status = Open
+17:56:49  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:49  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQLite query, let's break down the problem step by step:
+
+### Step 1: Understand the question
+The question asks us to find ** commands ( feature teams ) )** whose average ** scope drop** is greater than ** 25%**.
+
+### Step 2 Identif
+17:56:49  [SQL Agent] Generated SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG scope_drop_issues > 25
+17:56:49  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "scope_drop_issues"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG scope_drop...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG scope_drop_issues > 25]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:49  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "scope_drop_issues"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG scope_drop...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG scope_drop_issues > 25]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:56:49  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "scope_drop_issues"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG scope_drop...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG scope_drop_issues > 25]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG scope_drop_issues > 25 | params: {'assignee': '%daprokop%', 'status': '%Open%'}
+17:56:49    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "sc (6.7s)
+17:56:49  [41/46] #41 Кластеры, в которых больше 100 задач
+17:56:49  [SQL Agent] Processing: Кластеры, в которых больше 100 задач
+17:56:49  [EntityExtractor] Extracted: none
+17:56:49  [SQL Agent] Entities: none
+17:56:56  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:56:56  [SQL Agent] Raw LLM output: To translate the given natural language question into an executable SQL query, let's break down the problem step-by-step:
+
+1 **Identify the key elements of the question:
+   - " K clusters" refers to the " unit_name" column in the " report_agile Dashboard Metrics" table.
+   - " more than 10 tasks" me
+17:56:56  [SQL Agent] Generated SQL: SELECT unit_name FROM report_agile_dashboard_metrics GROUP BY unit_name having count ( * ) > 10
+17:56:56  [SQL Agent] Query returned no results
+17:56:56  [SQL Agent] Returned 0 row(s)
+17:56:56    FAIL: 0 rows (expected 9) (6.8s)
+17:56:56  [42/46] #42 Средний размер Story в story points
+17:56:56  [SQL Agent] Processing: Средний размер Story в story points
+17:56:56  [EntityExtractor] Extracted: issue_type = Story, team = rint
+17:56:56  [SQL Agent] Entities: issue_type = Story, team = rint
+17:57:03  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:57:03  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the question step by step:
+
+1 **Identify the key elements of the question:
+   - " average size" implies we need to calculate average values.
+   - " Story" indicates we are specifically interested in stories ( S
+17:57:03  [SQL Agent] Generated SQL: SELECT AVG storypoints_act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points a
+17:57:03  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT AVG storypoints_act real story points act real story ...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real storytó story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:03  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT AVG storypoints_act real story points act real story ...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real storytó story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:03  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT AVG storypoints_act real story points act real story ...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real storytó story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG storypoints_act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real storytó story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act | params: {'issue_type': '%Story%', 'team': '%rint%'}
+17:57:03    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "re (6.7s)
+17:57:03  [43/46] #43 Средний размер бага в story points
+17:57:03  [SQL Agent] Processing: Средний размер бага в story points
+17:57:03  [EntityExtractor] Extracted: issue_type = Story, team = rint
+17:57:03  [SQL Agent] Entities: issue_type = Story, team = rint
+17:57:07  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:57:07  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by-Step breakdown:
+
+1 **Identify the relevant table:
+   - The question mentions "size of a bug" which is likely stored in the ` report_agile Dashboard` table under the co
+17:57:07  [SQL Agent] Generated SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard WHERE issue_type ILIKE :issue_type AND feature_teams ILIKE :team
+17:57:07  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG storypoints_act ) AS average story points FROM re...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard WHERE issue_type ILIKE %(issue_type)s AND feature_teams ILIKE %(team)s]
+[parameters: {'issue_type': '%Story%', 'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:07  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG storypoints_act ) AS average story points FROM re...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard WHERE issue_type ILIKE %(issue_type)s AND feature_teams ILIKE %(team)s]
+[parameters: {'issue_type': '%Story%', 'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:07  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG storypoints_act ) AS average story points FROM re...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard WHERE issue_type ILIKE %(issue_type)s AND feature_teams ILIKE %(team)s]
+[parameters: {'issue_type': '%Story%', 'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard WHERE issue_type ILIKE :issue_type AND feature_teams ILIKE :team | params: {'issue_type': '%Story%', 'team': '%rint%'}
+17:57:07    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")" (4.8s)
+17:57:07  [44/46] #44 Топ-5 команд по средней velocity
+17:57:07  [SQL Agent] Processing: Топ-5 команд по средней velocity
+17:57:07  [EntityExtractor] Extracted: none
+17:57:07  [SQL Agent] Entities: none
+17:57:12  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:57:12  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question asks for information about teams and their average velocity ( velocity being represented by ` complete_sp`).
+   - The table `
+17:57:12  [SQL Agent] Generated SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY average velocity DESC LIMIT 5
+17:57:12  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ... feature_teams AS feature_teams , AVG complete_sp AS average...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY average velocity DESC LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:12  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ... feature_teams AS feature_teams , AVG complete_sp AS average...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY average velocity DESC LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:12  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ... feature_teams AS feature_teams , AVG complete_sp AS average...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY average velocity DESC LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY average velocity DESC LIMIT 5 | params: {}
+17:57:12    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS (4.7s)
+17:57:12  [45/46] #45 Топ-3 команды по количеству багов
+17:57:12  [SQL Agent] Processing: Топ-3 команды по количеству багов
+17:57:12  [EntityExtractor] Extracted: none
+17:57:12  [SQL Agent] Entities: none
+17:57:19  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:57:19  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQL query, let's break down the requirements step by step:
+
+1 **Identify the relevant table**:
+   - The question is about teams and the number of bugs they have fixed. The table ` report_agile Dashboard Metrics` contains information about
+17:57:19  [SQL Agent] Generated SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY bug count DESC LIMIT 3
+17:57:19  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ...s AS feature_teams , COUNT issue_priority_for_bug AS bug cou...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY bug count DESC LIMIT 3]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:19  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ...s AS feature_teams , COUNT issue_priority_for_bug AS bug cou...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY bug count DESC LIMIT 3]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:19  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ...s AS feature_teams , COUNT issue_priority_for_bug AS bug cou...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY bug count DESC LIMIT 3]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY bug count DESC LIMIT 3 | params: {}
+17:57:19    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS (6.9s)
+17:57:19  [46/46] #46 Средний done total команды несуществующая_команда
+17:57:19  [SQL Agent] Processing: Средний done total команды несуществующая_команда
+17:57:19  [EntityExtractor] Extracted: status = Done, team = travolta
+17:57:19  [SQL Agent] Entities: status = Done, team = travolta
+17:57:25  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+17:57:25  [SQL Agent] Raw LLM output: To translate the natural language question into an executable SQLite query, let's break down the question step by step:
+
+### Step-by- Step breakdown:
+
+1 **Identify the main goal:
+   - calculate the average value of ` done total` for a specific team named ` non existent team`.
+
+2 **Identify the relev
+17:57:25  [SQL Agent] Generated SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team
+17:57:25  Database session error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total issues ...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%travolta%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:25  Query execution failed: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total issues ...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%travolta%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+17:57:25  [SQL Agent] Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total issues ...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%travolta%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405) | SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team | params: {'status': '%Done%', 'team': '%travolta%'}
+17:57:25    FAIL: error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")" (6.2s)
+
+============================================================
+SQL Eval: sql_omnisql_v3  (6/46 passed, 40 failed)
+============================================================
+
+17:57:25  Results saved → /app/eval/results/sql_omnisql_v3_20260411_175725.json
+Category        Total    Passed  Rate
+------------  -------  --------  ------
+aggregation        20         1  5%
+comparative         7         0  0%
+cross_table         1         0  0%
+metric              6         0  0%
+negative            3         1  33%
+single_task         2         2  100%
+tasks_filter        7         2  29%
+
+Difficulty      Total    Passed  Rate
+------------  -------  --------  ------
+easy               16         5  31%
+hard               14         0  0%
+medium             16         1  6%
+
+Failed (40):
+  #3 [negative] Информация о задаче AL-99999
+    SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = :issue_key Al-9-9-9 ' '...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "Al"
+LINE 1: ...port_agile_dashboard WHERE issue_key = 'AL-99999' Al-9-9-9 '...
+                                                             ^
+
+[SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = %(issue_key)s Al-9-9-9 ' ']
+[parameters: {'issue_key': 'AL-99999'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #4 [tasks_filter] Все задачи команды cthulhu
+    SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team...
+    rows: 2 (expected 70)
+  #5 [tasks_filter] Задачи команды lpop в спринте #1 Q1'26
+    SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE :team AND...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "26"
+LINE 1: ...teams ILIKE '%lpop%' AND sprint_name ILIKE '%#1 Q1''26%' 26'
+                                                                    ^
+
+[SQL: SELECT * FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_name ILIKE %(sprint)s 26']
+[parameters: {'team': '%lpop%', 'sprint': "%#1 Q1'26%"}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #6 [tasks_filter] Покажи все баги
+    SQL: SELECT * FROM report_agile_dashboard WHERE issue_type = ' bug'...
+    rows: 0 (expected 118)
+  #7 [tasks_filter] Баги в кластере Logistics
+    SQL: To translate the natural language question into an executable SQL query , let's ...
+    error: Unsafe SQL rejected (only SELECT allowed)
+  #10 [tasks_filter] Закрытые баги команды lpop
+    SQL: To translate the natural language question into an executable SQL query , let's ...
+    error: Unsafe SQL rejected (only SELECT allowed)
+  #11 [metric] Какой scope drop у команды cthulhu?
+    SQL: To translate the natural language question into an executable SQLite query , let...
+    error: Unsafe SQL rejected (only SELECT allowed)
+  #12 [metric] Done total команды lpop
+    SQL: SELECT done_total_issues FROM report_agile_dashboard_metrics WHERE feature_teams...
+    2 row(s) missing or different
+  #13 [metric] Метрики спринта #1 Q1'26
+    SQL: SELECT * FROM report_agile_dashboard_metrics WHERE sprint_name ILIKE :sprint...
+    rows: 2 (expected 1)
+  #14 [metric] Velocity команды linehaul
+    SQL: SELECT complete_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE...
+    3 row(s) missing or different
+  #15 [metric] Sprint goal команды lpop
+    SQL: SELECT * FROM report_agile_dashboard WHERE issue_type ILIKE :issue_type AND feat...
+    row count: 5 != 2
+  #16 [metric] Cancel rate команды marketplace
+    SQL: SELECT cancel_rate FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE...
+    3 row(s) missing or different
+  #17 [aggregation] Сколько всего story points у команды cthulhu?
+    SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total story points FROM report_agi...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total story points FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #19 [aggregation] Распределение задач по статусам у команды cthulhu
+    SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM rep...
+    error: Database error: (psycopg2.errors.UndefinedColumn) column "issue_status_end_of_sprint" does not exist
+LINE 1: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS...
+               ^
+
+[SQL: SELECT issue_status_end_of_sprint AS status , COUNT ( * ) AS task_count FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s GROUP BY issue_status_end_of_sprint]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #20 [comparative] У какой команды самый высокий done_total?
+    SQL: SELECT feature_teams FROM report_agile_dashboard_metrics ORDER BY done_total DES...
+    feature_teams: 'linehaul' != 'legal tech'
+  #21 [comparative] У какой команды самый большой scope drop?
+    SQL: SELECT feature_teams FROM report_agile_dashboard_metrics ORDER BY scope_drop_iss...
+    feature_teams: 'shopping cart' != 'horizontal ml technologies'
+  #22 [comparative] Топ-3 команды по количеству задач
+    SQL: SELECT feature_teams AS team_name , COUNT ( * ) AS task_count FROM report_agile_...
+    shopping cart: 4 != 196; missing: testops; rint: 4 != 131
+  #23 [cross_table] Покажи scope drop команды cthulhu и их задачи с...
+    SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metric...
+    error: Database error: (psycopg2.errors.UndefinedColumn) column "issue_status_act" does not exist
+LINE 1: ...s AS T1 WHERE feature_teams ILIKE '%cthulhu%' AND issue_stat...
+                                                             ^
+
+[SQL: SELECT scope_drop_issues AS scope_drop_issues FROM report_agile_dashboard_metrics AS T1 WHERE feature_teams ILIKE %(team)s AND issue_status_act ILIKE %(status)s]
+[parameters: {'team': '%cthulhu%', 'status': '%Cancelled%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #25 [aggregation] Среднее значение done total у команды cthulhu
+    SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total FROM re...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND sprint_state = ' closed' AND done_total_issues IS NOT null]
+[parameters: {'team': '%cthulhu%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #26 [aggregation] Среднее done total команды marketplace за все с...
+    SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metric...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG.done_total ) AS average done total FROM report_ag...
+                              ^
+
+[SQL: SELECT AVG.done_total ) AS average done total FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%marketplace%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #27 [aggregation] Средняя velocity команды linehaul
+    SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG complete_sp ) AS average velocity FROM report_agi...
+                               ^
+
+[SQL: SELECT AVG complete_sp ) AS average velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%linehaul%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #28 [aggregation] Средний scope drop у команды shopping cart
+    SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG scope_drop_issues ) AS average scope drop FROM re...
+                                     ^
+
+[SQL: SELECT AVG scope_drop_issues ) AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s AND status = ' Open' AND assignee_name ILIKE %(assignee)s]
+[parameters: {'team': '%shopping cart%', 'assignee': '%daprokop%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #29 [aggregation] Средний done total по каждой команде
+    SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS av...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "total"
+LINE 1: ...ECT feature_teams AS feature_teams , average done total issu...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , average done total issues per team AS average done total issues per team FROM report_agile_dashboard_metrics WHERE feature feature teams = 'travolta' GROUP BY feature feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #30 [aggregation] Средний scope drop по каждой команде
+    SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agi...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT feature_teams , AVG scope_drop real AS average scope ...
+                                              ^
+
+[SQL: SELECT feature_teams , AVG scope_drop real AS average scope drop FROM report_agile_dashboard_metrics WHERE feature_teams IS not null group by feature_teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #31 [aggregation] Какой максимальный story points у одной задачи?
+    SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "actual"
+LINE 1: SELECT MAX storypoints_act actual story points ) AS max stor...
+                                   ^
+
+[SQL: SELECT MAX storypoints_act actual story points ) AS max story points FROM report_agile_dashboard]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #32 [comparative] Какой минимальный done total среди всех команд ...
+    SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboa...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "done"
+LINE 1: SELECT MIN ( done_total_issues ) AS minimum done total FROM ...
+                                                    ^
+
+[SQL: SELECT MIN ( done_total_issues ) AS minimum done total FROM report_agile_dashboard_metrics]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #33 [comparative] В каком спринте был самый большой scope drop?
+    SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELE...
+    error: Database error: (psycopg2.errors.UndefinedColumn) column "max" does not exist
+LINE 1: ...ile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_...
+                                                             ^
+
+[SQL: SELECT sprint_name FROM report_agile_dashboard_metrics WHERE scope_drop = ( SELECT MAX scope_drop FROM report_agile_dashboard_metrics ) limit 1]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #34 [aggregation] Сколько задач в каждом кластере?
+    SQL: SELECT unit_name AS cluster_name , COUNT ( * ) AS task_count FROM report_agile_d...
+    missing: AI Lab; missing: Architecture; missing: FinTech; missing: Internal Automation; missing: Logistics (+7 more)
+  #35 [aggregation] Сколько задач со статусом Done в каждом кластере?
+    SQL: To translate the given natural language question into an executable SQL query , ...
+    error: Unsafe SQL rejected (only SELECT allowed)
+  #36 [aggregation] Сколько задач у команды shopping cart в каждом ...
+    SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature tea...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "feature"
+LINE 1: SELECT sprint_name , COUNT feature_teams feature teams featu...
+                                                 ^
+
+[SQL: SELECT sprint_name , COUNT feature_teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams feature teams]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #37 [aggregation] Суммарная velocity команды rint за все спринты
+    SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHE...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: SELECT SUM complete_sp AS total velocity FROM report_agile_d...
+                               ^
+
+[SQL: SELECT SUM complete_sp AS total velocity FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #38 [aggregation] Сколько всего SP было добавлено в спринты коман...
+    SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "cart"
+LINE 1: ...ard_metrics WHERE feature_teams ILIKE '%shopping cart%' cart
+                                                                   ^
+
+[SQL: SELECT sum added_work_sp FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s cart]
+[parameters: {'team': '%shopping cart%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #39 [aggregation] Какие команды имеют средний done total ниже 80%?
+    SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams ...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "done_total"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG done_total...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG done_total < 8]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #40 [aggregation] Команды со средним scope drop больше 25%
+    SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams ...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "scope_drop_issues"
+LINE 1: ...shboard_metrics GROUP BY feature_teams having AVG scope_drop...
+                                                             ^
+
+[SQL: SELECT feature_teams FROM report_agile_dashboard_metrics GROUP BY feature_teams having AVG scope_drop_issues > 25]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #41 [aggregation] Кластеры, в которых больше 100 задач
+    SQL: SELECT unit_name FROM report_agile_dashboard_metrics GROUP BY unit_name having c...
+    0 rows (expected 9)
+  #42 [aggregation] Средний размер Story в story points
+    SQL: SELECT AVG storypoints_act real story points act real story points act real stor...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "real"
+LINE 1: SELECT AVG storypoints_act real story points act real story ...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real storytó story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act real story points act]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #43 [aggregation] Средний размер бага в story points
+    SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG storypoints_act ) AS average story points FROM re...
+                                   ^
+
+[SQL: SELECT AVG storypoints_act ) AS average story points FROM report_agile_dashboard WHERE issue_type ILIKE %(issue_type)s AND feature_teams ILIKE %(team)s]
+[parameters: {'issue_type': '%Story%', 'team': '%rint%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #44 [comparative] Топ-5 команд по средней velocity
+    SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ... feature_teams AS feature_teams , AVG complete_sp AS average...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , AVG complete_sp AS average velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY average velocity DESC LIMIT 5]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #45 [comparative] Топ-3 команды по количеству багов
+    SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug coun...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near "AS"
+LINE 1: ...s AS feature_teams , COUNT issue_priority_for_bug AS bug cou...
+                                                             ^
+
+[SQL: SELECT feature_teams AS feature_teams , COUNT issue_priority_for_bug AS bug count FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY bug count DESC LIMIT 3]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+  #46 [negative] Средний done total команды несуществующая_команда
+    SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_da...
+    error: Database error: (psycopg2.errors.SyntaxError) syntax error at or near ")"
+LINE 1: SELECT AVG done_total_issues ) AS average done total issues ...
+                                     ^
+
+[SQL: SELECT AVG done_total_issues ) AS average done total issues FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE %(team)s]
+[parameters: {'team': '%travolta%'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+Latency: avg=5.82s, min=2.88s, max=7.32s
+
