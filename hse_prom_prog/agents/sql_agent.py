@@ -391,23 +391,29 @@ def _replace_literals_with_params(sql: str, entities: ExtractedEntities) -> str:
     The model generates `WHERE issue_key = ' ' 'AL-38787'` (broken by tokenizer).
     This replaces the entire `column = <broken_value>` with `column = :param`
     or `column ILIKE :param` for each extracted entity.
+    Skips if column already uses a :bind_param.
     """
     for attr, (col, use_ilike) in _ENTITY_COL_MAP.items():
         val = getattr(entities, attr, None)
         if val is None:
             continue
 
-        # Match: column_name <operator> <any_value_expression>
-        # Value can be: 'text', ' ' 'text', :param, etc.
-        # Pattern: col (=|ILIKE|LIKE) followed by value until AND|OR|LIMIT|GROUP|ORDER|HAVING|)
+        op = "ILIKE" if use_ilike else "="
+        replacement = f"{col} {op} :{attr}"
+
+        # Skip if already using bind param for this column
+        already_bound = rf"\b{re.escape(col)}\b\s*(?:=|ILIKE)\s*:{re.escape(attr)}\b"
+        if re.search(already_bound, sql, re.IGNORECASE):
+            continue
+
+        # Match: column_name <operator> <broken_literal_value>
+        # Value: one or more quoted strings like ' ' 'text', or unquoted word
         pattern = (
             rf"\b{re.escape(col)}\b\s*"
             r"(?:=|ILIKE|LIKE|il\s+like)\s*"
-            r"(?:'[^']*'(?:\s*'[^']*')*|:[a-z_]+|[^\s,)]+)"
+            r"(?:'[^']*'(?:\s*'[^']*')*|[^\s,)]+)"
         )
-        op = "ILIKE" if use_ilike else "="
-        replacement = f"{col} {op} :{attr}"
-        sql = re.sub(pattern, replacement, sql, flags=re.IGNORECASE)
+        sql = re.sub(pattern, replacement, sql, count=1, flags=re.IGNORECASE)
 
     return sql
 
