@@ -170,26 +170,38 @@ class SQLAgent:
 # ── Utilities ────────────────────────────────────────────────
 
 
+def _strip_fences(text: str) -> str:
+    """Remove markdown code fences."""
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text.rsplit("```", 1)[0]
+    return text.strip()
+
+
 def _parse_answer(raw: str) -> str:
     """Extract SQL from Arctic-Text2SQL output with <think>/<answer> tags."""
-    # Try to extract from <answer> tag, fallback to raw output
+    # 1. <answer> tag
     answer_match = re.search(r"<answer>\s*(.*?)\s*</answer>", raw, re.DOTALL)
-    sql = answer_match.group(1).strip() if answer_match else raw.strip()
+    if answer_match:
+        sql = _strip_fences(answer_match.group(1).strip())
+        if sql.upper().startswith("SELECT"):
+            return sql.split(";")[0].strip()
 
-    # Remove markdown code fences
-    if sql.startswith("```"):
-        sql = sql.split("\n", 1)[-1]
-    if sql.endswith("```"):
-        sql = sql.rsplit("```", 1)[0]
-    sql = sql.strip()
+    # 2. Last ```sql block
+    code_blocks = re.findall(r"```(?:sql)?\s*\n?(.*?)```", raw, re.DOTALL)
+    if code_blocks:
+        sql = code_blocks[-1].strip()
+        if sql.upper().startswith("SELECT"):
+            return sql.split(";")[0].strip()
 
-    # Extract SELECT statement if there's reasoning before it
-    upper = sql.upper()
-    select_idx = upper.find("SELECT")
-    if select_idx > 0:
-        sql = sql[select_idx:]
+    # 3. Last SELECT (rfind, not find)
+    upper = raw.upper()
+    idx = upper.rfind("SELECT")
+    if idx >= 0:
+        return re.split(r";|\n\n|```", raw[idx:])[0].strip()
 
-    return sql.split(";")[0].strip()
+    return raw.strip()
 
 
 def _normalize(name: str) -> str:
