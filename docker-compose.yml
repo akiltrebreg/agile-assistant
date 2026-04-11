@@ -152,6 +152,7 @@ services:
       - --dtype=float16
       - --max-model-len=2048
       - --gpu-memory-utilization=0.45
+      - --enforce-eager
     volumes:
       - vllm-cache:/models
     ipc: host
