@@ -182,9 +182,7 @@ def get_schema_compact(engine: Engine) -> str:
     tables = _load_tables(engine)
     result = render_schema(tables, compact=True)
     _cache[key] = (now, result)
-    logger.info(
-        "[SchemaLoader] Loaded compact schema: %d tables, %d chars", len(tables), len(result)
-    )
+    logger.info("[SchemaLoader] Loaded DDL schema: %d tables, %d chars", len(tables), len(result))
     return result
 
 

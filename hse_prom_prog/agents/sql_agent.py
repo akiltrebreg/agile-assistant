@@ -35,6 +35,9 @@ Database Engine: PostgreSQL
 Database Schema:
 {schema}
 
+Use :parameter_name placeholders for filter values instead of literals.
+Example: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE :team
+
 This query will use the following parameters: {entities}
 
 Question:
