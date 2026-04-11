@@ -134,8 +134,15 @@ def render_schema(tables: list[TableInfo], compact: bool = False) -> str:
     parts: list[str] = []
     for t in tables:
         if compact:
-            col_defs = ", ".join(f'"{c.name}" {c.data_type}' for c in t.columns)
-            parts.append(f'CREATE TABLE "{t.name}" ({col_defs})')
+            # OmniSQL DDL format: CREATE TABLE with column comments
+            desc = f" -- {t.comment}" if t.comment else ""
+            lines = [f"CREATE TABLE {t.name} ({desc}"]
+            for i, c in enumerate(t.columns):
+                comma = "," if i < len(t.columns) - 1 else ""
+                comment = f" -- {c.comment}" if c.comment else ""
+                lines.append(f"    {c.name} {c.data_type}{comma}{comment}")
+            lines.append(");")
+            parts.append("\n".join(lines))
         else:
             desc = f" -- {t.comment}" if t.comment else ""
             lines = [f"TABLE {t.name}{desc}", "COLUMNS:"]
@@ -144,7 +151,7 @@ def render_schema(tables: list[TableInfo], compact: bool = False) -> str:
                 comment = f" -- {c.comment}" if c.comment else ""
                 lines.append(f"  {c.name} {c.data_type}{pk}{comment}")
             parts.append("\n".join(lines))
-    return "\n".join(parts) if compact else "\n\n".join(parts)
+    return "\n\n".join(parts)
 
 
 def get_schema(engine: Engine) -> str:
