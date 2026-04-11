@@ -25,12 +25,16 @@ logger = logging.getLogger(__name__)
 # ── Prompt (completion-style for text2sql models) ───────────
 
 _COMPLETION_TEMPLATE = """\
-### PostgreSQL tables with their columns:
-#
 {schema}
-#
-### Rules: use ILIKE for text filters. Add LIMIT 100 unless aggregating.
-### Question: {question}
+
+-- Using valid PostgreSQL, answer the following question for the tables provided above.
+-- Use double quotes for all table and column names.
+-- Use ILIKE for text filters. Add LIMIT 100 unless aggregating.
+
+-- Question: Сколько задач в спринте #1?
+SELECT COUNT(*) FROM "report_agile_dashboard" WHERE "sprint_name" ILIKE '%#1%';
+
+-- Question: {question}
 SELECT"""
 
 
@@ -79,7 +83,8 @@ class SQLAgent:
             prompt=prompt,
             temperature=0.0,
             max_tokens=256,
-            stop=[";", "\n\n"],
+            stop=[";", "\n\n", "\n--"],
+            extra_body={"repetition_penalty": 1.15},
         )
         raw = "SELECT" + response.choices[0].text
         sql = _clean_sql(raw)

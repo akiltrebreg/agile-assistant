@@ -129,15 +129,15 @@ def render_schema(tables: list[TableInfo], compact: bool = False) -> str:
 
     Args:
         tables: Table metadata.
-        compact: If True, omit column comments to save tokens.
+        compact: If True, use CREATE TABLE DDL format (best for text2sql models).
     """
     parts: list[str] = []
     for t in tables:
-        desc = f" -- {t.comment}" if t.comment else ""
-        cols = ", ".join(f"{c.name} {c.data_type}" for c in t.columns) if compact else None
         if compact:
-            parts.append(f"# {t.name}({cols}){desc}")
+            col_defs = ", ".join(f'"{c.name}" {c.data_type}' for c in t.columns)
+            parts.append(f'CREATE TABLE "{t.name}" ({col_defs})')
         else:
+            desc = f" -- {t.comment}" if t.comment else ""
             lines = [f"TABLE {t.name}{desc}", "COLUMNS:"]
             for c in t.columns:
                 pk = " PK" if c.is_pk else ""
