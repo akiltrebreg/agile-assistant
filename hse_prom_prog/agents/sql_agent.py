@@ -97,6 +97,9 @@ class SQLAgent:
         table_names, col_names = get_known_names(self.db.engine)
         sql = _fix_identifiers(sql, table_names, col_names)
 
+        # Replace broken literal values with bind params from entity extractor
+        sql = _replace_literals_with_params(sql, entities)
+
         logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
         return sql
 
@@ -362,6 +365,48 @@ def _fix_identifiers(sql: str, table_names: list[str], col_names: list[str]) -> 
         result.extend(_resolve_buf(buf, lookup))
 
     return " ".join(t for t in result if t.strip())
+
+
+# Maps entity attr → (column_name, use_ilike)
+_ENTITY_COL_MAP: dict[str, tuple[str, bool]] = {
+    "issue_key": ("issue_key", False),
+    "team": ("feature_teams", True),
+    "sprint": ("sprint_name", True),
+    "cluster": ("cluster", True),
+    "issue_type": ("issue_type", True),
+    "status": ("issue_status_act", True),
+    "assignee": ("assignee_name", True),
+    "unit": ("unit", True),
+    "project": ("issue_project", True),
+    "priority": ("issue_priority_for_bug", False),
+}
+
+
+def _replace_literals_with_params(sql: str, entities: ExtractedEntities) -> str:
+    """Replace broken string literals with bind params from entity extractor.
+
+    The model generates `WHERE issue_key = ' ' 'AL-38787'` (broken by tokenizer).
+    This replaces the entire `column = <broken_value>` with `column = :param`
+    or `column ILIKE :param` for each extracted entity.
+    """
+    for attr, (col, use_ilike) in _ENTITY_COL_MAP.items():
+        val = getattr(entities, attr, None)
+        if val is None:
+            continue
+
+        # Match: column_name <operator> <any_value_expression>
+        # Value can be: 'text', ' ' 'text', :param, etc.
+        # Pattern: col (=|ILIKE|LIKE) followed by value until AND|OR|LIMIT|GROUP|ORDER|HAVING|)
+        pattern = (
+            rf"\b{re.escape(col)}\b\s*"
+            r"(?:=|ILIKE|LIKE|il\s+like)\s*"
+            r"(?:'[^']*'(?:\s*'[^']*')*|:[a-z_]+|[^\s,)]+)"
+        )
+        op = "ILIKE" if use_ilike else "="
+        replacement = f"{col} {op} :{attr}"
+        sql = re.sub(pattern, replacement, sql, flags=re.IGNORECASE)
+
+    return sql
 
 
 _FORBIDDEN = frozenset(
