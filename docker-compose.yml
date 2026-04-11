@@ -150,8 +150,8 @@ services:
       - --model=/models/arctic-text2sql-gptq-8bit
       - --quantization=gptq
       - --dtype=float16
-      - --max-model-len=2048
-      - --gpu-memory-utilization=0.45
+      - --max-model-len=1024
+      - --gpu-memory-utilization=0.40
       - --enforce-eager
     volumes:
       - vllm-cache:/models
@@ -188,7 +188,8 @@ services:
       - --quantization=gptq
       - --dtype=float16
       - --max-model-len=4096
-      - --gpu-memory-utilization=0.50
+      - --gpu-memory-utilization=0.45
+      - --enforce-eager
     volumes:
       - vllm-cache:/models
     ipc: host
