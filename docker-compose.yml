@@ -151,6 +151,7 @@ services:
       - --quantization=gptq
       - --dtype=float16
       - --max-model-len=4096
+      - --gpu-memory-utilization=0.35
     volumes:
       - vllm-cache:/models
     ipc: host
@@ -186,6 +187,7 @@ services:
       - --quantization=gptq
       - --dtype=float16
       - --max-model-len=8192
+      - --gpu-memory-utilization=0.55
     volumes:
       - vllm-cache:/models
     ipc: host
