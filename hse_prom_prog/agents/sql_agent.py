@@ -16,30 +16,22 @@ from typing import Any
 from openai import OpenAI
 from sqlalchemy.exc import SQLAlchemyError
 
-from hse_prom_prog.agents.schema_loader import get_schema
+from hse_prom_prog.agents.schema_loader import get_schema_compact
 from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
 
 logger = logging.getLogger(__name__)
 
-# ── Prompt ───────────────────────────────────────────────────
+# ── Prompt (completion-style for text2sql models) ───────────
 
-_SYSTEM_PROMPT = """\
-You are a PostgreSQL SQL generator. Output ONLY a valid SQL query.
-
-RULES:
-1. Think: FROM which table → WHERE filters → SELECT columns
-2. Use ILIKE '%value%' for all text filters
-3. Add LIMIT 100 unless using COUNT, SUM, AVG, GROUP BY, or ORDER BY ... LIMIT N
-4. Output ONLY SQL. No explanations, no markdown."""
-
-_USER_TEMPLATE = """\
-SCHEMA:
+_COMPLETION_TEMPLATE = """\
+### PostgreSQL tables with their columns:
+#
 {schema}
-
-QUESTION: {question}
-
-SQL:"""
+#
+### Rules: use ILIKE for text filters. Add LIMIT 100 unless aggregating.
+### Question: {question}
+SELECT"""
 
 
 # ── Agent ────────────────────────────────────────────────────
@@ -76,23 +68,20 @@ class SQLAgent:
     # ── SQL generation ───────────────────────────────────────
 
     def _generate_sql(self, question: str) -> str:
-        """Generate SQL from user question using text2sql LLM."""
+        """Generate SQL from user question using text2sql LLM (completions API)."""
         self._ensure_db()
-        schema = get_schema(self.db.engine)
+        schema = get_schema_compact(self.db.engine)
 
-        response = self._sql_client.chat.completions.create(
+        prompt = _COMPLETION_TEMPLATE.format(schema=schema, question=question)
+
+        response = self._sql_client.completions.create(
             model=self._sql_model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _USER_TEMPLATE.format(schema=schema, question=question),
-                },
-            ],
+            prompt=prompt,
             temperature=0.0,
             max_tokens=256,
+            stop=[";", "\n\n"],
         )
-        raw = response.choices[0].message.content.strip()
+        raw = "SELECT" + response.choices[0].text
         sql = _clean_sql(raw)
         logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
         return sql
@@ -163,12 +152,26 @@ class SQLAgent:
 
 
 def _clean_sql(raw: str) -> str:
-    """Strip markdown wrappers and extra text around SQL."""
+    """Strip markdown wrappers and extra text around SQL.
+
+    If the model outputs reasoning before the query, extract the SELECT
+    statement from the raw output.
+    """
     sql = raw.strip()
+    # Remove markdown code fences
     if sql.startswith("```"):
         sql = sql.split("\n", 1)[-1]
     if sql.endswith("```"):
         sql = sql.rsplit("```", 1)[0]
+    sql = sql.strip()
+
+    # If model produced reasoning, extract the SELECT statement
+    upper = sql.upper()
+    select_idx = upper.find("SELECT")
+    if select_idx > 0:
+        sql = sql[select_idx:]
+
+    # Take only the first statement
     return sql.split(";")[0].strip()
 
 

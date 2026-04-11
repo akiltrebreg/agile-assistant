@@ -124,18 +124,27 @@ def _load_tables(engine: Engine) -> list[TableInfo]:
     return list(tables.values())
 
 
-def render_schema(tables: list[TableInfo]) -> str:
-    """Render schema as compact text for the LLM prompt."""
+def render_schema(tables: list[TableInfo], compact: bool = False) -> str:
+    """Render schema as text for the LLM prompt.
+
+    Args:
+        tables: Table metadata.
+        compact: If True, omit column comments to save tokens.
+    """
     parts: list[str] = []
     for t in tables:
         desc = f" -- {t.comment}" if t.comment else ""
-        lines = [f"TABLE {t.name}{desc}", "COLUMNS:"]
-        for c in t.columns:
-            pk = " PK" if c.is_pk else ""
-            comment = f" -- {c.comment}" if c.comment else ""
-            lines.append(f"  {c.name} {c.data_type}{pk}{comment}")
-        parts.append("\n".join(lines))
-    return "\n\n".join(parts)
+        cols = ", ".join(f"{c.name} {c.data_type}" for c in t.columns) if compact else None
+        if compact:
+            parts.append(f"# {t.name}({cols}){desc}")
+        else:
+            lines = [f"TABLE {t.name}{desc}", "COLUMNS:"]
+            for c in t.columns:
+                pk = " PK" if c.is_pk else ""
+                comment = f" -- {c.comment}" if c.comment else ""
+                lines.append(f"  {c.name} {c.data_type}{pk}{comment}")
+            parts.append("\n".join(lines))
+    return "\n".join(parts) if compact else "\n\n".join(parts)
 
 
 def get_schema(engine: Engine) -> str:
@@ -151,4 +160,22 @@ def get_schema(engine: Engine) -> str:
     result = render_schema(tables)
     _cache[key] = (now, result)
     logger.info("[SchemaLoader] Loaded schema: %d tables, %d chars", len(tables), len(result))
+    return result
+
+
+def get_schema_compact(engine: Engine) -> str:
+    """Return compact schema text (no column comments, cached for 10 min)."""
+    now = time.time()
+    key = "schema_compact"
+    if key in _cache:
+        ts, cached = _cache[key]
+        if now - ts < _CACHE_TTL:
+            return cached
+
+    tables = _load_tables(engine)
+    result = render_schema(tables, compact=True)
+    _cache[key] = (now, result)
+    logger.info(
+        "[SchemaLoader] Loaded compact schema: %d tables, %d chars", len(tables), len(result)
+    )
     return result
