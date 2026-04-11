@@ -179,3 +179,20 @@ def get_schema_compact(engine: Engine) -> str:
         "[SchemaLoader] Loaded compact schema: %d tables, %d chars", len(tables), len(result)
     )
     return result
+
+
+def get_known_names(engine: Engine) -> tuple[list[str], list[str]]:
+    """Return (table_names, column_names) from schema (cached)."""
+    now = time.time()
+    key = "known_names"
+    if key in _cache:
+        ts, cached = _cache[key]
+        if now - ts < _CACHE_TTL:
+            return cached
+
+    tables = _load_tables(engine)
+    table_names = [t.name for t in tables]
+    col_names = list({c.name for t in tables for c in t.columns})
+    result = (table_names, col_names)
+    _cache[key] = (now, result)
+    return result
