@@ -89,8 +89,7 @@ class SQLAgent:
             model=self._sql_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=256,
-            extra_body={"repetition_penalty": 1.2},
+            max_tokens=1024,
         )
         raw = response.choices[0].message.content.strip()
         logger.info("[SQL Agent] Raw LLM output: %s", raw[:300])
