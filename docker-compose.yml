@@ -135,24 +135,23 @@ services:
     networks:
       - hse-network
 
-  # vLLM for text2sql (arctic-7b, port 8001)
+  # vLLM for text2sql (Arctic-Text2SQL-R1-7B FP16 from HuggingFace)
+  # For eval: stop vllm first (docker compose stop vllm) to free GPU
   vllm-sql:
     image: vllm/vllm-openai:v0.6.6.post1
     container_name: vllm-sql-server
-    depends_on:
-      download-sql-model:
-        condition: service_completed_successfully
     ports:
       - "8001:8000"
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
     command:
-      - --model=/models/arctic-text2sql-gptq-8bit
-      - --quantization=gptq
-      - --dtype=float16
-      - --max-model-len=2048
-      - --gpu-memory-utilization=0.45
+      - --model=Snowflake/Arctic-Text2SQL-R1-7B
+      - --dtype=auto
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.90
       - --enforce-eager
+      - --download-dir=/models
     volumes:
       - vllm-cache:/models
     ipc: host
@@ -168,7 +167,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 10
-      start_period: 300s
+      start_period: 600s
     networks:
       - hse-network
 
@@ -229,7 +228,7 @@ services:
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
-      - SQL_VLLM_MODEL=/models/arctic-text2sql-gptq-8bit
+      - SQL_VLLM_MODEL=Snowflake/Arctic-Text2SQL-R1-7B
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -296,7 +295,7 @@ services:
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
-      - SQL_VLLM_MODEL=/models/arctic-text2sql-gptq-8bit
+      - SQL_VLLM_MODEL=Snowflake/Arctic-Text2SQL-R1-7B
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -349,7 +348,7 @@ services:
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
-      - SQL_VLLM_MODEL=/models/arctic-text2sql-gptq-8bit
+      - SQL_VLLM_MODEL=Snowflake/Arctic-Text2SQL-R1-7B
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

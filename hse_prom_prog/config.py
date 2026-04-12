@@ -83,7 +83,7 @@ class Settings(BaseSettings):
         description="Base URL for text2sql vLLM endpoint (arctic-7b)",
     )
     sql_vllm_model: str = Field(
-        default="/models/arctic-text2sql-gptq-8bit",
+        default="Snowflake/Arctic-Text2SQL-R1-7B",
         description="Text2SQL model name",
     )
 
