@@ -89,7 +89,8 @@ class SQLAgent:
             model=self._sql_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=512,
+            max_tokens=256,
+            extra_body={"repetition_penalty": 1.2},
         )
         raw = response.choices[0].message.content.strip()
         logger.info("[SQL Agent] Raw LLM output: %s", raw[:300])
@@ -102,6 +103,11 @@ class SQLAgent:
 
         # Replace broken literal values with bind params from entity extractor
         sql = _replace_literals_with_params(sql, entities)
+
+        # Fix remaining arctic tokenizer artifacts
+        sql = _fix_aggregates(sql)
+        sql = _fix_aliases(sql)
+        sql = _fix_param_trailing_junk(sql)
 
         logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
         return sql
@@ -368,6 +374,77 @@ def _fix_identifiers(sql: str, table_names: list[str], col_names: list[str]) -> 
         result.extend(_resolve_buf(buf, lookup))
 
     return " ".join(t for t in result if t.strip())
+
+
+def _fix_aggregates(sql: str) -> str:
+    """Fix missing opening paren in aggregate functions.
+
+    Arctic tokenizer drops '(' → 'AVG done_total )' instead of 'AVG(done_total)'.
+    """
+    # Pattern: AGG_FN <space> column_name <optional space> )
+    sql = re.sub(
+        r"\b(AVG|SUM|COUNT|MIN|MAX)\s+(\w+)\s*\)",
+        r"\1(\2)",
+        sql,
+        flags=re.IGNORECASE,
+    )
+    # Also fix: AGG_FN <space> ( column_name ) — extra space before (
+    return re.sub(
+        r"\b(AVG|SUM|COUNT|MIN|MAX)\s+\(",
+        r"\1(",
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+
+def _fix_aliases(sql: str) -> str:
+    """Fix multi-word aliases after AS.
+
+    'AS average done total' → 'AS average_done_total'
+    Collects non-keyword words after AS and joins with underscore.
+    """
+    # Split preserving commas/parens as separate tokens
+    tokens = re.findall(r"[,()]|[^\s,()]+", sql)
+    result: list[str] = []
+    i = 0
+    while i < len(tokens):
+        if tokens[i].upper() == "AS" and i + 1 < len(tokens):
+            result.append(tokens[i])
+            i += 1
+            # Collect alias words (non-keyword, non-punctuation)
+            alias_parts: list[str] = []
+            while i < len(tokens):
+                w = tokens[i]
+                if w.lower() in _SQL_KEYWORDS or w in (",", ")", "("):
+                    break
+                alias_parts.append(w)
+                i += 1
+            if len(alias_parts) > 1:
+                result.append("_".join(alias_parts))
+            elif alias_parts:
+                result.append(alias_parts[0])
+            else:
+                result.append("alias")
+        else:
+            result.append(tokens[i])
+            i += 1
+    return " ".join(result)
+
+
+def _fix_param_trailing_junk(sql: str) -> str:
+    """Remove junk tokens after :param placeholders.
+
+    Model sometimes 'completes' the value: ':issue_key Al-9-9-9' or ':team cart'.
+    Strip everything between :param and next SQL keyword/operator.
+    """
+    return re.sub(
+        r"(:\w+)\s+(?!AND|OR|GROUP|ORDER|HAVING|LIMIT|FROM|WHERE|ON|AS|,|\))"
+        r"[^\s,)]+(?:\s+[^\s,)]+)*?"
+        r"(?=\s+(?:AND|OR|GROUP|ORDER|HAVING|LIMIT|FROM|WHERE|,|\))|$)",
+        r"\1",
+        sql,
+        flags=re.IGNORECASE,
+    )
 
 
 # Maps entity attr → (column_name, use_ilike)
