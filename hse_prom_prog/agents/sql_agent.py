@@ -329,27 +329,27 @@ def _resolve_buf(buf: list[str], lookup: dict[str, str]) -> list[str]:
     return list(buf)
 
 
+def _flush_buf(buf: list[str], lookup: dict[str, str], result: list[str]) -> None:
+    """Resolve buffered identifier words and append to result."""
+    if buf:
+        result.extend(_resolve_buf(buf, lookup))
+        buf.clear()
+
+
 def _fix_identifiers(sql: str, table_names: list[str], col_names: list[str]) -> str:
     """Fix broken identifiers produced by arctic tokenizer.
 
-    Strategy: tokenize the SQL, find sequences of non-keyword words,
-    normalize them (strip spaces/case), and match against known
-    table/column names via normalized lookup.
+    If a token already exactly matches a known name, keep it as-is.
     """
     lookup: dict[str, str] = {}
     for name in table_names + col_names:
         lookup[_normalize(name)] = name
 
+    known_exact = set(table_names + col_names)
     sql = re.sub(r"\bil\s+like\b", "ILIKE", sql, flags=re.IGNORECASE)
-
-    def _fix_quoted(m: re.Match) -> str:
-        norm = _normalize(m.group(1))
-        return lookup.get(norm, m.group(1))
-
-    sql = re.sub(r'"([^"]+)"', _fix_quoted, sql)
+    sql = re.sub(r'"([^"]+)"', lambda m: lookup.get(_normalize(m.group(1)), m.group(1)), sql)
 
     tokens = re.split(r"(\s+|[(),=<>!*]|'[^']*'|:[a-z_]+)", sql)
-
     result: list[str] = []
     buf: list[str] = []
 
@@ -360,18 +360,16 @@ def _fix_identifiers(sql: str, table_names: list[str], col_names: list[str]) -> 
         if not stripped:
             if not buf:
                 result.append(token)
-            continue
-
-        if _is_structural_token(stripped):
-            if buf:
-                result.extend(_resolve_buf(buf, lookup))
-                buf.clear()
+        elif stripped in known_exact:
+            _flush_buf(buf, lookup, result)
+            result.append(stripped)
+        elif _is_structural_token(stripped):
+            _flush_buf(buf, lookup, result)
             result.append(token)
         else:
             buf.append(stripped)
 
-    if buf:
-        result.extend(_resolve_buf(buf, lookup))
+    _flush_buf(buf, lookup, result)
 
     return " ".join(t for t in result if t.strip())
 
@@ -381,14 +379,22 @@ def _fix_aggregates(sql: str) -> str:
 
     Arctic tokenizer drops '(' → 'AVG done_total )' instead of 'AVG(done_total)'.
     """
-    # Pattern: AGG_FN <space> column_name <optional space> )
+    # Pattern: AGG_FN <dot_or_space> column_name <optional space> )
+    # Handles: AVG done_total ), AVG.done_total ), SUM.complete_sp
     sql = re.sub(
-        r"\b(AVG|SUM|COUNT|MIN|MAX)\s+(\w+)\s*\)",
+        r"\b(AVG|SUM|COUNT|MIN|MAX)[.\s]+(\w+)\s*\)",
         r"\1(\2)",
         sql,
         flags=re.IGNORECASE,
     )
-    # Also fix: AGG_FN <space> ( column_name ) — extra space before (
+    # AGG_FN <dot_or_space> column_name (no closing paren) — add both parens
+    sql = re.sub(
+        r"\b(AVG|SUM|COUNT|MIN|MAX)[.\s]+(\w+)\b(?!\s*[.(])",
+        r"\1(\2)",
+        sql,
+        flags=re.IGNORECASE,
+    )
+    # Extra space before (
     return re.sub(
         r"\b(AVG|SUM|COUNT|MIN|MAX)\s+\(",
         r"\1(",

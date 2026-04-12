@@ -40,6 +40,66 @@ _ENTITY_COLUMNS: dict[str, str] = {
 
 _ISSUE_KEY_RE = re.compile(r"\b([A-Z]{1,10}-\d+)\b")
 
+# Common Russian/English words that accidentally match DB values.
+# "done" matches status "Done", "story" matches type "Story", etc.
+_STOP_WORDS = frozenset(
+    {
+        "done",
+        "open",
+        "new",
+        "all",
+        "total",
+        "story",
+        "bug",
+        "sprint",
+        "scope",
+        "drop",
+        "cancel",
+        "rate",
+        "goal",
+        "средний",
+        "средняя",
+        "среднее",
+        "каждой",
+        "каждого",
+        "каждом",
+        "команды",
+        "команда",
+        "задачи",
+        "задач",
+        "статус",
+        "статусом",
+        "кластер",
+        "кластере",
+        "спринте",
+        "спринта",
+        "баги",
+        "багов",
+        "самый",
+        "самая",
+        "самое",
+        "высокий",
+        "большой",
+        "максимальный",
+        "минимальный",
+        "размер",
+        "количество",
+        "покажи",
+        "расскажи",
+        "информация",
+        "данные",
+        "метрики",
+        "velocity",
+        "initial",
+        "final",
+        "complete",
+        "added",
+        "progress",
+        "resolved",
+        "closed",
+    }
+)
+
 
 @dataclass
 class ExtractedEntities:
@@ -109,32 +169,59 @@ def _load_distinct_values(engine: Engine) -> dict[str, list[str]]:
     return result
 
 
-def _fuzzy_match(query: str, candidates: list[str], threshold: float = 0.6) -> str | None:
-    """Find the best fuzzy match for query among candidates."""
+def _fuzzy_match(query: str, candidates: list[str], threshold: float = 0.75) -> str | None:
+    """Find the best fuzzy match for query among candidates.
+
+    Strict matching to avoid false positives:
+    - Only exact substring match if candidate is 4+ chars
+    - Skip candidates that are common/stop words
+    - Higher fuzzy threshold (0.75)
+    """
     query_lower = query.lower()
+    min_len = 4
 
-    # Exact substring match first (case-insensitive)
-    for c in candidates:
-        if c.lower() in query_lower or query_lower in c.lower():
-            return c
-
-    # Fuzzy match on word tokens from the question
-    words = query_lower.split()
-    best_score = 0.0
-    best_match = None
+    # Exact substring match — only if candidate is specific enough
     for c in candidates:
         c_lower = c.lower()
-        # Check each word and multi-word combination
-        for i in range(len(words)):
-            for j in range(i + 1, min(i + 4, len(words) + 1)):
-                fragment = " ".join(words[i:j])
-                score = SequenceMatcher(None, fragment, c_lower).ratio()
-                if score > best_score:
-                    best_score = score
-                    best_match = c
-    if best_score >= threshold:
-        return best_match
-    return None
+        if c_lower in _STOP_WORDS or len(c_lower) < min_len:
+            continue
+        if c_lower in query_lower:
+            return c
+
+    # Fuzzy match on multi-word fragments
+    best_score = 0.0
+    best_match = None
+    words = query_lower.split()
+    for c in candidates:
+        c_lower = c.lower()
+        if c_lower in _STOP_WORDS or len(c_lower) < min_len:
+            continue
+        best_match, best_score = _best_fragment_match(
+            words,
+            c_lower,
+            best_match,
+            best_score,
+        )
+    return best_match if best_score >= threshold else None
+
+
+def _best_fragment_match(
+    words: list[str],
+    candidate: str,
+    best_match: str | None,
+    best_score: float,
+) -> tuple[str | None, float]:
+    """Find best matching fragment from words for a candidate."""
+    for i in range(len(words)):
+        for j in range(i + 1, min(i + 4, len(words) + 1)):
+            fragment = " ".join(words[i:j])
+            if all(w in _STOP_WORDS for w in fragment.split()):
+                continue
+            score = SequenceMatcher(None, fragment, candidate).ratio()
+            if score > best_score:
+                best_score = score
+                best_match = candidate
+    return best_match, best_score
 
 
 def extract_entities(question: str, engine: Engine) -> ExtractedEntities:
