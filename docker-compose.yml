@@ -107,7 +107,7 @@ services:
     networks:
       - hse-network
 
-  # Download arctic-text2sql-gptq-8bit from S3 into shared volume
+  # Download Qwen3-8B-AWQ from S3 into shared volume
   download-sql-model:
     image: amazon/aws-cli:2.22.35
     environment:
@@ -118,40 +118,43 @@ services:
     command:
       - -c
       - |
-        if [ -f /models/arctic-text2sql-gptq-8bit/config.json ]; then
-          echo "SQL model already downloaded, skipping"
+        if [ -f /models/qwen3-8b-awq-4bit/config.json ]; then
+          echo "Qwen3-8B-AWQ already downloaded, skipping"
           exit 0
         fi
-        echo "Downloading arctic-text2sql-gptq-8bit from S3..."
+        echo "Downloading qwen3-8b-awq-4bit from S3..."
         aws s3 sync \
-          s3://${S3_BUCKET:-quant-models-agile}/models/arctic-text2sql-gptq-8bit/ \
-          /models/arctic-text2sql-gptq-8bit/ \
+          s3://${S3_BUCKET:-quant-models-agile}/qwen3-8b-awq-4bit/ \
+          /models/qwen3-8b-awq-4bit/ \
           --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
-        test -f /models/arctic-text2sql-gptq-8bit/config.json || { echo "ERROR: config.json not found"; exit 1; }
+        test -f /models/qwen3-8b-awq-4bit/config.json || { echo "ERROR: config.json not found"; exit 1; }
         echo "Download complete"
-        ls -lh /models/arctic-text2sql-gptq-8bit/
+        ls -lh /models/qwen3-8b-awq-4bit/
     volumes:
       - vllm-cache:/models
     networks:
       - hse-network
 
-  # vLLM for text2sql (Arctic-Text2SQL-R1-7B FP16 from HuggingFace)
-  # For eval: stop vllm first (docker compose stop vllm) to free GPU
+  # vLLM for SQL Agent (Qwen3-8B-AWQ, port 8001)
   vllm-sql:
     image: vllm/vllm-openai:v0.6.6.post1
     container_name: vllm-sql-server
+    depends_on:
+      download-sql-model:
+        condition: service_completed_successfully
     ports:
       - "8001:8000"
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
-      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
     command:
-      - --model=Snowflake/Arctic-Text2SQL-R1-7B
-      - --dtype=auto
+      - --model=/models/qwen3-8b-awq-4bit
+      - --quantization=awq
+      - --dtype=float16
       - --max-model-len=4096
-      - --gpu-memory-utilization=0.90
+      - --gpu-memory-utilization=0.45
       - --enforce-eager
-      - --download-dir=/models
+      - --enable-auto-tool-choice
+      - --tool-call-parser=hermes
     volumes:
       - vllm-cache:/models
     ipc: host
@@ -167,7 +170,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 10
-      start_period: 600s
+      start_period: 300s
     networks:
       - hse-network
 
@@ -228,7 +231,7 @@ services:
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
-      - SQL_VLLM_MODEL=Snowflake/Arctic-Text2SQL-R1-7B
+      - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -295,7 +298,7 @@ services:
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
-      - SQL_VLLM_MODEL=Snowflake/Arctic-Text2SQL-R1-7B
+      - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -348,7 +351,7 @@ services:
       - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
-      - SQL_VLLM_MODEL=Snowflake/Arctic-Text2SQL-R1-7B
+      - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

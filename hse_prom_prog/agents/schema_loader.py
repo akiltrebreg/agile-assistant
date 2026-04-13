@@ -124,54 +124,23 @@ def _load_tables(engine: Engine) -> list[TableInfo]:
     return list(tables.values())
 
 
-def render_schema(tables: list[TableInfo], compact: bool = False) -> str:
-    """Render schema as text for the LLM prompt.
-
-    Args:
-        tables: Table metadata.
-        compact: If True, use CREATE TABLE DDL format (best for text2sql models).
-    """
+def render_schema(tables: list[TableInfo]) -> str:
+    """Render schema as CREATE TABLE DDL for the LLM prompt."""
     parts: list[str] = []
     for t in tables:
-        if compact:
-            # OmniSQL DDL format: CREATE TABLE with column comments
-            desc = f" -- {t.comment}" if t.comment else ""
-            lines = [f"CREATE TABLE {t.name} ({desc}"]
-            for i, c in enumerate(t.columns):
-                comma = "," if i < len(t.columns) - 1 else ""
-                comment = f" -- {c.comment}" if c.comment else ""
-                lines.append(f"    {c.name} {c.data_type}{comma}{comment}")
-            lines.append(");")
-            parts.append("\n".join(lines))
-        else:
-            desc = f" -- {t.comment}" if t.comment else ""
-            lines = [f"TABLE {t.name}{desc}", "COLUMNS:"]
-            for c in t.columns:
-                pk = " PK" if c.is_pk else ""
-                comment = f" -- {c.comment}" if c.comment else ""
-                lines.append(f"  {c.name} {c.data_type}{pk}{comment}")
-            parts.append("\n".join(lines))
+        desc = f" -- {t.comment}" if t.comment else ""
+        lines = [f"CREATE TABLE {t.name} ({desc}"]
+        for i, c in enumerate(t.columns):
+            comma = "," if i < len(t.columns) - 1 else ""
+            comment = f" -- {c.comment}" if c.comment else ""
+            lines.append(f"    {c.name} {c.data_type}{comma}{comment}")
+        lines.append(");")
+        parts.append("\n".join(lines))
     return "\n\n".join(parts)
 
 
-def get_schema(engine: Engine) -> str:
-    """Return schema text (cached for 10 min)."""
-    now = time.time()
-    key = "schema"
-    if key in _cache:
-        ts, cached = _cache[key]
-        if now - ts < _CACHE_TTL:
-            return cached
-
-    tables = _load_tables(engine)
-    result = render_schema(tables)
-    _cache[key] = (now, result)
-    logger.info("[SchemaLoader] Loaded schema: %d tables, %d chars", len(tables), len(result))
-    return result
-
-
 def get_schema_compact(engine: Engine) -> str:
-    """Return compact schema text (no column comments, cached for 10 min)."""
+    """Return DDL schema text (CREATE TABLE format, cached for 10 min)."""
     now = time.time()
     key = "schema_compact"
     if key in _cache:
@@ -180,24 +149,7 @@ def get_schema_compact(engine: Engine) -> str:
             return cached
 
     tables = _load_tables(engine)
-    result = render_schema(tables, compact=True)
+    result = render_schema(tables)
     _cache[key] = (now, result)
     logger.info("[SchemaLoader] Loaded DDL schema: %d tables, %d chars", len(tables), len(result))
-    return result
-
-
-def get_known_names(engine: Engine) -> tuple[list[str], list[str]]:
-    """Return (table_names, column_names) from schema (cached)."""
-    now = time.time()
-    key = "known_names"
-    if key in _cache:
-        ts, cached = _cache[key]
-        if now - ts < _CACHE_TTL:
-            return cached
-
-    tables = _load_tables(engine)
-    table_names = [t.name for t in tables]
-    col_names = list({c.name for t in tables for c in t.columns})
-    result = (table_names, col_names)
-    _cache[key] = (now, result)
     return result

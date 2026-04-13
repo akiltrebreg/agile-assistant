@@ -83,8 +83,8 @@ class Settings(BaseSettings):
         description="Base URL for text2sql vLLM endpoint (arctic-7b)",
     )
     sql_vllm_model: str = Field(
-        default="Snowflake/Arctic-Text2SQL-R1-7B",
-        description="Text2SQL model name",
+        default="/models/qwen3-8b-awq-4bit",
+        description="Text2SQL model name (Qwen3-8B-AWQ)",
     )
 
     # PostgreSQL Configuration
