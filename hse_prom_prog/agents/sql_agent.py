@@ -78,7 +78,7 @@ def _init_llm() -> Any:
             api_key=settings.vllm_api_key,
             model=settings.sql_vllm_model,
             temperature=0.0,
-            max_tokens=1024,
+            max_tokens=512,
         )
         _llm_with_tools = llm.bind_tools(SQL_TOOLS)
     return _llm_with_tools
