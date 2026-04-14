@@ -137,7 +137,7 @@ services:
 
   # vLLM for SQL Agent (Qwen3-8B-AWQ, port 8001)
   vllm-sql:
-    image: vllm/vllm-openai:v0.6.6.post1
+    image: vllm/vllm-openai:v0.9.1
     container_name: vllm-sql-server
     depends_on:
       download-sql-model:
