@@ -128,10 +128,14 @@ def _after_tools(state: AgentState) -> str:
 
 
 def _extract_results(state: AgentState) -> dict:
-    """Extract SQL and results from the conversation history."""
+    """Extract SQL from conversation and re-execute for full results.
+
+    The tool returns only a sample to the LLM (to stay under context limit),
+    so we re-run the last successful SQL here to get complete results.
+    """
     sql = ""
-    result: list[dict[str, Any]] = []
     error = ""
+    last_query_ok = False
 
     for msg in state["messages"]:
         if isinstance(msg, AIMessage) and msg.tool_calls:
@@ -142,10 +146,22 @@ def _extract_results(state: AgentState) -> dict:
             content = msg.content
             if content.startswith("SQL Error:") or content.startswith("ERROR:"):
                 error = content
-                result = []
+                last_query_ok = False
             else:
                 error = ""
-                result = _parse_tool_result(content)
+                last_query_ok = True
+
+    # Re-execute the last successful SQL to get full results
+    result: list[dict[str, Any]] = []
+    if sql and last_query_ok:
+        from hse_prom_prog.agents.sql_tools import _get_db  # noqa: PLC0415
+
+        try:
+            db = _get_db()
+            result = db.execute_query(sql)
+        except Exception as e:
+            logger.warning("[SQL Agent] Re-execute failed: %s", e)
+            error = f"Re-execute error: {e}"
 
     return {"final_sql": sql, "final_result": result, "final_error": error}
 

@@ -108,16 +108,30 @@ def run_query(query: str) -> str:
     if not results:
         return json.dumps({"row_count": 0, "rows": []})
 
-    # Limit rows sent back to LLM for context, but keep full count
-    max_rows = 50
-    payload = {
+    # Small sample to LLM — just enough to reason about the result shape.
+    # The agent re-executes the SQL for the final output to avoid context overflow.
+    sample_rows = 3
+    max_cols = 10
+    first_row = results[0]
+    columns = list(first_row.keys())[:max_cols]
+    sample: list[dict[str, Any]] = []
+    for row in results[:sample_rows]:
+        trimmed: dict[str, Any] = {}
+        for k in columns:
+            v = row.get(k)
+            trimmed[k] = v.isoformat() if hasattr(v, "isoformat") else v
+        sample.append(trimmed)
+    payload: dict[str, Any] = {
         "row_count": len(results),
-        "rows": [
-            {k: (v if not hasattr(v, "isoformat") else v.isoformat()) for k, v in row.items()}
-            for row in results[:max_rows]
-        ],
+        "sample": sample,
+        "columns_shown": columns,
+        "total_columns": len(first_row.keys()),
     }
-    logger.info("[SQL Tools] run_query returned %d rows", len(results))
+    logger.info(
+        "[SQL Tools] run_query returned %d rows (LLM sees %d)",
+        len(results),
+        sample_rows,
+    )
     return json.dumps(payload, default=str, ensure_ascii=False)
 
 
