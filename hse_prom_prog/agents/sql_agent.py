@@ -88,6 +88,13 @@ def _call_model(state: AgentState) -> dict:
     """Call the LLM with current messages."""
     llm = _init_llm()
     response = llm.invoke(state["messages"])
+    tool_calls = getattr(response, "tool_calls", None) or []
+    content_preview = str(response.content)[:300] if response.content else ""
+    logger.info(
+        "[SQL Agent] LLM response: tool_calls=%d, content=%r",
+        len(tool_calls),
+        content_preview,
+    )
     return {"messages": [response]}
 
 
