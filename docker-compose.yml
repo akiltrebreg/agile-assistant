@@ -124,7 +124,7 @@ services:
         fi
         echo "Downloading qwen3-8b-awq-4bit from S3..."
         aws s3 sync \
-          s3://${S3_BUCKET:-quant-models-agile}/qwen3-8b-awq-4bit/ \
+          s3://${S3_BUCKET:-quant-models-agile}/models/qwen3-8b-awq-4bit/ \
           /models/qwen3-8b-awq-4bit/ \
           --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
         test -f /models/qwen3-8b-awq-4bit/config.json || { echo "ERROR: config.json not found"; exit 1; }
