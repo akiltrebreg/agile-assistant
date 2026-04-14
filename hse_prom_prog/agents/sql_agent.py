@@ -14,6 +14,7 @@ Uses Qwen3-8B-AWQ served by vLLM with --enable-auto-tool-choice.
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 from typing import Annotated, Any
 
@@ -31,7 +32,6 @@ from hse_prom_prog.database.connection import DatabaseConnection, get_database
 logger = logging.getLogger(__name__)
 
 _MAX_RETRIES = 3
-_MIN_LINES_FOR_TABLE = 2
 
 _SYSTEM_PROMPT = """\
 You are a PostgreSQL SQL expert. You have access to tools to explore the database \
@@ -272,30 +272,9 @@ class SQLAgent:
 
 
 def _parse_tool_result(content: str) -> list[dict[str, Any]]:
-    """Parse the pipe-delimited text output of run_query into list[dict]."""
-    lines = content.strip().split("\n")
-    if len(lines) < _MIN_LINES_FOR_TABLE:
-        return []
-
-    data_lines = [line for line in lines if not line.startswith("...")]
-    if len(data_lines) < _MIN_LINES_FOR_TABLE:
-        return []
-
-    headers = [h.strip() for h in data_lines[0].split("|")]
-    rows: list[dict[str, Any]] = []
-    for line in data_lines[1:]:
-        values = [v.strip() for v in line.split("|")]
-        if len(values) == len(headers):
-            row = dict(zip(headers, values, strict=False))
-            _convert_numeric_values(row)
-            rows.append(row)
-    return rows
-
-
-def _convert_numeric_values(row: dict[str, Any]) -> None:
-    """Convert string values to int/float where possible, in-place."""
-    for k, v in row.items():
-        if not isinstance(v, str):
-            continue
-        with contextlib.suppress(ValueError, TypeError):
-            row[k] = float(v) if "." in v else int(v)
+    """Parse the JSON output of run_query into list[dict]."""
+    with contextlib.suppress(json.JSONDecodeError, TypeError):
+        payload = json.loads(content)
+        if isinstance(payload, dict) and "rows" in payload:
+            return payload["rows"]
+    return []

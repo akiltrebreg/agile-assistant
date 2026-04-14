@@ -8,6 +8,7 @@ Three tools that the LLM can call via tool-calling:
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -105,17 +106,19 @@ def run_query(query: str) -> str:
         return error_msg
 
     if not results:
-        return "Query returned 0 rows."
+        return json.dumps({"row_count": 0, "rows": []})
 
-    # Format results as readable text (limit to 50 rows for context)
+    # Limit rows sent back to LLM for context, but keep full count
     max_rows = 50
-    header = list(results[0].keys())
-    lines = [" | ".join(header)]
-    for row in results[:max_rows]:
-        lines.append(" | ".join(str(row.get(h, "")) for h in header))
-    if len(results) > max_rows:
-        lines.append(f"... ({len(results)} total rows, showing first {max_rows})")
-    return "\n".join(lines)
+    payload = {
+        "row_count": len(results),
+        "rows": [
+            {k: (v if not hasattr(v, "isoformat") else v.isoformat()) for k, v in row.items()}
+            for row in results[:max_rows]
+        ],
+    }
+    logger.info("[SQL Tools] run_query returned %d rows", len(results))
+    return json.dumps(payload, default=str, ensure_ascii=False)
 
 
 # All tools for binding to the LLM
