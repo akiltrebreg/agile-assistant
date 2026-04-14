@@ -148,7 +148,7 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
     command:
       - --model=/models/qwen3-8b-awq-4bit
-      - --dtype=float16
+      - --dtype=auto
       - --max-model-len=4096
       - --gpu-memory-utilization=0.45
       - --enforce-eager
