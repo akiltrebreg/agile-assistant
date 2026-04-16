@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import re
 from typing import Annotated, Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -84,10 +85,32 @@ def _init_llm() -> Any:
     return _llm_with_tools
 
 
+_THINK_RE = re.compile(r"<think>[\s\S]*?</think>\s*", flags=re.DOTALL)
+
+
+def _strip_think(messages: list) -> list:
+    """Remove <think>…</think> blocks from prior AI messages to save tokens."""
+    cleaned = []
+    for msg in messages:
+        if isinstance(msg, AIMessage) and msg.content:
+            new_content = _THINK_RE.sub("", msg.content).strip()
+            cleaned.append(
+                AIMessage(
+                    content=new_content,
+                    tool_calls=msg.tool_calls,
+                    id=msg.id,
+                )
+            )
+        else:
+            cleaned.append(msg)
+    return cleaned
+
+
 def _call_model(state: AgentState) -> dict:
     """Call the LLM with current messages."""
     llm = _init_llm()
-    response = llm.invoke(state["messages"])
+    messages = _strip_think(state["messages"])
+    response = llm.invoke(messages)
     tool_calls = getattr(response, "tool_calls", None) or []
     content_preview = str(response.content)[:300] if response.content else ""
     logger.info(
@@ -133,27 +156,28 @@ def _extract_results(state: AgentState) -> dict:
     The tool returns only a sample to the LLM (to stay under context limit),
     so we re-run the last successful SQL here to get complete results.
     """
-    sql = ""
+    last_sql = ""
+    last_ok_sql = ""
     error = ""
-    last_query_ok = False
 
     for msg in state["messages"]:
         if isinstance(msg, AIMessage) and msg.tool_calls:
             for tc in msg.tool_calls:
                 if tc["name"] == "run_query":
-                    sql = tc["args"].get("query", "")
+                    last_sql = tc["args"].get("query", "")
         if isinstance(msg, ToolMessage) and msg.name == "run_query":
             content = msg.content
             if content.startswith("SQL Error:") or content.startswith("ERROR:"):
                 error = content
-                last_query_ok = False
             else:
+                last_ok_sql = last_sql
                 error = ""
-                last_query_ok = True
+
+    sql = last_ok_sql or last_sql
 
     # Re-execute the last successful SQL to get full results
     result: list[dict[str, Any]] = []
-    if sql and last_query_ok:
+    if last_ok_sql:
         from hse_prom_prog.agents.sql_tools import _get_db  # noqa: PLC0415
 
         try:
