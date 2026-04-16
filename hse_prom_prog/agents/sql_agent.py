@@ -4,9 +4,9 @@ Architecture (based on https://docs.langchain.com/oss/python/langgraph/sql-agent
   START → model (LLM with tools) ↔ tools → extract → END
 
 The LLM uses tool calls to:
-1. list_tables — see available tables
-2. get_schema — get DDL for selected tables
-3. run_query — execute SQL (with retry on error, max 3 attempts)
+1. run_query — execute SQL (with retry on error, max 3 attempts)
+
+Schema is embedded in the system prompt (no list_tables/get_schema needed).
 
 Uses Qwen3-8B-AWQ served by vLLM with --enable-auto-tool-choice.
 """
@@ -35,21 +35,61 @@ logger = logging.getLogger(__name__)
 _MAX_RETRIES = 3
 
 _SYSTEM_PROMPT = """\
-You are a PostgreSQL SQL expert. You have access to tools to explore the database \
-and run queries.
+You are a PostgreSQL SQL expert. Your ONLY job is to write and execute SQL queries \
+using the run_query tool. NEVER answer with text alone — ALWAYS call run_query.
 
-Workflow:
-1. Call list_tables to see available tables
-2. Call get_schema with the relevant table names to see their columns
-3. Write a SELECT query and call run_query to execute it
-4. If you get an error, fix the query and retry (up to 3 times)
+## Database schema
 
-Rules:
-- Only use SELECT queries
-- Use ILIKE '%value%' for text filters (PostgreSQL)
-- Always check the schema before writing a query
-- If the question asks for a specific team, sprint, or entity, filter by it
-- Return the final SQL and results to the user"""
+TABLE report_agile_dashboard — Jira tasks: one row = one task in a sprint
+  launch_id int, issue_key text (task key, e.g. AL-38787), jirasprint_id bigint,
+  sprint_name text (sprint name, e.g. "#1 Q1'26"), start_date timestamp,
+  end_date timestamp, complete_date timestamp, activation_date timestamp,
+  sprint_state text (active/closed), issue_department text, issue_project text,
+  unit text, cluster text, issue_type text (Bug/Story/Task/Sub-task/Epic),
+  feature_teams text (team name), storypoints_act real, reporter text,
+  create_time timestamp, resolution_time timestamp, summary text,
+  resolution text, issue_status_act text (current status: In Progress/Done/Cancelled/...),
+  labels text, issue_unit text, added_until_sprint_start bool,
+  sprint_change_date_until_start timestamp, sprint_change_date_until_end timestamp,
+  num_of_current_sprint_for_task int,
+  issue_status_end_of_sprint text, storypoints_end_of_sprint real,
+  storypoints_start_of_sprint real, storypoints_next_sprint real,
+  original_estimate_end_of_sprint int, original_estimate_start_of_sprint int,
+  original_estimate_act int, assignee_name text (assignee login),
+  issue_priority_for_bug text (P1-P4), time_h_not_fixed int,
+  time_h_in_progress int, merged_pr_count int, last_comment_body text,
+  issue_touch_time int, feature_teams_start_of_sprint text,
+  feature_teams_end_of_sprint text, issue_potential_removal_date timestamp,
+  removal_status text, version_id int, is_report bool, is_tech_debt bool,
+  estimate_sprint_end real, dev_approach text, feature_teams_resolution text,
+  dev_approach_resolution text, drop_team text, is_pr bool,
+  epic_issue_key text, actual_resolution text, last_cancelled_date timestamp
+
+TABLE report_agile_dashboard_metrics — Aggregated team metrics per sprint
+  launch_id int, cluster_name text, unit_name text, feature_teams text (team name),
+  jirasprint_id bigint, sprint_name text, activation_date timestamp,
+  complete_date timestamp, initial_commitment_sp real, added_work_sp real,
+  final_commitment_sp real, undone_sp real,
+  complete_sp real (velocity in SP), dev_potential_sp real,
+  scope_drop real (scope drop %), done_total real (done total %),
+  sprint_goal real (sprint goal %), complete_initial_sp real,
+  complete_count_sg int, count_sg int, sprint_state text,
+  version_id int, count_retro_ai int, dev_approach text,
+  initial_commitment_issues real, added_work_issues real,
+  final_commitment_issues real, undone_issues real, cancel_issues real,
+  complete_issues real (completed tasks count),
+  scope_drop_issues real, done_total_issues real, done_issues real,
+  complete_initial_issues real, cancel_rate real (cancel rate %)
+
+## Rules
+- ALWAYS call run_query with a SELECT query. Never respond without executing SQL.
+- Use ILIKE '%value%' for text filters.
+- For task-level data (issue_key, status, assignee, type) → use report_agile_dashboard
+- For team metrics (velocity, done_total, scope_drop, sprint_goal, cancel_rate) \
+→ use report_agile_dashboard_metrics
+- Filter by feature_teams ILIKE '%team_name%' for team queries
+- Filter by sprint_name ILIKE '%sprint_pattern%' for sprint queries
+- If you get an error, fix the query and retry (up to 3 times)"""
 
 
 # ── State ────────────────────────────────────────────────────

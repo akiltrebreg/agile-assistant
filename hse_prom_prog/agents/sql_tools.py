@@ -15,7 +15,6 @@ from typing import Any
 from langchain_core.tools import tool
 from sqlalchemy.exc import SQLAlchemyError
 
-from hse_prom_prog.agents.schema_loader import ALLOWED_TABLES, get_schema_compact
 from hse_prom_prog.database.connection import DatabaseConnection
 
 logger = logging.getLogger(__name__)
@@ -35,45 +34,6 @@ def _get_db() -> DatabaseConnection:
         msg = "Database connection not set. Call set_db() first."
         raise RuntimeError(msg)
     return _db
-
-
-@tool
-def list_tables() -> str:
-    """List all available tables in the database.
-
-    Returns a comma-separated list of table names that can be queried.
-    Call this first to see what tables are available.
-    """
-    tables = sorted(ALLOWED_TABLES)
-    logger.info("[SQL Tools] list_tables → %s", tables)
-    return ", ".join(tables)
-
-
-@tool
-def get_schema(table_names: str) -> str:
-    """Get the CREATE TABLE DDL schema for the specified tables.
-
-    Args:
-        table_names: Comma-separated table names
-            (e.g. 'report_agile_dashboard')
-
-    Returns:
-        CREATE TABLE statements with column types and comments.
-    """
-    db = _get_db()
-    schema = get_schema_compact(db.engine)
-    requested = {t.strip() for t in table_names.split(",")}
-    logger.info("[SQL Tools] get_schema for tables: %s", requested)
-
-    # Filter schema to only requested tables
-    parts = schema.split("\n\n")
-    filtered = []
-    for part in parts:
-        for table in requested:
-            if table in part:
-                filtered.append(part)
-                break
-    return "\n\n".join(filtered) if filtered else schema
 
 
 @tool
@@ -136,4 +96,4 @@ def run_query(query: str) -> str:
 
 
 # All tools for binding to the LLM
-SQL_TOOLS: list[Any] = [list_tables, get_schema, run_query]
+SQL_TOOLS: list[Any] = [run_query]
