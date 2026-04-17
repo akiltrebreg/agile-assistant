@@ -6,7 +6,7 @@ Architecture (based on https://docs.langchain.com/oss/python/langgraph/sql-agent
 The LLM uses tool calls to:
 1. run_query — execute SQL (with retry on error, max 3 attempts)
 
-Schema is embedded in the system prompt (no list_tables/get_schema needed).
+Schema is loaded from DB at runtime and injected into the system prompt.
 
 Uses Qwen3-8B-AWQ served by vLLM with --enable-auto-tool-choice.
 """
@@ -26,6 +26,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from typing_extensions import TypedDict
 
+from hse_prom_prog.agents.schema_loader import get_schema_compact
 from hse_prom_prog.agents.sql_tools import SQL_TOOLS, set_db
 from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
@@ -34,40 +35,15 @@ logger = logging.getLogger(__name__)
 
 _MAX_RETRIES = 3
 
-_SYSTEM_PROMPT = """\
+_SYSTEM_PROMPT_TEMPLATE = """\
 You are a PostgreSQL SQL expert. \
-You MUST ALWAYS call the run_query tool to execute SQL before answering. \
-NEVER answer questions about data without first running a query. \
-If you know the SQL, call run_query immediately. Do NOT describe the query in text.
+You MUST ALWAYS call the run_query tool to execute SQL. \
+NEVER answer without running a query first. \
+If you know the SQL, call run_query immediately.
 
-## Database schema
+## Database schema (auto-loaded)
 
-TABLE report_agile_dashboard — Jira tasks (one row = one task in one sprint)
-  issue_key text (e.g. AL-38787), sprint_name text (e.g. "#1 Q1'26"),
-  feature_teams text (team name), cluster text, unit text,
-  issue_type text (Bug/Story/Task/Sub-task/Epic),
-  issue_status_act text (In Progress/Done/Cancelled/...),
-  assignee_name text, reporter text, summary text,
-  storypoints_act real (current SP — use for counting SP per task),
-  storypoints_end_of_sprint real, storypoints_start_of_sprint real,
-  start_date timestamp, end_date timestamp, complete_date timestamp,
-  create_time timestamp, resolution_time timestamp, resolution text,
-  sprint_state text, issue_priority_for_bug text (P1-P4),
-  time_h_in_progress int, merged_pr_count int, labels text,
-  issue_project text, issue_department text,
-  + 20 more columns (use SELECT * to get all)
-
-TABLE report_agile_dashboard_metrics — Team metrics per sprint
-  feature_teams text (team name), sprint_name text,
-  cluster_name text, unit_name text, sprint_state text,
-  complete_sp real (velocity in SP),
-  initial_commitment_sp real (NOT sum of task SP),
-  final_commitment_sp real (NOT sum of task SP),
-  scope_drop real (%), done_total real (%),
-  sprint_goal real (%), cancel_rate real (%),
-  complete_issues real, cancel_issues real,
-  scope_drop_issues real, done_total_issues real,
-  + 10 more columns (use SELECT * to get all)
+{schema}
 
 ## Rules
 - You MUST call run_query for EVERY question. No exceptions.
@@ -102,13 +78,19 @@ class AgentState(TypedDict):
 
 # ── Graph node functions (module-level) ──────────────────────
 
-_llm_with_tools: Any = None
+_llm_free: Any = None
+_llm_forced: Any = None
 
 
-def _init_llm() -> Any:
-    """Initialize LLM with tools (lazy, once)."""
-    global _llm_with_tools  # noqa: PLW0603
-    if _llm_with_tools is None:
+def _init_llms() -> tuple[Any, Any]:
+    """Initialize both LLM variants (lazy, once).
+
+    Returns (llm_forced, llm_free):
+      - llm_forced: tool_choice="any" — guarantees a tool call
+      - llm_free: no constraint — model can respond with text
+    """
+    global _llm_free, _llm_forced  # noqa: PLW0603
+    if _llm_free is None:
         llm = ChatOpenAI(
             base_url=settings.sql_vllm_base_url,
             api_key=settings.vllm_api_key,
@@ -116,8 +98,9 @@ def _init_llm() -> Any:
             temperature=0.0,
             max_tokens=512,
         )
-        _llm_with_tools = llm.bind_tools(SQL_TOOLS)
-    return _llm_with_tools
+        _llm_free = llm.bind_tools(SQL_TOOLS)
+        _llm_forced = llm.bind_tools(SQL_TOOLS, tool_choice="any")
+    return _llm_forced, _llm_free
 
 
 _THINK_RE = re.compile(r"<think>[\s\S]*?</think>\s*", flags=re.DOTALL)
@@ -141,10 +124,31 @@ def _strip_think(messages: list) -> list:
     return cleaned
 
 
+def _has_query_result(messages: list) -> bool:
+    """Check if run_query has already returned a successful result."""
+    for msg in messages:
+        if (
+            isinstance(msg, ToolMessage)
+            and msg.name == "run_query"
+            and not msg.content.startswith("SQL Error:")
+            and not msg.content.startswith("ERROR:")
+        ):
+            return True
+    return False
+
+
 def _call_model(state: AgentState) -> dict:
-    """Call the LLM with current messages."""
-    llm = _init_llm()
+    """Call the LLM with current messages.
+
+    Uses tool_choice="any" (forced) until the first successful
+    run_query result, then switches to free mode so the model
+    can finish with a text response.
+    """
+    llm_forced, llm_free = _init_llms()
     messages = _strip_think(state["messages"])
+
+    llm = llm_free if _has_query_result(messages) else llm_forced
+
     response = llm.invoke(messages)
     tool_calls = getattr(response, "tool_calls", None) or []
     content_preview = str(response.content)[:300] if response.content else ""
@@ -298,8 +302,11 @@ class SQLAgent:
         self._ensure_db()
         set_db(self.db)
 
+        schema_ddl = get_schema_compact(self.db.engine)
+        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(schema=schema_ddl)
+
         messages = [
-            SystemMessage(content=_SYSTEM_PROMPT),
+            SystemMessage(content=system_prompt),
             HumanMessage(content=original_query),
         ]
 
