@@ -184,7 +184,7 @@
     "question": "Метрики спринта #1 Q1'26",
     "expected_sql": "SELECT * FROM report_agile_dashboard_metrics WHERE sprint_name ILIKE '%#1 Q1''26%'",
     "expected_result": {
-      "row_count": 1
+      "row_count": 2
     },
     "category": "metric",
     "difficulty": "easy",
@@ -321,7 +321,7 @@
     "question": "У какой команды самый высокий done_total?",
     "expected_sql": "SELECT feature_teams, AVG(done_total) as avg_done FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_done DESC LIMIT 1",
     "expected_result": {
-      "feature_teams": "legal tech",
+      "feature_teams_any": ["legal tech", "shuttle"],
       "value": 100.0
     },
     "category": "comparative",

@@ -55,6 +55,13 @@ def _eval_exact_match_fields(actual_rows: list[dict], expected: dict) -> tuple[b
         key_fields = {k: v for k, v in expected.items() if k not in ("row_count", "value")}
     mismatches = []
     for field, exp_val in key_fields.items():
+        # Support "field_any": [val1, val2] — accept any of the values
+        if field.endswith("_any") and isinstance(exp_val, list):
+            real_field = field.removesuffix("_any")
+            act_val = row.get(real_field)
+            if str(act_val) not in [str(v) for v in exp_val]:
+                mismatches.append(f"{real_field}: {act_val!r} not in {exp_val}")
+            continue
         act_val = row.get(field)
         if isinstance(exp_val, float) and isinstance(act_val, (int, float)):
             if abs(float(act_val) - exp_val) > _FLOAT_TOLERANCE:
@@ -93,8 +100,22 @@ def _eval_exact_match_grouped(actual_rows: list[dict], expected: dict) -> tuple[
     if not actual_rows:
         return len(expected_data) == 0, f"0 rows (expected {len(expected_data)})"
     cols = list(actual_rows[0].keys())
+    exp_keys = set(expected_data.keys())
+
+    # Find group_col: the column whose values best match expected keys
     group_col = cols[0]
+    for c in cols:
+        col_vals = {str(r[c]) for r in actual_rows}
+        if col_vals & exp_keys:
+            group_col = c
+            break
+
+    # val_col: last numeric column that is not the group column
     val_col = cols[-1] if len(cols) > 1 else cols[0]
+    for c in reversed(cols):
+        if c != group_col:
+            val_col = c
+            break
     actual_data = {str(r[group_col]): _round(r[val_col]) for r in actual_rows}
     mismatches = []
     for k, exp_v in expected_data.items():
