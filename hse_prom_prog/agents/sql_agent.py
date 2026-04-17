@@ -48,8 +48,12 @@ If you know the SQL, call run_query immediately.
 ## Rules
 - You MUST call run_query for EVERY question. No exceptions.
 - When querying tasks, use SELECT * FROM report_agile_dashboard.
-- When querying metrics, ALWAYS include feature_teams and \
-sprint_name alongside the metric columns.
+- When querying a team metric (done_total, scope_drop, velocity, \
+cancel_rate, sprint_goal), return ONE ROW PER SPRINT: \
+SELECT feature_teams, sprint_name, <metric> FROM \
+report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%name%%'
+- Do NOT filter by sprint_state unless the user explicitly asks \
+for closed or active sprints. Query ALL sprints by default.
 - Use ILIKE '%%value%%' for text filters.
 - For task data (issue_key, status, assignee, bugs, types) \
 → report_agile_dashboard
@@ -58,7 +62,9 @@ sprint_goal, cancel_rate) → report_agile_dashboard_metrics
 - For "total story points of a team" use \
 SUM(storypoints_act) FROM report_agile_dashboard
 - When comparing teams use AVG() grouped by feature_teams.
-- Filter teams: feature_teams ILIKE '%%name%%'
+- Always filter teams by: feature_teams ILIKE '%%name%%'. \
+Never use cluster_name or unit_name to filter by team.
+- Group sprints by sprint_name, not by jirasprint_id.
 - Filter sprints: sprint_name ILIKE '%%pattern%%'
 - If error, fix the query and retry (up to 3 times)."""
 
@@ -168,17 +174,48 @@ def _should_continue(state: AgentState) -> str:
     return "extract"
 
 
+def _get_last_sqls(messages: list) -> list[str]:
+    """Extract all run_query SQL calls from message history."""
+    sqls: list[str] = []
+    for msg in messages:
+        if isinstance(msg, AIMessage) and msg.tool_calls:
+            for tc in msg.tool_calls:
+                if tc["name"] == "run_query":
+                    sqls.append(tc["args"].get("query", ""))
+    return sqls
+
+
 def _check_retry(state: AgentState) -> dict:
-    """Increment retry counter after tool execution if there was an error."""
+    """Increment retry counter; add hint if model repeats same SQL."""
     last = state["messages"][-1]
     retry = state.get("retry_count", 0)
+    extra_messages: list = []
+
     if isinstance(last, ToolMessage) and last.name == "run_query":
         content = last.content
         if content.startswith("SQL Error:") or content.startswith("ERROR:"):
             retry += 1
             if retry >= _MAX_RETRIES:
                 logger.warning("[SQL Agent] Max retries reached (%d)", retry)
-    return {"retry_count": retry}
+            else:
+                sqls = _get_last_sqls(state["messages"])
+                min_for_dup = 2
+                if len(sqls) >= min_for_dup and sqls[-1] == sqls[-2]:
+                    hint = (
+                        "Your SQL is identical to the previous attempt. "
+                        "Read the error carefully and change the query. "
+                        "Common fixes: add missing columns to GROUP BY, "
+                        "remove GROUP BY, or use a different column."
+                    )
+                    extra_messages.append(
+                        HumanMessage(content=hint),
+                    )
+                    logger.info("[SQL Agent] Added retry hint")
+
+    result: dict[str, Any] = {"retry_count": retry}
+    if extra_messages:
+        result["messages"] = extra_messages
+    return result
 
 
 def _after_tools(state: AgentState) -> str:
