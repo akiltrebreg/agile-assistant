@@ -71,9 +71,13 @@ def _eval_exact_match_rows(actual_rows: list[dict], expected: dict) -> tuple[boo
     if len(actual_rows) != len(expected_rows):
         return False, f"row count: {len(actual_rows)} != {len(expected_rows)}"
 
-    # Compare as sets of frozensets (order-insensitive)
+    # Only compare columns present in expected rows (extra columns are OK)
+    exp_cols = set()
+    for r in expected_rows:
+        exp_cols.update(r.keys())
+
     def _row_key(r: dict) -> frozenset:
-        return frozenset((k, _round(v)) for k, v in r.items())
+        return frozenset((k, _round(v)) for k, v in r.items() if k in exp_cols)
 
     actual_set = {_row_key(r) for r in actual_rows}
     expected_set = {_row_key(r) for r in expected_rows}

@@ -48,6 +48,13 @@ NEVER use = for teams. NEVER filter by cluster_name.
 3. GROUP BY sprint_name, never by jirasprint_id.
 4. For tasks: SELECT * FROM report_agile_dashboard WHERE ...
 5. "количество задач" = COUNT(*) of ALL tasks, not only Done.
+6. For "самый большой/маленький/максимальный/минимальный": \
+SELECT feature_teams, sprint_name, <col> \
+FROM ... ORDER BY <col> DESC/ASC LIMIT 1. No GROUP BY.
+7. Do NOT add WHERE <metric> > 0 or IS NOT NULL. \
+These filters change AVG calculations.
+8. For counting tasks (сколько задач) → report_agile_dashboard. \
+NEVER use report_agile_dashboard_metrics for task counts.
 
 ## Metric queries (3 types)
 A) "Какой X у команды Y" / "X команды Y" → rows per sprint:
