@@ -40,25 +40,34 @@ def _norm(v: Any) -> str:
     return str(v).strip().lower() if v is not None else ""
 
 
-def _entity_match(expected_val: Any, actual_val: Any) -> bool:
-    """Soft match: case-insensitive, substring either way.
-
-    'cthulhu' vs 'Cthulhu'         → True
-    'cthulhu' vs 'cthulhu team'    → True (substring)
-    'cthulhu' vs 'cthulhuu'        → True (substring) — false positive, acceptable
-    'cthulhu' vs 'linehaul'        → False
-    'AL-38787' vs 'AL-38787'       → True (exact after norm)
-    """
+def _scalar_match(expected_val: Any, actual_val: Any) -> bool:
+    """Match two scalars: case-insensitive, substring either way."""
     e = _norm(expected_val)
     a = _norm(actual_val)
     if not e and not a:
         return True
     if not e or not a:
         return False
-    if e == a:
+    return e == a or e in a or a in e
+
+
+def _entity_match(expected_val: Any, actual_val: Any) -> bool:
+    """Soft match: case-insensitive, substring either way.
+
+    Supports lists on either side (for team_name when multiple teams
+    are mentioned). A list matches if ALL expected items appear in
+    actual (list or scalar) via substring logic.
+    """
+    if not isinstance(expected_val, list) and not isinstance(actual_val, list):
+        return _scalar_match(expected_val, actual_val)
+
+    exp_list = expected_val if isinstance(expected_val, list) else [expected_val]
+    act_list = actual_val if isinstance(actual_val, list) else [actual_val]
+    if not exp_list and not act_list:
         return True
-    # Substring either direction
-    return e in a or a in e
+    if not exp_list or not act_list:
+        return False
+    return all(any(_scalar_match(e, a) for a in act_list) for e in exp_list)
 
 
 def _compare_entities(expected: dict[str, Any], actual: dict[str, Any]) -> tuple[bool, list[str]]:

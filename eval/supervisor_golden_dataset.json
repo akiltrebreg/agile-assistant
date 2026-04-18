@@ -580,10 +580,10 @@
     "expected": {
       "intent": "tasks_filter",
       "query_type": "sql",
-      "entities": { "team_name": "cthulhu" }
+      "entities": { "team_name": ["cthulhu", "linehaul"] }
     },
     "category": "adversarial",
-    "notes": "two teams mentioned — pick primary"
+    "notes": "multiple teams mentioned — expect array"
   },
   {
     "id": 64,
