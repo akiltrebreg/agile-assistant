@@ -313,6 +313,18 @@ class ResponseAgent:
         intent = state.get("intent", "general")
         original_query = state.get("original_query", "")
 
+        # --- Classifier error (explicit error intent from Supervisor) ---
+        if query_type == "error" or intent == "error":
+            err_msg = state.get("error", "Classifier unavailable")
+            logger.warning("[Response Agent] Error intent: %s", err_msg)
+            return {
+                "final_response": (
+                    "Извините, классификатор запросов временно недоступен. "
+                    "Попробуйте повторить запрос через несколько секунд или "
+                    "переформулировать его."
+                ),
+            }
+
         # --- Direct response (simple) ---
         if route == "direct_response" or query_type == "simple":
             logger.info("[Response Agent] Generating direct response")

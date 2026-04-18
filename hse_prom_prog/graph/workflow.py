@@ -137,7 +137,7 @@ class AgileWorkflow:
         query_type = state.get("query_type", "sql")
         logger.info("[Workflow] Routing decision: query_type=%s", query_type)
 
-        if query_type == "simple":
+        if query_type in ("simple", "error"):
             return "response_agent"
         if query_type == "rag":
             return "rag_agent"

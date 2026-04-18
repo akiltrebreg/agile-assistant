@@ -24,7 +24,7 @@ from hse_prom_prog.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
 
-_ISSUE_KEY_RE = re.compile(r"\b([A-Z]{2,}-\d+)\b")
+_ISSUE_KEY_RE = re.compile(r"\b([A-Za-z]{2,}-\d+)\b")
 
 # Mapping from (intent) -> default query_type
 _INTENT_TO_QUERY_TYPE: dict[str, str] = {
@@ -36,6 +36,54 @@ _INTENT_TO_QUERY_TYPE: dict[str, str] = {
 
 # Valid query types
 _VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple"})
+
+# JSON schema for structured output — vLLM enforces this via guided decoding
+_RESPONSE_FORMAT: dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "supervisor_classification",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "query_type": {
+                    "type": "string",
+                    "enum": ["sql", "rag", "hybrid", "simple"],
+                },
+                "intent": {
+                    "type": "string",
+                    "enum": ["task", "tasks_filter", "metric", "general"],
+                },
+                "entities": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": ["string", "null"]},
+                        "team_name": {"type": ["string", "null"]},
+                        "sprint_name": {"type": ["string", "null"]},
+                        "metric_name": {"type": ["string", "null"]},
+                        "issue_type": {"type": ["string", "null"]},
+                        "status": {"type": ["string", "null"]},
+                        "assignee": {"type": ["string", "null"]},
+                        "cluster": {"type": ["string", "null"]},
+                    },
+                    "required": [
+                        "issue_key",
+                        "team_name",
+                        "sprint_name",
+                        "metric_name",
+                        "issue_type",
+                        "status",
+                        "assignee",
+                        "cluster",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["query_type", "intent", "entities"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 
 class SupervisorAgent:
@@ -52,9 +100,13 @@ class SupervisorAgent:
         self.llm_client = llm_client
 
     def _extract_issue_key_regex(self, text: str) -> str | None:
-        """Extract Jira issue key using regex (fast path)."""
+        """Extract Jira issue key using regex (fast path).
+
+        Normalizes to uppercase so downstream agents see a canonical form
+        regardless of whether the user typed 'al-38787' or 'AL-38787'.
+        """
         match = _ISSUE_KEY_RE.search(text)
-        return match.group(1) if match else None
+        return match.group(1).upper() if match else None
 
     def _classify_with_llm(self, user_query: str) -> dict[str, Any]:
         """Classify query intent, entities, and query_type via LLM.
@@ -65,80 +117,143 @@ class SupervisorAgent:
         prompt = (
             "Ты — классификатор запросов к базе данных Jira и базе знаний.\n\n"
             f"{SCHEMA_DESCRIPTION}\n\n"
-            "Определи, что хочет пользователь, и верни ТОЛЬКО JSON "
-            "(без пояснений, без markdown):\n"
+            "Верни ТОЛЬКО JSON (без пояснений, без markdown):\n"
             "{\n"
             '  "intent": "task" | "tasks_filter" | "metric" | "general",\n'
             '  "query_type": "sql" | "rag" | "hybrid" | "simple",\n'
             '  "entities": {\n'
-            '    "issue_key": "ABC-123" или null,\n'
-            '    "team_name": "cthulhu" или null,\n'
-            '    "sprint_name": "имя спринта" или null,\n'
-            '    "metric_name": "done_total" или null,\n'
-            '    "issue_type": "Bug" или null,\n'
-            '    "status": "In Progress" или null,\n'
-            '    "assignee": "имя" или null,\n'
-            '    "cluster": "Logistics" или null\n'
+            '    "issue_key": "ABC-123" | null,\n'
+            '    "team_name": "..." | null,\n'
+            '    "sprint_name": "..." | null,\n'
+            '    "metric_name": "done_total" | null,\n'
+            '    "issue_type": "Bug" | null,\n'
+            '    "status": "In Progress" | null,\n'
+            '    "assignee": "..." | null,\n'
+            '    "cluster": "..." | null\n'
             "  }\n"
             "}\n\n"
-            "ВАЖНО: если запрос содержит приветствие И вопрос — ИГНОРИРУЙ "
-            "приветствие, классифицируй по СУТИ вопроса.\n\n"
-            "Правила для intent:\n"
-            '- intent="task" — запрос о конкретной задаче по ключу\n'
-            '- intent="tasks_filter" — поиск задач по фильтрам '
-            "(команда, спринт, тип, статус, кластер)\n"
-            '- intent="metric" — запрос метрик команды/спринта '
-            "(done_total, scope_drop, velocity и т.д.)\n"
-            '- intent="general" — ТОЛЬКО приветствие БЕЗ вопроса, '
-            "или вопрос о теории/практиках без привязки к данным БД\n\n"
-            "Правила для query_type:\n"
-            '- query_type="sql" — нужны данные из БД '
-            "(конкретная задача, список задач, метрики)\n"
-            '- query_type="rag" — вопрос о теории, практиках, регламентах, '
-            "рекомендациях (не о конкретных данных из БД)\n"
-            '- query_type="hybrid" — нужны данные из БД И рекомендации/контекст '
-            "из базы знаний (например: рассчитай метрику и дай рекомендации)\n"
-            '- query_type="simple" — приветствие, общий вопрос без данных\n\n'
-            f"{SUPERVISOR_FEW_SHOT_EXAMPLES}\n\n"
-            "Дополнительные примеры query_type:\n\n"
-            'Запрос: "Привет! Подскажи Done Total в спринте 26Q1.1 Конь не валялся"\n'
-            '{"intent": "metric", "query_type": "sql", '
-            '"entities": {"sprint_name": "26Q1.1 Конь не валялся", '
-            '"metric_name": "done_total"}}\n\n'
-            'Запрос: "Как снизить Scope Drop?"\n'
-            '{"intent": "general", "query_type": "rag", "entities": {}}\n\n'
-            'Запрос: "Что такое Definition of Done?"\n'
-            '{"intent": "general", "query_type": "rag", "entities": {}}\n\n'
-            'Запрос: "Какие бейзлайновые значения метрик?"\n'
-            '{"intent": "general", "query_type": "rag", "entities": {}}\n\n'
-            'Запрос: "Покажи scope drop команды cthulhu и дай рекомендации"\n'
-            '{"intent": "metric", "query_type": "hybrid", '
-            '"entities": {"team_name": "cthulhu", "metric_name": "scope_drop"}}\n\n'
+            "## Алгоритм классификации (следуй строго по шагам)\n"
+            "\n"
+            "Шаг 1. Есть ли в запросе issue_key в формате [A-Z]+-число "
+            "(например, AL-123)?\n"
+            "  ДА → query_type=sql, intent=task, entities.issue_key=<ключ>. СТОП.\n"
+            "  НЕТ → к шагу 2.\n"
+            "\n"
+            "Шаг 2. Запрос — приветствие, благодарность, или мета-вопрос "
+            "о возможностях?\n"
+            "  ('Привет', 'Спасибо', 'Как дела', 'Что ты умеешь', 'Hi')\n"
+            "  ДА → query_type=simple, intent=general, entities={}. СТОП.\n"
+            "  НЕТ → к шагу 3.\n"
+            "\n"
+            "Шаг 3. Запрос содержит ОБА признака:\n"
+            "  (a) конкретная команда/спринт/метрика;\n"
+            "  (b) просьба о рекомендациях, совете ИЛИ объяснении — слова:\n"
+            "      'улучшить', 'повысить', 'снизить', 'дай совет',\n"
+            "      'что делать', 'это нормально', 'объясни',\n"
+            "      'как с этим бороться', 'расскажи как', 'расскажи про',\n"
+            "      'как рассчитывается' (в паре с запросом данных —\n"
+            "      'покажи значение', 'у команды X').\n"
+            "  ДА → query_type=hybrid. Определи intent по шагу 5. Извлеки entities.\n"
+            "  НЕТ → к шагу 4.\n"
+            "\n"
+            "Шаг 4. Запрос — теоретический вопрос БЕЗ упоминания конкретной "
+            "команды/спринта?\n"
+            "  Маркеры: 'что такое', 'как рассчитывается', 'как снизить',\n"
+            "  'как идентифицируется', 'какой целевой порог',\n"
+            "  'какие бейзлайновые', 'что делать если', 'расскажи про метрику'.\n"
+            "  Также: одно слово-термин без контекста (например, 'Scope drop').\n"
+            "  ДА → query_type=rag, intent=general, entities={}. СТОП.\n"
+            "  НЕТ → к шагу 5.\n"
+            "\n"
+            "Шаг 5. Определи intent (применимо для query_type=sql или hybrid):\n"
+            "  - Есть название метрики (velocity, done_total, scope_drop, \n"
+            "    sprint_goal, cancel_rate, complete_sp и т.д.) ИЛИ \n"
+            "    слово 'метрика/метрики' → intent=metric.\n"
+            "  - Есть 'задачи/баги/сторис' + фильтр (команда/спринт/статус/\n"
+            "    кластер/исполнитель) → intent=tasks_filter.\n"
+            "  - Fallback → intent=tasks_filter.\n"
+            "\n"
+            "  query_type=sql если шаг 3 не сработал, hybrid если сработал.\n"
+            "\n"
+            f"{SUPERVISOR_FEW_SHOT_EXAMPLES}\n"
+            "\n"
+            "## Частые ошибки (избегай!)\n"
+            "\n"
+            'BAD:  "Расскажи про метрику scope drop" -> query_type=sql/metric\n'
+            "GOOD: query_type=rag, intent=general (нет команды, это вопрос\n"
+            "      о сути метрики — шаг 4).\n"
+            "\n"
+            'BAD:  "Задачи по Done Total у команды cthulhu" -> intent=tasks_filter\n'
+            "GOOD: intent=metric, query_type=sql (слово 'задачи' обманчиво —\n"
+            "      на деле это запрос метрики done_total).\n"
+            "\n"
+            'BAD:  "Scope drop" (одно слово) -> query_type=sql/metric\n'
+            "GOOD: query_type=rag, intent=general (без контекста —\n"
+            "      вопрос о сути метрики).\n"
+            "\n"
+            'BAD:  "Как снизить Scope Drop?" -> query_type=hybrid\n'
+            "GOOD: query_type=rag, intent=general ('как снизить' — запрос\n"
+            "      рекомендации, НО команда не указана -> чистый rag,\n"
+            "      не hybrid).\n"
+            "\n"
+            'BAD:  "Done total команды lpop и что можно улучшить" -> query_type=sql\n'
+            "GOOD: query_type=hybrid, intent=metric ('можно улучшить' —\n"
+            "      запрос совета + есть команда -> hybrid, шаг 3).\n"
+            "\n"
+            'BAD:  "Метрики спринта #1 Q1-26" -> intent=tasks_filter\n'
+            "GOOD: intent=metric (слово 'метрики' прямо указывает).\n"
+            "\n"
+            'BAD:  "Привет! Done Total в спринте 26Q1.1 Конь не валялся" ->\n'
+            "      query_type=simple\n"
+            "GOOD: query_type=sql, intent=metric (игнорируй приветствие,\n"
+            "      классифицируй по СУТИ вопроса).\n"
+            "\n"
+            'BAD:  "расскажи как считается Done Total и покажи значение у cthulhu"\n'
+            "      -> query_type=sql, intent=metric\n"
+            "GOOD: query_type=hybrid, intent=metric (комбинация 'расскажи как'\n"
+            "      + данные конкретной команды — нужны и теория, и цифры).\n"
+            "\n"
             f'Запрос пользователя: "{user_query}"\n'
             "JSON:"
         )
 
-        llm_response = self.llm_client.invoke(prompt)
+        llm_response = self.llm_client.invoke(
+            prompt,
+            response_format=_RESPONSE_FORMAT,
+            max_tokens=256,
+        )
         logger.info("[Supervisor] Raw LLM response: %s", llm_response[:300])
         return self._parse_llm_json(llm_response)
 
     def _parse_llm_json(self, raw: str) -> dict[str, Any]:
-        """Parse JSON from LLM response, handling markdown fences."""
+        """Parse JSON from LLM response, handling markdown fences.
+
+        With structured output enabled, the first json.loads should succeed.
+        The regex fallback is kept only for legacy/degraded responses.
+        On total parse failure, returns explicit error intent — not a silent
+        'general' fallback — so the caller can distinguish parsing errors
+        from legitimate general queries.
+        """
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```[a-z]*\n?", "", cleaned)
             cleaned = re.sub(r"\n?```$", "", cleaned)
             cleaned = cleaned.strip()
 
+        parsed: dict[str, Any] | None = None
         try:
             parsed = json.loads(cleaned)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", cleaned, re.DOTALL)
             if match:
-                parsed = json.loads(match.group())
-            else:
-                logger.warning("[Supervisor] Failed to parse LLM JSON: %s", raw[:200])
-                return {"intent": "general", "entities": {}, "query_type": "simple"}
+                try:
+                    parsed = json.loads(match.group())
+                except json.JSONDecodeError:
+                    parsed = None
+
+        if parsed is None:
+            logger.warning("[Supervisor] Failed to parse LLM JSON: %s", raw[:200])
+            return {"intent": "error", "entities": {}, "query_type": "error"}
 
         intent = parsed.get("intent", "general")
         if intent not in ("task", "tasks_filter", "metric", "general"):
@@ -185,10 +300,11 @@ class SupervisorAgent:
             logger.error("[Supervisor] LLM classification failed: %s", e)
             return {
                 "original_query": user_query,
-                "intent": "general",
+                "intent": "error",
                 "entities": {},
-                "query_type": "simple",
+                "query_type": "error",
                 "route": "direct_response",
+                "error": f"Classifier unavailable: {type(e).__name__}: {e}",
             }
 
         intent = classification["intent"]

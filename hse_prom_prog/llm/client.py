@@ -60,11 +60,22 @@ class LLMClient:
             },
         )
 
-    def invoke(self, prompt: str) -> str:
+    def invoke(
+        self,
+        prompt: str,
+        response_format: dict[str, Any] | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """Generate a response from the LLM for the given prompt.
 
         Args:
             prompt: The input prompt for the LLM.
+            response_format: Optional OpenAI-compatible response_format
+                (e.g. JSON schema). When set, vLLM uses guided decoding
+                to force the output to match the schema exactly.
+            max_tokens: Per-call override for completion length. Useful
+                for classifiers that emit short structured output — avoids
+                wasting budget on the default 600.
 
         Returns:
             The generated text response from the LLM.
@@ -74,7 +85,13 @@ class LLMClient:
         """
         try:
             logger.debug(f"Invoking LLM with prompt: {prompt[:100]}...")
-            response = self.client.invoke(prompt)
+            bind_kwargs: dict[str, Any] = {}
+            if response_format is not None:
+                bind_kwargs["response_format"] = response_format
+            if max_tokens is not None:
+                bind_kwargs["max_tokens"] = max_tokens
+            client = self.client.bind(**bind_kwargs) if bind_kwargs else self.client
+            response = client.invoke(prompt)
             result = response.content if hasattr(response, "content") else str(response)
             logger.debug(f"LLM response: {result[:100]}...")
             return result
