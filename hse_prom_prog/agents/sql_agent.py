@@ -56,46 +56,100 @@ NEVER use metrics (1 row per team×sprint) for task counts.
 9. "story points" (storypoints_act) exist for ALL issue_type. \
 NEVER add WHERE issue_type = 'Story' for total SP.
 
-## Metric queries (3 types — choose carefully)
-A) No word "среднее/средний/avg" → rows per sprint, NO AVG:
-   SELECT feature_teams, sprint_name, <metric> \
+## Metric queries — DECISION TREE
+STEP 1: Does the query contain ANY of: "средн*", "avg", \
+"сумма/суммарн*", "итого", "топ", "сравни", "у какой команды", \
+"каждой команде", "наибольш*", "наименьш*", "максимальн*", "минимальн*"?
+  NO  → DEFAULT = NO AGGREGATION. \
+Return rows per sprint using Type A.
+  YES → go to STEP 2.
+
+STEP 2: Choose aggregator by keyword.
+  "средн*" / "avg"       → AVG()
+  "сумма" / "суммарн*"   → SUM()
+  "топ N" / "у какой"    → AVG() + ORDER BY + LIMIT
+  "максимальн*/минимальн*/самый большой/самый маленький" \
+→ ORDER BY <col> DESC/ASC LIMIT 1 (no AVG, no GROUP BY)
+
+### Type A (default — NO aggregation)
+SELECT feature_teams, sprint_name, <metric> \
 FROM report_agile_dashboard_metrics \
 WHERE feature_teams ILIKE '%%team%%'
-   Examples: "X команды Y", "Какой X у команды Y"
 
-B) Word "среднее/средний/средняя/avg" → use AVG():
-   SELECT feature_teams, AVG(<metric>) \
+### Type B (team AVG/SUM across sprints)
+SELECT feature_teams, AVG(<metric>) \
 FROM report_agile_dashboard_metrics \
-WHERE feature_teams ILIKE '%%team%%' \
-GROUP BY feature_teams
+WHERE feature_teams ILIKE '%%team%%' GROUP BY feature_teams
 
-C) Compare teams ("у какой команды", "топ") → AVG per team:
-   SELECT feature_teams, AVG(<metric>) \
+### Type C (compare teams — top/which team)
+SELECT feature_teams, AVG(<metric>) \
 FROM report_agile_dashboard_metrics \
-GROUP BY feature_teams ORDER BY ...
+GROUP BY feature_teams ORDER BY ... LIMIT ...
+
+### Type D (MIN/MAX — single sprint)
+SELECT feature_teams, sprint_name, <metric> \
+FROM report_agile_dashboard_metrics \
+ORDER BY <metric> DESC/ASC LIMIT 1
 
 ## Table guide
-- Tasks (issue_key, status, assignee, type, bugs) \
-→ report_agile_dashboard
-- Metrics (velocity=complete_sp, done_total, scope_drop, \
-sprint_goal, cancel_rate) → report_agile_dashboard_metrics
+- Tasks (issue_key, status, assignee, type, bugs, COUNT tasks) \
+→ report_agile_dashboard (1 row per task)
+- Team metrics (velocity=complete_sp, done_total, scope_drop, \
+sprint_goal, cancel_rate) \
+→ report_agile_dashboard_metrics (1 row per team×sprint)
 - Story points sum → SUM(storypoints_act) \
 FROM report_agile_dashboard
 
+## Cross-table queries
+If a question needs BOTH tables, issue TWO separate run_query \
+calls in ONE turn. DO NOT JOIN the tables — they have different \
+granularity (tasks vs team-sprint aggregates).
+
 ## Examples
-Q: scope drop команды cthulhu
-SQL: SELECT feature_teams, sprint_name, scope_drop \
+
+Q: Done total команды lpop
+GOOD: SELECT feature_teams, sprint_name, done_total \
 FROM report_agile_dashboard_metrics \
-WHERE feature_teams ILIKE '%%cthulhu%%'
+WHERE feature_teams ILIKE '%%lpop%%'
+BAD: SELECT feature_teams, AVG(done_total) ... GROUP BY feature_teams \
+(no "средн*" in question → Type A, NOT Type B)
+
+Q: Velocity команды linehaul
+GOOD: SELECT feature_teams, sprint_name, complete_sp \
+FROM report_agile_dashboard_metrics \
+WHERE feature_teams ILIKE '%%linehaul%%'
+
+Q: Cancel rate команды marketplace
+GOOD: SELECT feature_teams, sprint_name, cancel_rate \
+FROM report_agile_dashboard_metrics \
+WHERE feature_teams ILIKE '%%marketplace%%'
 
 Q: Среднее done total команды marketplace
-SQL: SELECT feature_teams, AVG(done_total) \
+GOOD: SELECT feature_teams, AVG(done_total) \
 FROM report_agile_dashboard_metrics \
 WHERE feature_teams ILIKE '%%marketplace%%' \
 GROUP BY feature_teams
 
+Q: В каком спринте был самый большой scope drop?
+GOOD: SELECT feature_teams, sprint_name, scope_drop \
+FROM report_agile_dashboard_metrics \
+ORDER BY scope_drop DESC LIMIT 1
+BAD: GROUP BY sprint_name — loses feature_teams
+
+Q: Какой минимальный done total среди команд и спринтов?
+GOOD: SELECT feature_teams, sprint_name, done_total \
+FROM report_agile_dashboard_metrics \
+ORDER BY done_total ASC LIMIT 1
+BAD: SELECT MIN(done_total) — loses feature_teams and sprint_name
+
+Q: Сколько задач у команды shopping cart в каждом спринте?
+GOOD: SELECT sprint_name, COUNT(*) FROM report_agile_dashboard \
+WHERE feature_teams ILIKE '%%shopping cart%%' GROUP BY sprint_name
+BAD: FROM report_agile_dashboard_metrics — that table has \
+1 row per team×sprint, not 1 row per task
+
 Q: Все баги
-SQL: SELECT * FROM report_agile_dashboard \
+GOOD: SELECT * FROM report_agile_dashboard \
 WHERE issue_type = 'Bug'"""
 
 
@@ -161,16 +215,24 @@ def _strip_think(messages: list) -> list:
 
 
 def _has_query_result(messages: list) -> bool:
-    """Check if run_query has already returned a successful result."""
-    for msg in messages:
+    """Check if run_query has returned a successful result AND no retry hint is pending.
+
+    If the last message is a HumanMessage that came AFTER a successful tool result,
+    it's a retry hint — the model must call the tool again (stay in forced mode).
+    """
+    last_ok_idx = -1
+    for i, msg in enumerate(messages):
         if (
             isinstance(msg, ToolMessage)
             and msg.name == "run_query"
             and not msg.content.startswith("SQL Error:")
             and not msg.content.startswith("ERROR:")
         ):
-            return True
-    return False
+            last_ok_idx = i
+    if last_ok_idx == -1:
+        return False
+    # If there's a HumanMessage after the last successful tool result → retry hint
+    return all(not isinstance(msg, HumanMessage) for msg in messages[last_ok_idx + 1 :])
 
 
 def _call_model(state: AgentState) -> dict:
@@ -215,20 +277,97 @@ def _get_last_sqls(messages: list) -> list[str]:
     return sqls
 
 
+def _get_user_query(messages: list) -> str:
+    """Extract the original user question."""
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            return str(msg.content)
+    return ""
+
+
+_AGG_WORDS = re.compile(
+    r"\b(средн|avg|сумма|суммарн|итого|топ|top\s*\d|сравни|"
+    r"у\s+какой|каждой\s+команд|наибольш|наименьш|максимальн|минимальн)",
+    re.IGNORECASE,
+)
+_MINMAX_WORDS = re.compile(
+    r"\b(максимальн|минимальн|самый\s+больш|самый\s+маленьк|"
+    r"самый\s+высок|самый\s+низк|в\s+каком\s+спринте\s+был)",
+    re.IGNORECASE,
+)
+_METRIC_WORDS = re.compile(
+    r"\b(velocity|done\s*total|scope\s*drop|sprint\s*goal|"
+    r"cancel\s*rate|метрик)",
+    re.IGNORECASE,
+)
+_COUNT_TASKS_WORDS = re.compile(
+    r"\b(сколько\s+задач|количество\s+задач|топ.*по\s+задач|топ.*по\s+багов)",
+    re.IGNORECASE,
+)
+_HAS_AVG_SUM = re.compile(r"\b(AVG|SUM)\s*\(", re.IGNORECASE)
+_HAS_MIN_MAX = re.compile(r"\b(MIN|MAX)\s*\(", re.IGNORECASE)
+_SELECTS_METRICS_TABLE = re.compile(r"FROM\s+report_agile_dashboard_metrics\b", re.IGNORECASE)
+
+
+def _semantic_check(user_query: str, sql: str) -> str | None:
+    """Return a hint string if SQL semantically mismatches the user query.
+
+    Detects three common errors:
+    1. Aggregation (AVG/SUM) without aggregator words in the question
+    2. MIN/MAX used instead of ORDER BY ... LIMIT 1 (loses feature_teams)
+    3. COUNT of tasks issued against metrics table (wrong granularity)
+    """
+    is_metric_q = bool(_METRIC_WORDS.search(user_query))
+    has_agg_word = bool(_AGG_WORDS.search(user_query))
+    has_minmax_word = bool(_MINMAX_WORDS.search(user_query))
+    is_count_tasks_q = bool(_COUNT_TASKS_WORDS.search(user_query))
+
+    # Check 1: metric question without aggregator, but SQL has AVG/SUM
+    if is_metric_q and not has_agg_word and _HAS_AVG_SUM.search(sql):
+        return (
+            "The question has NO aggregation word (no 'среднее', 'сумма', "
+            "'топ', etc.), but your SQL uses AVG/SUM. Rewrite as Type A: "
+            "SELECT feature_teams, sprint_name, <metric> "
+            "FROM report_agile_dashboard_metrics "
+            "WHERE feature_teams ILIKE '%team%' — no GROUP BY, no AVG."
+        )
+
+    # Check 2: MIN/MAX question but SQL uses MIN()/MAX() aggregates
+    if has_minmax_word and _HAS_MIN_MAX.search(sql):
+        return (
+            "For MIN/MAX questions use ORDER BY <col> DESC/ASC LIMIT 1 "
+            "(Type D), not MIN()/MAX(). You need feature_teams AND "
+            "sprint_name in SELECT."
+        )
+
+    # Check 3: count of tasks routed to metrics table
+    if is_count_tasks_q and _SELECTS_METRICS_TABLE.search(sql):
+        return (
+            "You are counting tasks but querying report_agile_dashboard_metrics "
+            "(1 row per team×sprint). Use report_agile_dashboard (1 row per task)."
+        )
+
+    return None
+
+
 def _check_retry(state: AgentState) -> dict:
-    """Increment retry counter; add hint if model repeats same SQL."""
+    """Increment retry counter; add hints on SQL errors or semantic mismatch."""
     last = state["messages"][-1]
     retry = state.get("retry_count", 0)
     extra_messages: list = []
+    user_query = _get_user_query(state["messages"])
+    sqls = _get_last_sqls(state["messages"])
+    last_sql = sqls[-1] if sqls else ""
 
     if isinstance(last, ToolMessage) and last.name == "run_query":
         content = last.content
-        if content.startswith("SQL Error:") or content.startswith("ERROR:"):
+        is_error = content.startswith("SQL Error:") or content.startswith("ERROR:")
+
+        if is_error:
             retry += 1
             if retry >= _MAX_RETRIES:
                 logger.warning("[SQL Agent] Max retries reached (%d)", retry)
             else:
-                sqls = _get_last_sqls(state["messages"])
                 min_for_dup = 2
                 if len(sqls) >= min_for_dup and sqls[-1] == sqls[-2]:
                     hint = (
@@ -237,10 +376,20 @@ def _check_retry(state: AgentState) -> dict:
                         "Common fixes: add missing columns to GROUP BY, "
                         "remove GROUP BY, or use a different column."
                     )
-                    extra_messages.append(
-                        HumanMessage(content=hint),
+                    extra_messages.append(HumanMessage(content=hint))
+                    logger.info("[SQL Agent] Added retry hint (duplicate SQL)")
+        elif last_sql and retry < _MAX_RETRIES:
+            # Successful SQL — run semantic check
+            hint = _semantic_check(user_query, last_sql)
+            if hint:
+                retry += 1
+                extra_messages.append(
+                    HumanMessage(
+                        content=f"The query returned data, but it is wrong. {hint} "
+                        "Rewrite the SQL and call run_query again.",
                     )
-                    logger.info("[SQL Agent] Added retry hint")
+                )
+                logger.info("[SQL Agent] Semantic mismatch — forcing retry")
 
     result: dict[str, Any] = {"retry_count": retry}
     if extra_messages:

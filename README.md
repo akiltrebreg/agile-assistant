@@ -102,16 +102,28 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - **Slow path**: LLM классифицирует запрос и возвращает JSON с intent +
   entities + query_type
 
-**2. SQL Agent** (шаблонный SQL)
+**2. SQL Agent** (LangGraph text-to-SQL с tool calling)
 
-- Получает `intent` + `entities` от Supervisor
-- Строит SQL-запросы **программно из шаблонов** (не генерирует SQL через LLM):
-  - `task` → `SELECT * FROM report_agile_dashboard WHERE issue_key = :key`
-  - `tasks_filter` → динамический `WHERE` с `ILIKE` по entities
-  - `metric` → `SELECT` из `report_agile_dashboard_metrics` с whitelist метрик
-- Автоматический `LIMIT 100` на все запросы
-- Whitelist допустимых метрик (защита от невалидных колонок)
-- Параметризованные запросы через SQLAlchemy `text()` (защита от SQL-инъекций)
+- Реализован как LangGraph StateGraph с узлами:
+  `model → tools → check_retry → model → ... → extract`
+- **LLM**: Qwen3-8B-AWQ (4-bit) в отдельном vLLM-контейнере (`vllm-sql`,
+  порт 8001) с `--enable-auto-tool-choice --tool-call-parser=hermes`
+- **Schema injection**: DDL схема БД (с `COMMENT ON` описаниями) загружается из
+  `information_schema` через `get_schema_compact()` и встраивается в system
+  prompt при каждом запуске (кэш 10 минут). Новые таблицы и колонки
+  подхватываются автоматически — промпт менять не нужно
+- **Единственный tool**: `run_query(sql)` — выполняет SELECT, возвращает модели
+  sample (3 строки × 10 колонок) для экономии токенов
+- **Guarantee tool call**: до первого успешного `run_query` LLM вызывается с
+  `tool_choice="any"` — модель не может ответить текстом вместо SQL. После
+  успешного запроса — свободный режим, чтобы завершить диалог
+- **Retry on SQL error**: max 3 попытки. Если модель повторяет тот же SQL,
+  добавляется подсказка исправить запрос
+- **Full results**: tool отдаёт модели sample, но нода `extract` перевыполняет
+  последний успешный SQL для возврата полных данных
+- **Контекст-менеджмент**: блоки `<think>...</think>` от Qwen3 вырезаются из
+  истории перед каждым вызовом — чтобы не упираться в 8192 токена
+- **Безопасность**: `run_query` блокирует всё кроме `SELECT`
 
 **3. RAG Agent** (ответ на основе базы знаний)
 
@@ -158,21 +170,29 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 ### LLM Backend
 
-- **Модель**: avibe-gptq-8bit (GPTQ 8-bit квантизация, скачивается из Yandex
-  Cloud S3)
-- **Backend**: vLLM с OpenAI-compatible API, `--quantization=gptq`
-- **URL**: `http://localhost:8000/v1`
+Два раздельных vLLM-контейнера на одной GPU (совместный шаринг памяти):
+
+- **Основной LLM** (`vllm-server`, порт 8000): avibe-gptq-8bit (GPTQ 8-bit),
+  используется Supervisor, RAG Agent, Validator, Response Agent
+- **SQL LLM** (`vllm-sql-server`, порт 8001): Qwen3-8B-AWQ (4-bit,
+  compressed-tensors), используется только SQL Agent. Запущен с флагами
+  `--enable-auto-tool-choice --tool-call-parser=hermes` для поддержки tool
+  calling, `--max-model-len=8192`
+- **Модели** скачиваются из Yandex Cloud S3 при первом старте контейнера
 
 ### База данных
 
 - **СУБД**: PostgreSQL 16 (Alpine)
-- **Таблицы** (обе активно используются SQL Agent-ом):
+- **Таблицы** (обе доступны SQL Agent-у, модель сама выбирает нужную):
   - `report_agile_dashboard` — задачи Jira (58 полей): issue_key, feature_teams,
-    sprint_name, issue_status_act, storypoints_act и др. Используется для
-    интентов `task` и `tasks_filter`
+    sprint_name, issue_status_act, storypoints_act, issue_type, assignee_name и
+    др. Используется для запросов по задачам
   - `report_agile_dashboard_metrics` — агрегированные метрики команд по спринтам
-    (35 полей): done_total, scope_drop, velocity, sprint_goal и др. Используется
-    для интента `metric`
+    (35 полей): done_total, scope_drop, complete_sp (velocity), sprint_goal,
+    cancel_rate и др. Используется для запросов по метрикам
+- **Описания для LLM**: `COMMENT ON TABLE/COLUMN` в `init.sql` объясняют
+  назначение таблиц и колонок — LLM SQL Agent читает их через `pg_description` и
+  использует для выбора правильной таблицы и колонки
 - **Индексы**: issue_key, jirasprint_id, sprint_state, assignee_name,
   feature_teams
 - **Данные**: Загружаются из CSV файлов с использованием команды COPY
@@ -203,7 +223,9 @@ hse-prom-prog/
 │   ├── agents/
 │   │   ├── __init__.py
 │   │   ├── supervisor.py              # Supervisor (intent + entities + query_type)
-│   │   ├── sql_agent.py               # SQL agent (шаблонный SQL)
+│   │   ├── sql_agent.py               # SQL agent (LangGraph + Qwen3 tool calling)
+│   │   ├── sql_tools.py                # run_query tool для LangGraph SQL Agent
+│   │   ├── schema_loader.py            # Загрузка DDL схемы БД для промпта
 │   │   ├── rag_agent.py               # RAG agent (Qdrant + LLM)
 │   │   ├── validator_agent.py         # Validator (проверка результатов)
 │   │   ├── response_agent.py          # Response agent (LLM)
@@ -398,18 +420,19 @@ Streamlit UI доступен по адресу **http://localhost/** — это
 
 > Расскажи о задаче AL-38787
 
-Supervisor извлекает ключ `AL-38787`, SQL Agent выполняет
-`SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38787'`, Response
-Agent формирует ответ с описанием задачи, статусом, исполнителем, командой,
-story points и другими полями.
+Supervisor извлекает ключ `AL-38787` и маршрутизирует в SQL Agent. LangGraph SQL
+Agent через Qwen3-8B-AWQ генерирует и выполняет
+`SELECT * FROM report_agile_dashboard WHERE issue_key ILIKE '%AL-38787%'`,
+Response Agent формирует ответ с описанием задачи, статусом, исполнителем,
+командой, story points и другими полями.
 
 **2. Запрос метрик по спринту** (таблица `report_agile_dashboard_metrics`):
 
 > Напиши мне Done Total по спринту 26Q1.1 Конь не валялся
 
-Supervisor определяет intent=`metric`, SQL Agent выполняет запрос к таблице
-`report_agile_dashboard_metrics` с фильтром по `sprint_name`, Response Agent
-возвращает значение метрики `done_total` для указанного спринта.
+Supervisor маршрутизирует в SQL Agent. Qwen3 видит схему обеих таблиц в system
+prompt и выбирает `report_agile_dashboard_metrics`, генерирует SELECT с фильтром
+по `sprint_name`, Response Agent возвращает значение `done_total`.
 
 **3. Вопрос по документации компании** (RAG, база знаний в Qdrant):
 
@@ -679,8 +702,9 @@ poetry run python -m hse_prom_prog.main "Привет"
 [Supervisor] Извлекаю ключ задачи...
 [Supervisor] Найден ключ: AL-38787
 
-[SQL Agent] Выполняю запрос к PostgreSQL...
-[SQL Agent] Данные успешно получены
+[SQL Agent] Processing: Выведи данные по задаче AL-38787
+[SQL Agent] run_query: SELECT * FROM report_agile_dashboard WHERE issue_key ILIKE '%AL-38787%'
+[SQL Agent] Returned 2 row(s)
 
 [Response Agent] Форматирую ответ...
 
@@ -1499,7 +1523,7 @@ poetry run pre-commit run --all-files
 | Компонент      | Тестов | Что покрыто                                       |
 | -------------- | ------ | ------------------------------------------------- |
 | Supervisor     | 14     | regex, LLM-классификация, query_type, fallback    |
-| SQL Agent      | 11     | шаблоны SQL, ошибки БД, пустые результаты         |
+| SQL Agent      | 11     | LangGraph nodes, tool calling, retry, ошибки БД   |
 | RAG Agent      | 6      | retrieval, генерация, ошибки, truncation, sources |
 | Validator      | 9      | sql/rag/hybrid/both-failed сценарии               |
 | Response Agent | 12     | direct, sql, rag, hybrid, ошибки LLM              |
