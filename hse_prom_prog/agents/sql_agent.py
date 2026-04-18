@@ -19,7 +19,13 @@ import logging
 import re
 from typing import Annotated, Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+    get_buffer_string,
+)
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
@@ -281,10 +287,27 @@ def _call_model(state: AgentState) -> dict:
     messages = _strip_think(state["messages"])
 
     llm = llm_free if _has_query_result(messages) else llm_forced
+    mode = "free" if llm is llm_free else "forced"
+
+    prompt_chars = len(get_buffer_string(messages))
+    logger.info(
+        "[SQL Agent] Prompt size: chars=%d, messages=%d, mode=%s",
+        prompt_chars,
+        len(messages),
+        mode,
+    )
 
     response = llm.invoke(messages)
     tool_calls = getattr(response, "tool_calls", None) or []
     content_preview = str(response.content)[:300] if response.content else ""
+
+    usage = (response.response_metadata or {}).get("token_usage", {}) or {}
+    logger.info(
+        "[SQL Agent] Tokens: prompt=%d, completion=%d, total=%d",
+        usage.get("prompt_tokens", 0),
+        usage.get("completion_tokens", 0),
+        usage.get("total_tokens", 0),
+    )
     logger.info(
         "[SQL Agent] LLM response: tool_calls=%d, content=%r",
         len(tool_calls),

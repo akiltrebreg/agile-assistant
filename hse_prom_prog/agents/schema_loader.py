@@ -145,11 +145,21 @@ def get_schema_compact(engine: Engine) -> str:
     key = "schema_compact"
     if key in _cache:
         ts, cached = _cache[key]
-        if now - ts < _CACHE_TTL:
+        age = now - ts
+        if age < _CACHE_TTL:
+            logger.info("[SchemaLoader] Cache HIT (age=%.1fs, ttl=%ds)", age, _CACHE_TTL)
             return cached
+        logger.info("[SchemaLoader] Cache EXPIRED (age=%.1fs)", age)
 
+    t0 = time.time()
     tables = _load_tables(engine)
     result = render_schema(tables)
     _cache[key] = (now, result)
-    logger.info("[SchemaLoader] Loaded DDL schema: %d tables, %d chars", len(tables), len(result))
+    elapsed_ms = (time.time() - t0) * 1000
+    logger.info(
+        "[SchemaLoader] Cache MISS → loaded %d tables, %d chars in %.1f ms",
+        len(tables),
+        len(result),
+        elapsed_ms,
+    )
     return result
