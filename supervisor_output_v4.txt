@@ -1,0 +1,481 @@
+15:20:26  Loaded 66 Supervisor test cases
+15:20:33  Initializing LLM client with base_url=http://vllm:8000/v1, model=/models/avibe-gptq-8bit
+15:20:33  [1/66] #1 [task_regex] Расскажи о задаче AL-38787
+15:20:33  [Supervisor] Processing query: Расскажи о задаче AL-38787
+15:20:33  [Supervisor] Fast path — issue key found: AL-38787
+15:20:33    PASS: all match (0.00s)
+15:20:33  [2/66] #2 [task_regex] Покажи данные по задаче AL-38799
+15:20:33  [Supervisor] Processing query: Покажи данные по задаче AL-38799
+15:20:33  [Supervisor] Fast path — issue key found: AL-38799
+15:20:33    PASS: all match (0.00s)
+15:20:33  [3/66] #3 [task_regex] AL-38787
+15:20:33  [Supervisor] Processing query: AL-38787
+15:20:33  [Supervisor] Fast path — issue key found: AL-38787
+15:20:33    PASS: all match (0.00s)
+15:20:33  [4/66] #4 [task_regex] Что там с AL-39041?
+15:20:33  [Supervisor] Processing query: Что там с AL-39041?
+15:20:33  [Supervisor] Fast path — issue key found: AL-39041
+15:20:33    PASS: all match (0.00s)
+15:20:33  [5/66] #5 [task_regex] Информация о задаче AL-99999
+15:20:33  [Supervisor] Processing query: Информация о задаче AL-99999
+15:20:33  [Supervisor] Fast path — issue key found: AL-99999
+15:20:33    PASS: all match (0.00s)
+15:20:33  [6/66] #6 [task_regex] Выведи задачу DATA-1234
+15:20:33  [Supervisor] Processing query: Выведи задачу DATA-1234
+15:20:33  [Supervisor] Fast path — issue key found: DATA-1234
+15:20:33    PASS: all match (0.00s)
+15:20:33  [7/66] #7 [task_regex] покажи AL-40001 в подробностях
+15:20:33  [Supervisor] Processing query: покажи AL-40001 в подробностях
+15:20:33  [Supervisor] Fast path — issue key found: AL-40001
+15:20:33    PASS: all match (0.00s)
+15:20:33  [8/66] #8 [task_regex] задача RND-55
+15:20:33  [Supervisor] Processing query: задача RND-55
+15:20:33  [Supervisor] Fast path — issue key found: RND-55
+15:20:33    PASS: all match (0.00s)
+15:20:33  [9/66] #9 [task_regex] open AL-38787
+15:20:33  [Supervisor] Processing query: open AL-38787
+15:20:33  [Supervisor] Fast path — issue key found: AL-38787
+15:20:33    PASS: all match (0.00s)
+15:20:33  [10/66] #10 [task_regex] Details for AL-38800
+15:20:33  [Supervisor] Processing query: Details for AL-38800
+15:20:33  [Supervisor] Fast path — issue key found: AL-38800
+15:20:33    PASS: all match (0.00s)
+15:20:33  [11/66] #11 [tasks_filter] Все задачи команды cthulhu
+15:20:33  [Supervisor] Processing query: Все задачи команды cthulhu
+15:20:33  [Supervisor] No issue key in regex, calling LLM
+15:20:38  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:38  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "ALL-TASKS", "team_name": "cthulhu", "sprint_name": "SPRINT-NAME", "metric_name": "METRIC-NAME", "issue_type": "Issue Type Value", "status": "Status Value", "assignee": "Assignee Name", "cluster": "Cluster Name"}}
+15:20:38  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'ALL-TASKS', 'team_name': 'cthulhu', 'sprint_name': 'SPRINT-NAME', 'metric_name': 'METRIC-NAME', 'issue_type': 'Issue Type Value', 'status': 'Status Value', 'assignee': 'Assignee Name', 'cluster': 'Cluster Name'}, route=db_query
+15:20:38    PASS: all match (4.61s)
+15:20:38  [12/66] #12 [tasks_filter] Задачи команды lpop в спринте #1 Q1'26
+15:20:38  [Supervisor] Processing query: Задачи команды lpop в спринте #1 Q1'26
+15:20:38  [Supervisor] No issue key in regex, calling LLM
+15:20:40  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:40  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "ABC-123", "team_name": "lpop", "sprint_name": "#1 Q1'26" , "metric_name": "done_total", "issue_type": "Bug", "status": "Open", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:20:40  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'ABC-123', 'team_name': 'lpop', 'sprint_name': "#1 Q1'26", 'metric_name': 'done_total', 'issue_type': 'Bug', 'status': 'Open', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:20:40    PASS: all match (1.64s)
+15:20:40  [13/66] #13 [tasks_filter] Покажи все баги
+15:20:40  [Supervisor] Processing query: Покажи все баги
+15:20:40  [Supervisor] No issue key in regex, calling LLM
+15:20:41  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:41  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "ALL-BAIGS", "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": "Bug", "status": null, "assignee": null, "cluster": null}}
+15:20:41  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'ALL-BAIGS', 'issue_type': 'Bug'}, route=db_query
+15:20:41    PASS: all match (1.43s)
+15:20:41  [14/66] #14 [tasks_filter] Баги в кластере Logistics
+15:20:41  [Supervisor] Processing query: Баги в кластере Logistics
+15:20:41  [Supervisor] No issue key in regex, calling LLM
+15:20:43  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:43  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "ALL-BAIGS", "team_name": "Logistics", "sprint_name": "NULL", "metric_name": "NULL", "issue_type": "Bug", "status": "NULL", "assignee": "NULL", "cluster": "Logistics"}}
+15:20:43  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'ALL-BAIGS', 'team_name': 'Logistics', 'sprint_name': 'NULL', 'metric_name': 'NULL', 'issue_type': 'Bug', 'status': 'NULL', 'assignee': 'NULL', 'cluster': 'Logistics'}, route=db_query
+15:20:43    PASS: all match (1.54s)
+15:20:43  [15/66] #15 [tasks_filter] Задачи со статусом In Progress
+15:20:43  [Supervisor] Processing query: Задачи со статусом In Progress
+15:20:43  [Supervisor] No issue key in regex, calling LLM
+15:20:44  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:44  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": "In Progress", "assignee": null, "cluster": null}}
+15:20:44  [Supervisor] intent=tasks_filter, query_type=sql, entities={'status': 'In Progress'}, route=db_query
+15:20:44    PASS: all match (1.28s)
+15:20:44  [16/66] #16 [tasks_filter] Задачи исполнителя yuvpetrov
+15:20:44  [Supervisor] Processing query: Задачи исполнителя yuvpetrov
+15:20:44  [Supervisor] No issue key in regex, calling LLM
+15:20:45  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:45  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": "yuvpetrov", "cluster": null}}
+15:20:45  [Supervisor] intent=tasks_filter, query_type=sql, entities={'assignee': 'yuvpetrov'}, route=db_query
+15:20:45    PASS: all match (1.33s)
+15:20:45  [17/66] #17 [tasks_filter] Закрытые баги команды lpop
+15:20:45  [Supervisor] Processing query: Закрытые баги команды lpop
+15:20:45  [Supervisor] No issue key in regex, calling LLM
+15:20:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:47  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "ABC-123", "team_name": "lpop", "sprint_name": "#1 Q1'26", "metric_name": "done_total", "issue_type": "Bug", "status": "Closed", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:20:47  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'ABC-123', 'team_name': 'lpop', 'sprint_name': "#1 Q1'26", 'metric_name': 'done_total', 'issue_type': 'Bug', 'status': 'Closed', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:20:47    PASS: all match (1.71s)
+15:20:47  [18/66] #18 [tasks_filter] Сторис команды linehaul в активном спринте
+15:20:47  [Supervisor] Processing query: Сторис команды linehaul в активном спринте
+15:20:47  [Supervisor] No issue key in regex, calling LLM
+15:20:49  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:49  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "ABC-123", "team_name": "linehaul", "sprint_name": "активный спринт" , "metric_name": "stories" , "issue_type": "Story" , "status": "Active" , "assignee": "John Doe" , "cluster": "Cluster A"}}
+15:20:49  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'ABC-123', 'team_name': 'linehaul', 'sprint_name': 'активный спринт', 'metric_name': 'stories', 'issue_type': 'Story', 'status': 'Active', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:20:49    PASS: all match (1.71s)
+15:20:49  [19/66] #19 [tasks_filter] Покажи задачи marketplace
+15:20:49  [Supervisor] Processing query: Покажи задачи marketplace
+15:20:49  [Supervisor] No issue key in regex, calling LLM
+15:20:50  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:50  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "marketplace", "team_name": "marketplace", "sprint_name": "marketplace", "metric_name": "marketplace", "issue_type": "Marketplace", "status": "Marketplace", "assignee": "marketplace", "cluster": "marketplace"}}
+15:20:50  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'marketplace', 'team_name': 'marketplace', 'sprint_name': 'marketplace', 'metric_name': 'marketplace', 'issue_type': 'Marketplace', 'status': 'Marketplace', 'assignee': 'marketplace', 'cluster': 'marketplace'}, route=db_query
+15:20:50    PASS: all match (1.55s)
+15:20:50  [20/66] #20 [tasks_filter] задачи команды shopping cart в кластере Mobile
+15:20:50  [Supervisor] Processing query: задачи команды shopping cart в кластере Mobile
+15:20:50  [Supervisor] No issue key in regex, calling LLM
+15:20:51  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:51  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": null, "team_name": "shopping cart", "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": "Mobile"}}
+15:20:51  [Supervisor] intent=tasks_filter, query_type=sql, entities={'team_name': 'shopping cart', 'cluster': 'Mobile'}, route=db_query
+15:20:51    PASS: all match (1.33s)
+15:20:51  [21/66] #21 [metric] Какой scope drop у команды cthulhu?
+15:20:51  [Supervisor] Processing query: Какой scope drop у команды cthulhu?
+15:20:51  [Supervisor] No issue key in regex, calling LLM
+15:20:53  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:53  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "cthulhu", "sprint_name": "", "metric_name": "scope_drop", "issue_type": "" , "status": "", "assignee": "", "cluster": ""}}
+15:20:53  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'cthulhu', 'sprint_name': '', 'metric_name': 'scope_drop', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:20:53    PASS: all match (1.27s)
+15:20:53  [22/66] #22 [metric] Done total команды lpop
+15:20:53  [Supervisor] Processing query: Done total команды lpop
+15:20:53  [Supervisor] No issue key in regex, calling LLM
+15:20:54  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:54  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "lpop", "sprint_name": "#1 Q1'26", "metric_name": "done_total", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:20:54  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': 'ABC-123', 'team_name': 'lpop', 'sprint_name': "#1 Q1'26", 'metric_name': 'done_total', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:20:54    PASS: all match (1.60s)
+15:20:54  [23/66] #23 [metric] Velocity команды linehaul
+15:20:54  [Supervisor] Processing query: Velocity команды linehaul
+15:20:54  [Supervisor] No issue key in regex, calling LLM
+15:20:56  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:56  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "linehaul", "sprint_name": "", "metric_name": "velocity", "issue_type": "" , "status": "", "assignee": "", "cluster": ""}}
+15:20:56  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'linehaul', 'sprint_name': '', 'metric_name': 'velocity', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:20:56    PASS: all match (1.22s)
+15:20:56  [24/66] #24 [metric] Sprint goal команды lpop
+15:20:56  [Supervisor] Processing query: Sprint goal команды lpop
+15:20:56  [Supervisor] No issue key in regex, calling LLM
+15:20:57  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:57  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "lpop", "sprint_name": "Sprint Goal", "metric_name": "sprint_goal", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:20:57  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': 'ABC-123', 'team_name': 'lpop', 'sprint_name': 'Sprint Goal', 'metric_name': 'sprint_goal', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:20:57    PASS: all match (1.57s)
+15:20:57  [25/66] #25 [metric] Cancel rate команды marketplace
+15:20:57  [Supervisor] Processing query: Cancel rate команды marketplace
+15:20:57  [Supervisor] No issue key in regex, calling LLM
+15:20:58  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:20:58  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "marketplace", "sprint_name": "", "metric_name": "cancel_rate", "issue_type": "" , "status": "", "assignee": "", "cluster": ""}}
+15:20:58  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'marketplace', 'sprint_name': '', 'metric_name': 'cancel_rate', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:20:58    PASS: all match (1.24s)
+15:20:58  [26/66] #26 [metric] Метрики спринта #1 Q1'26
+15:20:58  [Supervisor] Processing query: Метрики спринта #1 Q1'26
+15:20:58  [Supervisor] No issue key in regex, calling LLM
+15:21:00  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:00  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "", "sprint_name": "#1 Q1'26'" , "metric_name": "" , "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:00  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': '', 'sprint_name': "#1 Q1'26'", 'metric_name': '', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:00    PASS: all match (1.33s)
+15:21:00  [27/66] #27 [metric] Среднее значение done total у команды cthulhu
+15:21:00  [Supervisor] Processing query: Среднее значение done total у команды cthulhu
+15:21:00  [Supervisor] No issue key in regex, calling LLM
+15:21:01  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:01  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "cthulhu", "sprint_name": "", "metric_name": "done_total", "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:01  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'cthulhu', 'sprint_name': '', 'metric_name': 'done_total', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:01    PASS: all match (1.31s)
+15:21:01  [28/66] #28 [metric] Суммарная velocity команды rint за все спринты
+15:21:01  [Supervisor] Processing query: Суммарная velocity команды rint за все спринты
+15:21:01  [Supervisor] No issue key in regex, calling LLM
+15:21:02  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:02  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "rint", "sprint_name": "" , "metric_name": "velocity" , "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:02  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'rint', 'sprint_name': '', 'metric_name': 'velocity', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:02    PASS: all match (1.30s)
+15:21:02  [29/66] #29 [metric] У какой команды самый высокий done_total?
+15:21:02  [Supervisor] Processing query: У какой команды самый высокий done_total?
+15:21:02  [Supervisor] No issue key in regex, calling LLM
+15:21:04  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:04  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "cthulhu", "sprint_name": "#1 Q1'26", "metric_name": "done_total", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:21:04  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': 'ABC-123', 'team_name': 'cthulhu', 'sprint_name': "#1 Q1'26", 'metric_name': 'done_total', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:21:04    PASS: all match (1.59s)
+15:21:04  [30/66] #30 [metric] Топ-5 команд по средней velocity
+15:21:04  [Supervisor] Processing query: Топ-5 команд по средней velocity
+15:21:04  [Supervisor] No issue key in regex, calling LLM
+15:21:05  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:05  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "TOP-5-VELOCITY", "team_name": "топ-5 команд", "sprint_name": "", "metric_name": "velocity", "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:05  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': 'TOP-5-VELOCITY', 'team_name': 'топ-5 команд', 'sprint_name': '', 'metric_name': 'velocity', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:05    FAIL: qt: hybrid→sql (1.38s)
+15:21:05  [31/66] #31 [rag] Как рассчитывается Done Total?
+15:21:05  [Supervisor] Processing query: Как рассчитывается Done Total?
+15:21:05  [Supervisor] No issue key in regex, calling LLM
+15:21:07  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:07  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": "done_total" , "issue_type": null, "status": null, "assignee": null, "cluster": null } }
+15:21:07  [Supervisor] intent=general, query_type=rag, entities={'metric_name': 'done_total'}, route=db_query
+15:21:07    PASS: all match (1.29s)
+15:21:07  [32/66] #32 [rag] Какой целевой порог метрики Done Total?
+15:21:07  [Supervisor] Processing query: Какой целевой порог метрики Done Total?
+15:21:07  [Supervisor] No issue key in regex, calling LLM
+15:21:08  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:08  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "", "sprint_name": "", "metric_name": "done_total", "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:08  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': '', 'sprint_name': '', 'metric_name': 'done_total', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:08    FAIL: qt: sql→rag; intent: metric→general (1.21s)
+15:21:08  [33/66] #33 [rag] Что такое Scope Drop и каков его целевой порог?
+15:21:08  [Supervisor] Processing query: Что такое Scope Drop и каков его целевой порог?
+15:21:08  [Supervisor] No issue key in regex, calling LLM
+15:21:09  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:09  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:09  [Supervisor] intent=general, query_type=rag, entities={}, route=db_query
+15:21:09    PASS: all match (1.29s)
+15:21:09  [34/66] #34 [rag] Как снизить Scope Drop?
+15:21:09  [Supervisor] Processing query: Как снизить Scope Drop?
+15:21:09  [Supervisor] No issue key in regex, calling LLM
+15:21:10  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:10  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:10  [Supervisor] intent=general, query_type=rag, entities={}, route=db_query
+15:21:10    PASS: all match (1.26s)
+15:21:10  [35/66] #35 [rag] Сколько Sprint Goals оптимально брать в спринт?
+15:21:10  [Supervisor] Processing query: Сколько Sprint Goals оптимально брать в спринт?
+15:21:10  [Supervisor] No issue key in regex, calling LLM
+15:21:12  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:12  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:12  [Supervisor] intent=general, query_type=rag, entities={}, route=db_query
+15:21:12    PASS: all match (1.24s)
+15:21:12  [36/66] #36 [rag] Что такое Definition of Done?
+15:21:12  [Supervisor] Processing query: Что такое Definition of Done?
+15:21:12  [Supervisor] No issue key in regex, calling LLM
+15:21:13  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:13  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:13  [Supervisor] intent=general, query_type=rag, entities={}, route=db_query
+15:21:13    PASS: all match (1.30s)
+15:21:13  [37/66] #37 [rag] Какие бейзлайновые значения метрик?
+15:21:13  [Supervisor] Processing query: Какие бейзлайновые значения метрик?
+15:21:13  [Supervisor] No issue key in regex, calling LLM
+15:21:14  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:14  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null } }
+15:21:14  [Supervisor] intent=general, query_type=rag, entities={}, route=db_query
+15:21:14    PASS: all match (1.39s)
+15:21:14  [38/66] #38 [rag] Что делать если velocity падает?
+15:21:14  [Supervisor] Processing query: Что делать если velocity падает?
+15:21:14  [Supervisor] No issue key in regex, calling LLM
+15:21:16  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:16  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": "velocity" , "issue_type": null, "status": null, "assignee": null, "cluster": null } }
+15:21:16  [Supervisor] intent=general, query_type=rag, entities={'metric_name': 'velocity'}, route=db_query
+15:21:16    PASS: all match (1.45s)
+15:21:16  [39/66] #39 [rag] Расскажи про метрику scope drop
+15:21:16  [Supervisor] Processing query: Расскажи про метрику scope drop
+15:21:16  [Supervisor] No issue key in regex, calling LLM
+15:21:17  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:17  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": "scope_drop" , "issue_type": null, "status": null, "assignee": null, "cluster": null } }
+15:21:17  [Supervisor] intent=general, query_type=rag, entities={'metric_name': 'scope_drop'}, route=db_query
+15:21:17    PASS: all match (1.36s)
+15:21:17  [40/66] #40 [rag] Как идентифицируется Sprint Goal в JIRA?
+15:21:17  [Supervisor] Processing query: Как идентифицируется Sprint Goal в JIRA?
+15:21:17  [Supervisor] No issue key in regex, calling LLM
+15:21:18  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:18  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:18  [Supervisor] intent=general, query_type=rag, entities={}, route=db_query
+15:21:18    PASS: all match (1.26s)
+15:21:18  [41/66] #41 [hybrid] Покажи scope drop команды cthulhu и дай рекомендации
+15:21:18  [Supervisor] Processing query: Покажи scope drop команды cthulhu и дай рекомендации
+15:21:18  [Supervisor] No issue key in regex, calling LLM
+15:21:20  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:20  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "cthulhu", "sprint_name": "#1 Q1'26", "metric_name": "scope_drop", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:21:20  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': 'ABC-123', 'team_name': 'cthulhu', 'sprint_name': "#1 Q1'26", 'metric_name': 'scope_drop', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:21:20    PASS: all match (1.61s)
+15:21:20  [42/66] #42 [hybrid] Done total команды lpop и что можно улучшить
+15:21:20  [Supervisor] Processing query: Done total команды lpop и что можно улучшить
+15:21:20  [Supervisor] No issue key in regex, calling LLM
+15:21:21  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:21  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "lpop", "sprint_name": "", "metric_name": "done_total", "issue_type": "" , "status": "", "assignee": "", "cluster": ""}}
+15:21:21  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'lpop', 'sprint_name': '', 'metric_name': 'done_total', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:21    FAIL: qt: sql→hybrid (1.19s)
+15:21:21  [43/66] #43 [hybrid] Velocity linehaul — как её повысить?
+15:21:21  [Supervisor] Processing query: Velocity linehaul — как её повысить?
+15:21:21  [Supervisor] No issue key in regex, calling LLM
+15:21:23  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:23  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "Velocity linehaul", "team_name": "linehaul", "sprint_name": "Velocity linehaul", "metric_name": "velocity", "issue_type": "Velocity linehaul", "status": "как её повысить?", "assignee": "как её повысить?", "cluster": "как её повы
+15:21:23  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': 'Velocity linehaul', 'team_name': 'linehaul', 'sprint_name': 'Velocity linehaul', 'metric_name': 'velocity', 'issue_type': 'Velocity linehaul', 'status': 'как её повысить?', 'assignee': 'как её повысить?', 'cluster': 'как её повысить?'}, route=db_query
+15:21:23    PASS: all match (1.60s)
+15:21:23  [44/66] #44 [hybrid] Cancel rate marketplace и как с этим бороться
+15:21:23  [Supervisor] Processing query: Cancel rate marketplace и как с этим бороться
+15:21:23  [Supervisor] No issue key in regex, calling LLM
+15:21:24  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:24  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "marketplace", "sprint_name": "#1 Q1'26", "metric_name": "cancel_rate", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:21:24  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': 'ABC-123', 'team_name': 'marketplace', 'sprint_name': "#1 Q1'26", 'metric_name': 'cancel_rate', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:21:24    PASS: all match (1.61s)
+15:21:24  [45/66] #45 [hybrid] Посмотри sprint goal команды cthulhu и объясни метрику
+15:21:24  [Supervisor] Processing query: Посмотри sprint goal команды cthulhu и объясни метрику
+15:21:24  [Supervisor] No issue key in regex, calling LLM
+15:21:26  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:26  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "cthulhu", "sprint_name": "#1 Q1'26", "metric_name": "velocity", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:21:26  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': 'ABC-123', 'team_name': 'cthulhu', 'sprint_name': "#1 Q1'26", 'metric_name': 'velocity', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:21:26    PART: entities: metric_name: 'velocity' != 'sprint_goal' (1.57s)
+15:21:26  [46/66] #46 [hybrid] Покажи метрики команды shopping cart и дай советы
+15:21:26  [Supervisor] Processing query: Покажи метрики команды shopping cart и дай советы
+15:21:26  [Supervisor] No issue key in regex, calling LLM
+15:21:35  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:35  Error invoking LLM: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=512, prompt_tokens=3089, total_tokens=3601, completion_tokens_details=None, prompt_tokens_details=None)
+15:21:35  [Supervisor] LLM classification failed: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=512, prompt_tokens=3089, total_tokens=3601, completion_tokens_details=None, prompt_tokens_details=None)
+15:21:35    FAIL: qt: error→hybrid; intent: error→metric; entities: team_name: None != 'shopping cart' (9.22s)
+15:21:35  [47/66] #47 [hybrid] scope drop команды rint — это нормально?
+15:21:35  [Supervisor] Processing query: scope drop команды rint — это нормально?
+15:21:35  [Supervisor] No issue key in regex, calling LLM
+15:21:37  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:37  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": "ABC-123", "team_name": "rint", "sprint_name": "#1 Q1'26" , "metric_name": "scope_drop"   , "issue_type": "Bug"  , "status": "Done"  , "assignee": "John Doe"  , "cluster": "Cluster A" }}
+15:21:37  [Supervisor] intent=general, query_type=rag, entities={'issue_key': 'ABC-123', 'team_name': 'rint', 'sprint_name': "#1 Q1'26", 'metric_name': 'scope_drop', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:21:37    FAIL: qt: rag→hybrid; intent: general→metric (1.76s)
+15:21:37  [48/66] #48 [hybrid] Что с метриками команды linehaul и как их улучшить
+15:21:37  [Supervisor] Processing query: Что с метриками команды linehaul и как их улучшить
+15:21:37  [Supervisor] No issue key in regex, calling LLM
+15:21:38  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:38  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "", "team_name": "linehaul", "sprint_name": "" , "metric_name": "velocity", "issue_type": "Bug", "status": "Done", "assignee": "", "cluster": ""}}
+15:21:38  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': '', 'team_name': 'linehaul', 'sprint_name': '', 'metric_name': 'velocity', 'issue_type': 'Bug', 'status': 'Done', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:38    PASS: all match (1.25s)
+15:21:38  [49/66] #49 [simple] Привет
+15:21:38  [Supervisor] Processing query: Привет
+15:21:38  [Supervisor] No issue key in regex, calling LLM
+15:21:39  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:39  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:39  [Supervisor] intent=general, query_type=simple, entities={}, route=direct_response
+15:21:39    PASS: all match (1.23s)
+15:21:39  [50/66] #50 [simple] Здравствуйте
+15:21:39  [Supervisor] Processing query: Здравствуйте
+15:21:39  [Supervisor] No issue key in regex, calling LLM
+15:21:41  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:41  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:41  [Supervisor] intent=general, query_type=simple, entities={}, route=direct_response
+15:21:41    PASS: all match (1.21s)
+15:21:41  [51/66] #51 [simple] Спасибо!
+15:21:41  [Supervisor] Processing query: Спасибо!
+15:21:41  [Supervisor] No issue key in regex, calling LLM
+15:21:42  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:42  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:42  [Supervisor] intent=general, query_type=simple, entities={}, route=direct_response
+15:21:42    PASS: all match (1.23s)
+15:21:42  [52/66] #52 [simple] Как дела?
+15:21:42  [Supervisor] Processing query: Как дела?
+15:21:42  [Supervisor] No issue key in regex, calling LLM
+15:21:43  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:43  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:43  [Supervisor] intent=general, query_type=simple, entities={}, route=direct_response
+15:21:43    PASS: all match (1.20s)
+15:21:43  [53/66] #53 [simple] Что ты умеешь?
+15:21:43  [Supervisor] Processing query: Что ты умеешь?
+15:21:43  [Supervisor] No issue key in regex, calling LLM
+15:21:44  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:44  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:44  [Supervisor] intent=general, query_type=simple, entities={}, route=direct_response
+15:21:44    PASS: all match (1.23s)
+15:21:44  [54/66] #54 [simple] Hi there
+15:21:44  [Supervisor] Processing query: Hi there
+15:21:44  [Supervisor] No issue key in regex, calling LLM
+15:21:45  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:45  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:45  [Supervisor] intent=general, query_type=simple, entities={}, route=direct_response
+15:21:45    PASS: all match (1.25s)
+15:21:45  [55/66] #55 [adversarial] Привет, расскажи про AL-38787
+15:21:45  [Supervisor] Processing query: Привет, расскажи про AL-38787
+15:21:45  [Supervisor] Fast path — issue key found: AL-38787
+15:21:45    PASS: all match (0.00s)
+15:21:45  [56/66] #56 [adversarial] Задачи команды AL-38787
+15:21:45  [Supervisor] Processing query: Задачи команды AL-38787
+15:21:45  [Supervisor] Fast path — issue key found: AL-38787
+15:21:45    PASS: all match (0.00s)
+15:21:45  [57/66] #57 [adversarial] DROP TABLE report_agile_dashboard
+15:21:45  [Supervisor] Processing query: DROP TABLE report_agile_dashboard
+15:21:45  [Supervisor] No issue key in regex, calling LLM
+15:21:54  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:54  Error invoking LLM: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=512, prompt_tokens=3087, total_tokens=3599, completion_tokens_details=None, prompt_tokens_details=None)
+15:21:54  [Supervisor] LLM classification failed: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=512, prompt_tokens=3087, total_tokens=3599, completion_tokens_details=None, prompt_tokens_details=None)
+15:21:54    FAIL: qt: error→simple; intent: error→general (8.60s)
+15:21:54  [58/66] #58 [adversarial] Задачи по Done Total у команды cthulhu
+15:21:54  [Supervisor] Processing query: Задачи по Done Total у команды cthulhu
+15:21:54  [Supervisor] No issue key in regex, calling LLM
+15:21:55  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:55  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "cthulhu", "sprint_name": "", "metric_name": "done_total", "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:55  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'cthulhu', 'sprint_name': '', 'metric_name': 'done_total', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:55    PASS: all match (1.28s)
+15:21:55  [59/66] #59 [adversarial] How's velocity of linehaul team?
+15:21:55  [Supervisor] Processing query: How's velocity of linehaul team?
+15:21:55  [Supervisor] No issue key in regex, calling LLM
+15:21:57  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:57  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "metric", "entities": {"issue_key": "", "team_name": "linehaul", "sprint_name": "", "metric_name": "velocity", "issue_type": "" , "status": "" , "assignee": "" , "cluster": ""}}
+15:21:57  [Supervisor] intent=metric, query_type=sql, entities={'issue_key': '', 'team_name': 'linehaul', 'sprint_name': '', 'metric_name': 'velocity', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=db_query
+15:21:57    PASS: all match (1.25s)
+15:21:57  [60/66] #60 [adversarial] Scope drop
+15:21:57  [Supervisor] Processing query: Scope drop
+15:21:57  [Supervisor] No issue key in regex, calling LLM
+15:21:58  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:58  [Supervisor] Raw LLM response: {"query_type": "rag", "intent": "general", "entities": { "issue_key": null, "team_name": null, "sprint_name": null, "metric_name": "scope_drop", "issue_type": null, "status": null, "assignee": null, "cluster": null }}
+15:21:58  [Supervisor] intent=general, query_type=rag, entities={'metric_name': 'scope_drop'}, route=db_query
+15:21:58    PASS: all match (1.29s)
+15:21:58  [61/66] #61 [adversarial] Покажи задачи
+15:21:58  [Supervisor] Processing query: Покажи задачи
+15:21:58  [Supervisor] No issue key in regex, calling LLM
+15:21:59  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:21:59  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": { "issue_key": "NULL", "team_name": "NULL", "sprint_name": "NULL" , "metric_name": "NULL" , "issue_type": "NULL" , "status": "NULL" , "assignee": "NULL" , "cluster": "NULL"}}
+15:21:59  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'NULL', 'team_name': 'NULL', 'sprint_name': 'NULL', 'metric_name': 'NULL', 'issue_type': 'NULL', 'status': 'NULL', 'assignee': 'NULL', 'cluster': 'NULL'}, route=db_query
+15:21:59    PASS: all match (1.47s)
+15:21:59  [62/66] #62 [adversarial] al-38787
+15:21:59  [Supervisor] Processing query: al-38787
+15:21:59  [Supervisor] Fast path — issue key found: AL-38787
+15:21:59    PASS: all match (0.00s)
+15:21:59  [63/66] #63 [adversarial] задачи cthulhu и сравни с linehaul
+15:21:59  [Supervisor] Processing query: задачи cthulhu и сравни с linehaul
+15:21:59  [Supervisor] No issue key in regex, calling LLM
+15:22:01  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:22:01  [Supervisor] Raw LLM response: {"query_type": "sql", "intent": "tasks_filter", "entities": {"issue_key": "CTHULHU-LINEHAUL", "team_name": ["cthulhu", "linehaul"], "sprint_name": null, "metric_name": null, "issue_type": null, "status": null, "assignee": null, "cluster": null}}
+15:22:01  [Supervisor] intent=tasks_filter, query_type=sql, entities={'issue_key': 'CTHULHU-LINEHAUL', 'team_name': ['cthulhu', 'linehaul']}, route=db_query
+15:22:01    PASS: all match (1.51s)
+15:22:01  [64/66] #64 [adversarial] AL-38787 это хорошо или плохо?
+15:22:01  [Supervisor] Processing query: AL-38787 это хорошо или плохо?
+15:22:01  [Supervisor] Fast path — issue key found: AL-38787
+15:22:01    PASS: all match (0.00s)
+15:22:01  [65/66] #65 [adversarial] 
+15:22:01  [Supervisor] Processing query: 
+15:22:01  [Supervisor] No issue key in regex, calling LLM
+15:22:02  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:22:02  [Supervisor] Raw LLM response: {"query_type": "simple", "intent": "general", "entities": { "issue_key": "" , "team_name": "", "sprint_name": "", "metric_name": "", "issue_type": "", "status": "", "assignee": "", "cluster": ""}}
+15:22:02  [Supervisor] intent=general, query_type=simple, entities={'issue_key': '', 'team_name': '', 'sprint_name': '', 'metric_name': '', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}, route=direct_response
+15:22:02    PASS: all match (1.11s)
+15:22:02  [66/66] #66 [adversarial] расскажи как считается Done Total и покажи значение у cthulh
+15:22:02  [Supervisor] Processing query: расскажи как считается Done Total и покажи значение у cthulhu
+15:22:02  [Supervisor] No issue key in regex, calling LLM
+15:22:04  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 200 OK"
+15:22:04  [Supervisor] Raw LLM response: {"query_type": "hybrid", "intent": "metric", "entities": {"issue_key": "ABC-123", "team_name": "cthulhu", "sprint_name": "#1 Q1'26", "metric_name": "done_total", "issue_type": "Bug", "status": "Done", "assignee": "John Doe", "cluster": "Cluster A"}}
+15:22:04  [Supervisor] intent=metric, query_type=hybrid, entities={'issue_key': 'ABC-123', 'team_name': 'cthulhu', 'sprint_name': "#1 Q1'26", 'metric_name': 'done_total', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}, route=db_query
+15:22:04    PASS: all match (1.60s)
+
+============================================================
+Supervisor Eval: supervisor_v4  (66 cases)
+============================================================
+
+  Routing accuracy : 60/66 (90.9%)
+  Partial match    : 60/66 (90.9%)
+  Exact match      : 59/66 (89.4%)
+
+Per-category:
+15:22:04  Saved results to /app/eval/results/supervisor_v4_20260418_152204.json
+Category        N  Routing    R%    Exact    E%
+------------  ---  ---------  ----  -------  ----
+adversarial    12  11/12      92%   11/12    92%
+hybrid          8  5/8        62%   4/8      50%
+metric         10  9/10       90%   9/10     90%
+rag            10  9/10       90%   9/10     90%
+simple          6  6/6        100%  6/6      100%
+task_regex     10  10/10      100%  10/10    100%
+tasks_filter   10  10/10      100%  10/10    100%
+
+Confusion matrix (query_type, expected rows × actual cols):
+expected \ actual      sql    rag    hybrid    simple
+-------------------  -----  -----  --------  --------
+sql                     37      0         1         0
+rag                      1     10         0         0
+hybrid                   1      1         6         0
+simple                   0      0         0         7
+
+Fast-path: fired on 13/14 eligible queries (93%)
+
+Latency slow-path: n=53, p50=1.33s, p95=4.61s, max=9.22s
+Latency fast-path: n=13, avg=0.0ms
+
+Failed (7):
+  #30 [metric] [ROUTING] Топ-5 команд по средней velocity
+    expected: qt=sql, intent=metric, entities={'metric_name': 'velocity'}
+    actual  : qt=hybrid, intent=metric, entities={'issue_key': 'TOP-5-VELOCITY', 'team_name': 'топ-5 команд', 'sprint_name': '', 'metric_name': 'velocity', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}
+  #32 [rag] [ROUTING] Какой целевой порог метрики Done Total?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=sql, intent=metric, entities={'issue_key': '', 'team_name': '', 'sprint_name': '', 'metric_name': 'done_total', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}
+  #42 [hybrid] [ROUTING] Done total команды lpop и что можно улучшить
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'done_total'}
+    actual  : qt=sql, intent=metric, entities={'issue_key': '', 'team_name': 'lpop', 'sprint_name': '', 'metric_name': 'done_total', 'issue_type': '', 'status': '', 'assignee': '', 'cluster': ''}
+  #45 [hybrid] [ENTITIES] Посмотри sprint goal команды cthulhu и объясни ...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'sprint_goal'}
+    actual  : qt=hybrid, intent=metric, entities={'issue_key': 'ABC-123', 'team_name': 'cthulhu', 'sprint_name': "#1 Q1'26", 'metric_name': 'velocity', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}
+    mismatches: metric_name: 'velocity' != 'sprint_goal'
+  #46 [hybrid] [ROUTING] Покажи метрики команды shopping cart и дай советы
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'shopping cart'}
+    actual  : qt=error, intent=error, entities={}
+    mismatches: team_name: None != 'shopping cart'
+  #47 [hybrid] [ROUTING] scope drop команды rint — это нормально?
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'rint', 'metric_name': 'scope_drop'}
+    actual  : qt=rag, intent=general, entities={'issue_key': 'ABC-123', 'team_name': 'rint', 'sprint_name': "#1 Q1'26", 'metric_name': 'scope_drop', 'issue_type': 'Bug', 'status': 'Done', 'assignee': 'John Doe', 'cluster': 'Cluster A'}
+  #57 [adversarial] [ROUTING] DROP TABLE report_agile_dashboard
+    expected: qt=simple, intent=general, entities={}
+    actual  : qt=error, intent=error, entities={}
+
