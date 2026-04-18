@@ -48,13 +48,14 @@ NEVER use = for teams. NEVER filter by cluster_name.
 3. GROUP BY sprint_name, never by jirasprint_id.
 4. For tasks: SELECT * FROM report_agile_dashboard WHERE ...
 5. "количество задач" = COUNT(*) of ALL tasks, not only Done.
-6. MIN/MAX: SELECT feature_teams, sprint_name, <col> \
-FROM ... ORDER BY <col> DESC/ASC LIMIT 1. No GROUP BY.
+6. MIN/MAX: choose strategy by granularity — see "MIN/MAX decision" below.
 7. No WHERE <metric> > 0 or IS NOT NULL — changes AVG.
 8. COUNT tasks → report_agile_dashboard (1 row per task). \
 NEVER use metrics (1 row per team×sprint) for task counts.
 9. "story points" (storypoints_act) exist for ALL issue_type. \
 NEVER add WHERE issue_type = 'Story' for total SP.
+10. Use the FULL team name in ILIKE — \
+'%%cthulhu%%' not '%%cthu%%'. Don't abbreviate team names.
 
 ## Metric queries — DECISION TREE
 STEP 1: Does the query contain ANY of: "средн*", "avg", \
@@ -67,9 +68,19 @@ Return rows per sprint using Type A.
 STEP 2: Choose aggregator by keyword.
   "средн*" / "avg"       → AVG()
   "сумма" / "суммарн*"   → SUM()
-  "топ N" / "у какой"    → AVG() + ORDER BY + LIMIT
-  "максимальн*/минимальн*/самый большой/самый маленький" \
-→ ORDER BY <col> DESC/ASC LIMIT 1 (no AVG, no GROUP BY)
+  "топ N"                → AVG() + ORDER BY + LIMIT
+  MIN/MAX: depends on WHAT we rank (see MIN/MAX decision below).
+
+## MIN/MAX decision — by granularity of the answer
+"у какой команды" / "какая команда" → AVG per team (Type C):
+  SELECT feature_teams, AVG(<col>) FROM ... \
+GROUP BY feature_teams ORDER BY 2 DESC LIMIT 1
+"в каком спринте" / "у какой задачи" → single record (Type D):
+  SELECT feature_teams, sprint_name, <col> FROM ... \
+ORDER BY <col> DESC/ASC LIMIT 1
+"какой максимальный/минимальный X" (no team/sprint) → scalar:
+  SELECT MAX(<col>) FROM report_agile_dashboard
+  (e.g. "максимальный storypoints у одной задачи" = MAX(storypoints_act))
 
 ### Type A (default — NO aggregation)
 SELECT feature_teams, sprint_name, <metric> \
@@ -141,6 +152,18 @@ GOOD: SELECT feature_teams, sprint_name, done_total \
 FROM report_agile_dashboard_metrics \
 ORDER BY done_total ASC LIMIT 1
 BAD: SELECT MIN(done_total) — loses feature_teams and sprint_name
+
+Q: У какой команды самый высокий done_total?
+GOOD: SELECT feature_teams, AVG(done_total) \
+FROM report_agile_dashboard_metrics \
+GROUP BY feature_teams ORDER BY 2 DESC LIMIT 1
+BAD: ORDER BY done_total DESC LIMIT 1 \
+— returns a single best sprint, not the best team average
+
+Q: Какой максимальный story points у одной задачи?
+GOOD: SELECT MAX(storypoints_act) FROM report_agile_dashboard
+BAD: ORDER BY storypoints_act DESC LIMIT 1 — returns a row, \
+not a scalar value
 
 Q: Сколько задач у команды shopping cart в каждом спринте?
 GOOD: SELECT sprint_name, COUNT(*) FROM report_agile_dashboard \
@@ -295,6 +318,13 @@ _MINMAX_WORDS = re.compile(
     r"самый\s+высок|самый\s+низк|в\s+каком\s+спринте\s+был)",
     re.IGNORECASE,
 )
+# Context markers — MIN/MAX needs feature_teams/sprint_name
+# ONLY when one of these appears in the question.
+_MINMAX_CONTEXT_WORDS = re.compile(
+    r"\b(в\s+каком\s+спринте|у\s+какой\s+команд|у\s+какой\s+задач|"
+    r"какая\s+команд|какой\s+спринт|среди\s+команд|среди\s+спринт)",
+    re.IGNORECASE,
+)
 _METRIC_WORDS = re.compile(
     r"\b(velocity|done\s*total|scope\s*drop|sprint\s*goal|"
     r"cancel\s*rate|метрик)",
@@ -320,10 +350,12 @@ def _semantic_check(user_query: str, sql: str) -> str | None:
     is_metric_q = bool(_METRIC_WORDS.search(user_query))
     has_agg_word = bool(_AGG_WORDS.search(user_query))
     has_minmax_word = bool(_MINMAX_WORDS.search(user_query))
+    has_minmax_context = bool(_MINMAX_CONTEXT_WORDS.search(user_query))
     is_count_tasks_q = bool(_COUNT_TASKS_WORDS.search(user_query))
 
     # Check 1: metric question without aggregator, but SQL has AVG/SUM
     if is_metric_q and not has_agg_word and _HAS_AVG_SUM.search(sql):
+        logger.info("[SQL Agent] Semantic check fired: reason=metric_without_agg")
         return (
             "The question has NO aggregation word (no 'среднее', 'сумма', "
             "'топ', etc.), but your SQL uses AVG/SUM. Rewrite as Type A: "
@@ -332,16 +364,20 @@ def _semantic_check(user_query: str, sql: str) -> str | None:
             "WHERE feature_teams ILIKE '%team%' — no GROUP BY, no AVG."
         )
 
-    # Check 2: MIN/MAX question but SQL uses MIN()/MAX() aggregates
-    if has_minmax_word and _HAS_MIN_MAX.search(sql):
+    # Check 2: MIN/MAX with team/sprint context but SQL returns a scalar.
+    # Only trigger when the question explicitly asks WHICH team/sprint/task.
+    # Scalar MAX/MIN (e.g. max SP of a single task) is OK.
+    if has_minmax_word and has_minmax_context and _HAS_MIN_MAX.search(sql):
+        logger.info("[SQL Agent] Semantic check fired: reason=minmax_needs_context")
         return (
-            "For MIN/MAX questions use ORDER BY <col> DESC/ASC LIMIT 1 "
-            "(Type D), not MIN()/MAX(). You need feature_teams AND "
-            "sprint_name in SELECT."
+            "The question asks WHICH team/sprint. Use ORDER BY <col> "
+            "DESC/ASC LIMIT 1 (Type D) and include feature_teams and "
+            "sprint_name in SELECT. Do NOT use MIN()/MAX() aggregates."
         )
 
     # Check 3: count of tasks routed to metrics table
     if is_count_tasks_q and _SELECTS_METRICS_TABLE.search(sql):
+        logger.info("[SQL Agent] Semantic check fired: reason=count_wrong_table")
         return (
             "You are counting tasks but querying report_agile_dashboard_metrics "
             "(1 row per team×sprint). Use report_agile_dashboard (1 row per task)."
@@ -405,44 +441,49 @@ def _after_tools(state: AgentState) -> str:
     return "model"
 
 
-def _extract_results(state: AgentState) -> dict:
-    """Extract SQL from conversation and re-execute for full results.
-
-    The tool returns only a sample to the LLM (to stay under context limit),
-    so we re-run the last successful SQL here to get complete results.
-    """
-    last_sql = ""
-    last_ok_sql = ""
+def _collect_successful_sqls(messages: list) -> tuple[list[str], str, str]:
+    """Walk messages, return (successful_sqls, last_attempted_sql, last_error)."""
+    tc_id_to_sql: dict[str, str] = {}
+    successful: list[str] = []
     error = ""
-
-    for msg in state["messages"]:
+    for msg in messages:
         if isinstance(msg, AIMessage) and msg.tool_calls:
             for tc in msg.tool_calls:
                 if tc["name"] == "run_query":
-                    last_sql = tc["args"].get("query", "")
+                    tc_id_to_sql[tc["id"]] = tc["args"].get("query", "")
         if isinstance(msg, ToolMessage) and msg.name == "run_query":
             content = msg.content
+            sql_for_msg = tc_id_to_sql.get(msg.tool_call_id, "")
             if content.startswith("SQL Error:") or content.startswith("ERROR:"):
                 error = content
-            else:
-                last_ok_sql = last_sql
+            elif sql_for_msg and sql_for_msg not in successful:
+                successful.append(sql_for_msg)
                 error = ""
+    last_attempted = list(tc_id_to_sql.values())[-1] if tc_id_to_sql else ""
+    return successful, last_attempted, error
 
-    sql = last_ok_sql or last_sql
 
-    # Re-execute the last successful SQL to get full results
+def _extract_results(state: AgentState) -> dict:
+    """Re-execute successful SQLs to get full rows (tool returns only a sample).
+
+    For parallel tool-calls (cross-table), concatenates rows from all queries.
+    """
+    successful_sqls, last_attempted, error = _collect_successful_sqls(state["messages"])
+    sql_str = "; ".join(successful_sqls) if successful_sqls else last_attempted
+
     result: list[dict[str, Any]] = []
-    if last_ok_sql:
+    if successful_sqls:
         from hse_prom_prog.agents.sql_tools import _get_db  # noqa: PLC0415
 
         try:
             db = _get_db()
-            result = db.execute_query(sql)
+            for one_sql in successful_sqls:
+                result.extend(db.execute_query(one_sql))
         except Exception as e:
             logger.warning("[SQL Agent] Re-execute failed: %s", e)
             error = f"Re-execute error: {e}"
 
-    return {"final_sql": sql, "final_result": result, "final_error": error}
+    return {"final_sql": sql_str, "final_result": result, "final_error": error}
 
 
 # ── Graph builder ────────────────────────────────────────────
