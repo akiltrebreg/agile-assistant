@@ -1,0 +1,682 @@
+13:27:20  Loaded 66 Supervisor test cases
+13:27:27  Initializing LLM client with base_url=http://vllm:8000/v1, model=/models/avibe-gptq-8bit
+13:27:27  [1/66] #1 [task_regex] Расскажи о задаче AL-38787
+13:27:27  [Supervisor] Processing query: Расскажи о задаче AL-38787
+13:27:27  [Supervisor] Fast path — issue key found: AL-38787
+13:27:27    PASS: all match (0.00s)
+13:27:27  [2/66] #2 [task_regex] Покажи данные по задаче AL-38799
+13:27:27  [Supervisor] Processing query: Покажи данные по задаче AL-38799
+13:27:27  [Supervisor] Fast path — issue key found: AL-38799
+13:27:27    PASS: all match (0.00s)
+13:27:27  [3/66] #3 [task_regex] AL-38787
+13:27:27  [Supervisor] Processing query: AL-38787
+13:27:27  [Supervisor] Fast path — issue key found: AL-38787
+13:27:27    PASS: all match (0.00s)
+13:27:27  [4/66] #4 [task_regex] Что там с AL-39041?
+13:27:27  [Supervisor] Processing query: Что там с AL-39041?
+13:27:27  [Supervisor] Fast path — issue key found: AL-39041
+13:27:27    PASS: all match (0.00s)
+13:27:27  [5/66] #5 [task_regex] Информация о задаче AL-99999
+13:27:27  [Supervisor] Processing query: Информация о задаче AL-99999
+13:27:27  [Supervisor] Fast path — issue key found: AL-99999
+13:27:27    PASS: all match (0.00s)
+13:27:27  [6/66] #6 [task_regex] Выведи задачу DATA-1234
+13:27:27  [Supervisor] Processing query: Выведи задачу DATA-1234
+13:27:27  [Supervisor] Fast path — issue key found: DATA-1234
+13:27:27    PASS: all match (0.00s)
+13:27:27  [7/66] #7 [task_regex] покажи AL-40001 в подробностях
+13:27:27  [Supervisor] Processing query: покажи AL-40001 в подробностях
+13:27:27  [Supervisor] Fast path — issue key found: AL-40001
+13:27:27    PASS: all match (0.00s)
+13:27:27  [8/66] #8 [task_regex] задача RND-55
+13:27:27  [Supervisor] Processing query: задача RND-55
+13:27:27  [Supervisor] Fast path — issue key found: RND-55
+13:27:27    PASS: all match (0.00s)
+13:27:27  [9/66] #9 [task_regex] open AL-38787
+13:27:27  [Supervisor] Processing query: open AL-38787
+13:27:27  [Supervisor] Fast path — issue key found: AL-38787
+13:27:27    PASS: all match (0.00s)
+13:27:27  [10/66] #10 [task_regex] Details for AL-38800
+13:27:27  [Supervisor] Processing query: Details for AL-38800
+13:27:27  [Supervisor] Fast path — issue key found: AL-38800
+13:27:27    PASS: all match (0.00s)
+13:27:27  [11/66] #11 [tasks_filter] Все задачи команды cthulhu
+13:27:27  [Supervisor] Processing query: Все задачи команды cthulhu
+13:27:27  [Supervisor] No issue key in regex, calling LLM
+13:27:27  Retrying request to /chat/completions in 0.395816 seconds
+13:27:28  Retrying request to /chat/completions in 0.759512 seconds
+13:27:29  Error invoking LLM: Connection error.
+13:27:29  [Supervisor] LLM classification failed: Connection error.
+13:27:29    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'cthulhu' (1.23s)
+13:27:29  [12/66] #12 [tasks_filter] Задачи команды lpop в спринте #1 Q1'26
+13:27:29  [Supervisor] Processing query: Задачи команды lpop в спринте #1 Q1'26
+13:27:29  [Supervisor] No issue key in regex, calling LLM
+13:27:29  Retrying request to /chat/completions in 0.407591 seconds
+13:27:29  Retrying request to /chat/completions in 0.987618 seconds
+13:27:30  Error invoking LLM: Connection error.
+13:27:30  [Supervisor] LLM classification failed: Connection error.
+13:27:30    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'lpop'; sprint_name: None (1.47s)
+13:27:30  [13/66] #13 [tasks_filter] Покажи все баги
+13:27:30  [Supervisor] Processing query: Покажи все баги
+13:27:30  [Supervisor] No issue key in regex, calling LLM
+13:27:30  Retrying request to /chat/completions in 0.457593 seconds
+13:27:30  Retrying request to /chat/completions in 0.834936 seconds
+13:27:31  Error invoking LLM: Connection error.
+13:27:31  [Supervisor] LLM classification failed: Connection error.
+13:27:31    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: issue_type: None != 'Bug' (1.37s)
+13:27:31  [14/66] #14 [tasks_filter] Баги в кластере Logistics
+13:27:31  [Supervisor] Processing query: Баги в кластере Logistics
+13:27:31  [Supervisor] No issue key in regex, calling LLM
+13:27:31  Retrying request to /chat/completions in 0.483802 seconds
+13:27:32  Retrying request to /chat/completions in 0.951016 seconds
+13:27:33  Error invoking LLM: Connection error.
+13:27:33  [Supervisor] LLM classification failed: Connection error.
+13:27:33    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: issue_type: None != 'Bug'; cluster: None !=  (1.53s)
+13:27:33  [15/66] #15 [tasks_filter] Задачи со статусом In Progress
+13:27:33  [Supervisor] Processing query: Задачи со статусом In Progress
+13:27:33  [Supervisor] No issue key in regex, calling LLM
+13:27:33  Retrying request to /chat/completions in 0.474656 seconds
+13:27:33  Retrying request to /chat/completions in 0.912355 seconds
+13:27:34  Error invoking LLM: Connection error.
+13:27:34  [Supervisor] LLM classification failed: Connection error.
+13:27:34    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: status: None != 'In Progress' (1.46s)
+13:27:34  [16/66] #16 [tasks_filter] Задачи исполнителя yuvpetrov
+13:27:34  [Supervisor] Processing query: Задачи исполнителя yuvpetrov
+13:27:34  [Supervisor] No issue key in regex, calling LLM
+13:27:34  Retrying request to /chat/completions in 0.471804 seconds
+13:27:35  Retrying request to /chat/completions in 0.808480 seconds
+13:27:36  Error invoking LLM: Connection error.
+13:27:36  [Supervisor] LLM classification failed: Connection error.
+13:27:36    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: assignee: None != 'yuvpetrov' (1.35s)
+13:27:36  [17/66] #17 [tasks_filter] Закрытые баги команды lpop
+13:27:36  [Supervisor] Processing query: Закрытые баги команды lpop
+13:27:36  [Supervisor] No issue key in regex, calling LLM
+13:27:36  Retrying request to /chat/completions in 0.489272 seconds
+13:27:36  Retrying request to /chat/completions in 0.878351 seconds
+13:27:37  Error invoking LLM: Connection error.
+13:27:37  [Supervisor] LLM classification failed: Connection error.
+13:27:37    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'lpop'; issue_type: None  (1.44s)
+13:27:37  [18/66] #18 [tasks_filter] Сторис команды linehaul в активном спринте
+13:27:37  [Supervisor] Processing query: Сторис команды linehaul в активном спринте
+13:27:37  [Supervisor] No issue key in regex, calling LLM
+13:27:37  Retrying request to /chat/completions in 0.411183 seconds
+13:27:38  Retrying request to /chat/completions in 0.947763 seconds
+13:27:39  Error invoking LLM: Connection error.
+13:27:39  [Supervisor] LLM classification failed: Connection error.
+13:27:39    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'linehaul'; issue_type: N (1.43s)
+13:27:39  [19/66] #19 [tasks_filter] Покажи задачи marketplace
+13:27:39  [Supervisor] Processing query: Покажи задачи marketplace
+13:27:39  [Supervisor] No issue key in regex, calling LLM
+13:27:39  Retrying request to /chat/completions in 0.460975 seconds
+13:27:39  Retrying request to /chat/completions in 0.849245 seconds
+13:27:40  Error invoking LLM: Connection error.
+13:27:40  [Supervisor] LLM classification failed: Connection error.
+13:27:40    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'marketplace' (1.38s)
+13:27:40  [20/66] #20 [tasks_filter] задачи команды shopping cart в кластере Mobile
+13:27:40  [Supervisor] Processing query: задачи команды shopping cart в кластере Mobile
+13:27:40  [Supervisor] No issue key in regex, calling LLM
+13:27:40  Retrying request to /chat/completions in 0.397401 seconds
+13:27:40  Retrying request to /chat/completions in 0.988388 seconds
+13:27:41  Error invoking LLM: Connection error.
+13:27:41  [Supervisor] LLM classification failed: Connection error.
+13:27:41    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'shopping cart'; cluster: (1.46s)
+13:27:41  [21/66] #21 [metric] Какой scope drop у команды cthulhu?
+13:27:41  [Supervisor] Processing query: Какой scope drop у команды cthulhu?
+13:27:41  [Supervisor] No issue key in regex, calling LLM
+13:27:41  Retrying request to /chat/completions in 0.453273 seconds
+13:27:42  Retrying request to /chat/completions in 0.889108 seconds
+13:27:43  Error invoking LLM: Connection error.
+13:27:43  [Supervisor] LLM classification failed: Connection error.
+13:27:43    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None != (1.42s)
+13:27:43  [22/66] #22 [metric] Done total команды lpop
+13:27:43  [Supervisor] Processing query: Done total команды lpop
+13:27:43  [Supervisor] No issue key in regex, calling LLM
+13:27:43  Retrying request to /chat/completions in 0.446358 seconds
+13:27:43  Retrying request to /chat/completions in 0.925987 seconds
+13:27:44  Error invoking LLM: Connection error.
+13:27:44  [Supervisor] LLM classification failed: Connection error.
+13:27:44    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'lpop'; metric_name: None != 'd (1.44s)
+13:27:44  [23/66] #23 [metric] Velocity команды linehaul
+13:27:44  [Supervisor] Processing query: Velocity команды linehaul
+13:27:44  [Supervisor] No issue key in regex, calling LLM
+13:27:44  Retrying request to /chat/completions in 0.460896 seconds
+13:27:45  Retrying request to /chat/completions in 0.951287 seconds
+13:27:46  Error invoking LLM: Connection error.
+13:27:46  [Supervisor] LLM classification failed: Connection error.
+13:27:46    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'linehaul'; metric_name: None ! (1.49s)
+13:27:46  [24/66] #24 [metric] Sprint goal команды lpop
+13:27:46  [Supervisor] Processing query: Sprint goal команды lpop
+13:27:46  [Supervisor] No issue key in regex, calling LLM
+13:27:46  Retrying request to /chat/completions in 0.421238 seconds
+13:27:46  Retrying request to /chat/completions in 0.954734 seconds
+13:27:47  Error invoking LLM: Connection error.
+13:27:47  [Supervisor] LLM classification failed: Connection error.
+13:27:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'lpop'; metric_name: None != 's (1.45s)
+13:27:47  [25/66] #25 [metric] Cancel rate команды marketplace
+13:27:47  [Supervisor] Processing query: Cancel rate команды marketplace
+13:27:47  [Supervisor] No issue key in regex, calling LLM
+13:27:47  Retrying request to /chat/completions in 0.439218 seconds
+13:27:48  Retrying request to /chat/completions in 0.855046 seconds
+13:27:49  Error invoking LLM: Connection error.
+13:27:49  [Supervisor] LLM classification failed: Connection error.
+13:27:49    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'marketplace'; metric_name: Non (1.37s)
+13:27:49  [26/66] #26 [metric] Метрики спринта #1 Q1'26
+13:27:49  [Supervisor] Processing query: Метрики спринта #1 Q1'26
+13:27:49  [Supervisor] No issue key in regex, calling LLM
+13:27:49  Retrying request to /chat/completions in 0.408726 seconds
+13:27:49  Retrying request to /chat/completions in 0.800246 seconds
+13:27:50  Error invoking LLM: Connection error.
+13:27:50  [Supervisor] LLM classification failed: Connection error.
+13:27:50    FAIL: qt: simple→sql; intent: general→metric; entities: sprint_name: None != "#1 Q1'26" (1.28s)
+13:27:50  [27/66] #27 [metric] Среднее значение done total у команды cthulhu
+13:27:50  [Supervisor] Processing query: Среднее значение done total у команды cthulhu
+13:27:50  [Supervisor] No issue key in regex, calling LLM
+13:27:50  Retrying request to /chat/completions in 0.465786 seconds
+13:27:50  Retrying request to /chat/completions in 0.766728 seconds
+13:27:51  Error invoking LLM: Connection error.
+13:27:51  [Supervisor] LLM classification failed: Connection error.
+13:27:51    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None != (1.31s)
+13:27:51  [28/66] #28 [metric] Суммарная velocity команды rint за все спринты
+13:27:51  [Supervisor] Processing query: Суммарная velocity команды rint за все спринты
+13:27:51  [Supervisor] No issue key in regex, calling LLM
+13:27:51  Retrying request to /chat/completions in 0.412033 seconds
+13:27:52  Retrying request to /chat/completions in 0.790320 seconds
+13:27:52  Error invoking LLM: Connection error.
+13:27:52  [Supervisor] LLM classification failed: Connection error.
+13:27:52    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'rint'; metric_name: None != 'v (1.28s)
+13:27:52  [29/66] #29 [metric] У какой команды самый высокий done_total?
+13:27:52  [Supervisor] Processing query: У какой команды самый высокий done_total?
+13:27:52  [Supervisor] No issue key in regex, calling LLM
+13:27:52  Retrying request to /chat/completions in 0.459798 seconds
+13:27:53  Retrying request to /chat/completions in 0.848952 seconds
+13:27:54  Error invoking LLM: Connection error.
+13:27:54  [Supervisor] LLM classification failed: Connection error.
+13:27:54    FAIL: qt: simple→sql; intent: general→metric; entities: metric_name: None != 'done_total' (1.38s)
+13:27:54  [30/66] #30 [metric] Топ-5 команд по средней velocity
+13:27:54  [Supervisor] Processing query: Топ-5 команд по средней velocity
+13:27:54  [Supervisor] No issue key in regex, calling LLM
+13:27:54  Retrying request to /chat/completions in 0.390135 seconds
+13:27:54  Retrying request to /chat/completions in 0.908076 seconds
+13:27:55  Error invoking LLM: Connection error.
+13:27:55  [Supervisor] LLM classification failed: Connection error.
+13:27:55    FAIL: qt: simple→sql; intent: general→metric; entities: metric_name: None != 'velocity' (1.37s)
+13:27:55  [31/66] #31 [rag] Как рассчитывается Done Total?
+13:27:55  [Supervisor] Processing query: Как рассчитывается Done Total?
+13:27:55  [Supervisor] No issue key in regex, calling LLM
+13:27:55  Retrying request to /chat/completions in 0.392163 seconds
+13:27:56  Retrying request to /chat/completions in 0.947199 seconds
+13:27:57  Error invoking LLM: Connection error.
+13:27:57  [Supervisor] LLM classification failed: Connection error.
+13:27:57    FAIL: qt: simple→rag (1.43s)
+13:27:57  [32/66] #32 [rag] Какой целевой порог метрики Done Total?
+13:27:57  [Supervisor] Processing query: Какой целевой порог метрики Done Total?
+13:27:57  [Supervisor] No issue key in regex, calling LLM
+13:27:57  Retrying request to /chat/completions in 0.451670 seconds
+13:27:57  Retrying request to /chat/completions in 0.780514 seconds
+13:27:58  Error invoking LLM: Connection error.
+13:27:58  [Supervisor] LLM classification failed: Connection error.
+13:27:58    FAIL: qt: simple→rag (1.30s)
+13:27:58  [33/66] #33 [rag] Что такое Scope Drop и каков его целевой порог?
+13:27:58  [Supervisor] Processing query: Что такое Scope Drop и каков его целевой порог?
+13:27:58  [Supervisor] No issue key in regex, calling LLM
+13:27:58  Retrying request to /chat/completions in 0.452086 seconds
+13:27:58  Retrying request to /chat/completions in 0.874998 seconds
+13:27:59  Error invoking LLM: Connection error.
+13:27:59  [Supervisor] LLM classification failed: Connection error.
+13:27:59    FAIL: qt: simple→rag (1.40s)
+13:27:59  [34/66] #34 [rag] Как снизить Scope Drop?
+13:27:59  [Supervisor] Processing query: Как снизить Scope Drop?
+13:27:59  [Supervisor] No issue key in regex, calling LLM
+13:27:59  Retrying request to /chat/completions in 0.476372 seconds
+13:28:00  Retrying request to /chat/completions in 0.990607 seconds
+13:28:01  Error invoking LLM: Connection error.
+13:28:01  [Supervisor] LLM classification failed: Connection error.
+13:28:01    FAIL: qt: simple→rag (1.54s)
+13:28:01  [35/66] #35 [rag] Сколько Sprint Goals оптимально брать в спринт?
+13:28:01  [Supervisor] Processing query: Сколько Sprint Goals оптимально брать в спринт?
+13:28:01  [Supervisor] No issue key in regex, calling LLM
+13:28:01  Retrying request to /chat/completions in 0.489296 seconds
+13:28:01  Retrying request to /chat/completions in 0.800006 seconds
+13:28:02  Error invoking LLM: Connection error.
+13:28:02  [Supervisor] LLM classification failed: Connection error.
+13:28:02    FAIL: qt: simple→rag (1.37s)
+13:28:02  [36/66] #36 [rag] Что такое Definition of Done?
+13:28:02  [Supervisor] Processing query: Что такое Definition of Done?
+13:28:02  [Supervisor] No issue key in regex, calling LLM
+13:28:02  Retrying request to /chat/completions in 0.445482 seconds
+13:28:03  Retrying request to /chat/completions in 0.823439 seconds
+13:28:04  Error invoking LLM: Connection error.
+13:28:04  [Supervisor] LLM classification failed: Connection error.
+13:28:04    FAIL: qt: simple→rag (1.34s)
+13:28:04  [37/66] #37 [rag] Какие бейзлайновые значения метрик?
+13:28:04  [Supervisor] Processing query: Какие бейзлайновые значения метрик?
+13:28:04  [Supervisor] No issue key in regex, calling LLM
+13:28:04  Retrying request to /chat/completions in 0.455383 seconds
+13:28:04  Retrying request to /chat/completions in 0.884658 seconds
+13:28:05  Error invoking LLM: Connection error.
+13:28:05  [Supervisor] LLM classification failed: Connection error.
+13:28:05    FAIL: qt: simple→rag (1.41s)
+13:28:05  [38/66] #38 [rag] Что делать если velocity падает?
+13:28:05  [Supervisor] Processing query: Что делать если velocity падает?
+13:28:05  [Supervisor] No issue key in regex, calling LLM
+13:28:05  Retrying request to /chat/completions in 0.471428 seconds
+13:28:06  Retrying request to /chat/completions in 0.833137 seconds
+13:28:06  Error invoking LLM: Connection error.
+13:28:06  [Supervisor] LLM classification failed: Connection error.
+13:28:06    FAIL: qt: simple→rag (1.38s)
+13:28:06  [39/66] #39 [rag] Расскажи про метрику scope drop
+13:28:06  [Supervisor] Processing query: Расскажи про метрику scope drop
+13:28:06  [Supervisor] No issue key in regex, calling LLM
+13:28:06  Retrying request to /chat/completions in 0.477069 seconds
+13:28:07  Retrying request to /chat/completions in 0.798321 seconds
+13:28:08  Error invoking LLM: Connection error.
+13:28:08  [Supervisor] LLM classification failed: Connection error.
+13:28:08    FAIL: qt: simple→rag (1.42s)
+13:28:08  [40/66] #40 [rag] Как идентифицируется Sprint Goal в JIRA?
+13:28:08  [Supervisor] Processing query: Как идентифицируется Sprint Goal в JIRA?
+13:28:08  [Supervisor] No issue key in regex, calling LLM
+13:28:08  Retrying request to /chat/completions in 0.376335 seconds
+13:28:08  Retrying request to /chat/completions in 0.899043 seconds
+13:28:09  Error invoking LLM: Connection error.
+13:28:09  [Supervisor] LLM classification failed: Connection error.
+13:28:09    FAIL: qt: simple→rag (1.35s)
+13:28:09  [41/66] #41 [hybrid] Покажи scope drop команды cthulhu и дай рекомендации
+13:28:09  [Supervisor] Processing query: Покажи scope drop команды cthulhu и дай рекомендации
+13:28:09  [Supervisor] No issue key in regex, calling LLM
+13:28:09  Retrying request to /chat/completions in 0.449154 seconds
+13:28:10  Retrying request to /chat/completions in 0.840102 seconds
+13:28:11  Error invoking LLM: Connection error.
+13:28:11  [Supervisor] LLM classification failed: Connection error.
+13:28:11    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None (1.36s)
+13:28:11  [42/66] #42 [hybrid] Done total команды lpop и что можно улучшить
+13:28:11  [Supervisor] Processing query: Done total команды lpop и что можно улучшить
+13:28:11  [Supervisor] No issue key in regex, calling LLM
+13:28:11  Retrying request to /chat/completions in 0.430166 seconds
+13:28:11  Retrying request to /chat/completions in 0.989787 seconds
+13:28:12  Error invoking LLM: Connection error.
+13:28:12  [Supervisor] LLM classification failed: Connection error.
+13:28:12    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'lpop'; metric_name: None != (1.50s)
+13:28:12  [43/66] #43 [hybrid] Velocity linehaul — как её повысить?
+13:28:12  [Supervisor] Processing query: Velocity linehaul — как её повысить?
+13:28:12  [Supervisor] No issue key in regex, calling LLM
+13:28:12  Retrying request to /chat/completions in 0.464312 seconds
+13:28:13  Retrying request to /chat/completions in 0.869892 seconds
+13:28:13  Error invoking LLM: Connection error.
+13:28:13  [Supervisor] LLM classification failed: Connection error.
+13:28:13    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'linehaul'; metric_name: Non (1.41s)
+13:28:13  [44/66] #44 [hybrid] Cancel rate marketplace и как с этим бороться
+13:28:13  [Supervisor] Processing query: Cancel rate marketplace и как с этим бороться
+13:28:13  [Supervisor] No issue key in regex, calling LLM
+13:28:13  Retrying request to /chat/completions in 0.443624 seconds
+13:28:14  Retrying request to /chat/completions in 0.958943 seconds
+13:28:15  Error invoking LLM: Connection error.
+13:28:15  [Supervisor] LLM classification failed: Connection error.
+13:28:15    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'marketplace'; metric_name:  (1.47s)
+13:28:15  [45/66] #45 [hybrid] Посмотри sprint goal команды cthulhu и объясни метрику
+13:28:15  [Supervisor] Processing query: Посмотри sprint goal команды cthulhu и объясни метрику
+13:28:15  [Supervisor] No issue key in regex, calling LLM
+13:28:15  Retrying request to /chat/completions in 0.468514 seconds
+13:28:15  Retrying request to /chat/completions in 0.967673 seconds
+13:28:16  Error invoking LLM: Connection error.
+13:28:16  [Supervisor] LLM classification failed: Connection error.
+13:28:16    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None (1.51s)
+13:28:16  [46/66] #46 [hybrid] Покажи метрики команды shopping cart и дай советы
+13:28:16  [Supervisor] Processing query: Покажи метрики команды shopping cart и дай советы
+13:28:16  [Supervisor] No issue key in regex, calling LLM
+13:28:16  Retrying request to /chat/completions in 0.451569 seconds
+13:28:17  Retrying request to /chat/completions in 0.916313 seconds
+13:28:18  Error invoking LLM: Connection error.
+13:28:18  [Supervisor] LLM classification failed: Connection error.
+13:28:18    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'shopping cart' (1.44s)
+13:28:18  [47/66] #47 [hybrid] scope drop команды rint — это нормально?
+13:28:18  [Supervisor] Processing query: scope drop команды rint — это нормально?
+13:28:18  [Supervisor] No issue key in regex, calling LLM
+13:28:18  Retrying request to /chat/completions in 0.429981 seconds
+13:28:18  Retrying request to /chat/completions in 0.961518 seconds
+13:28:19  Error invoking LLM: Connection error.
+13:28:19  [Supervisor] LLM classification failed: Connection error.
+13:28:19    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'rint'; metric_name: None != (1.46s)
+13:28:19  [48/66] #48 [hybrid] Что с метриками команды linehaul и как их улучшить
+13:28:19  [Supervisor] Processing query: Что с метриками команды linehaul и как их улучшить
+13:28:19  [Supervisor] No issue key in regex, calling LLM
+13:28:19  Retrying request to /chat/completions in 0.491044 seconds
+13:28:20  Retrying request to /chat/completions in 0.880810 seconds
+13:28:21  Error invoking LLM: Connection error.
+13:28:21  [Supervisor] LLM classification failed: Connection error.
+13:28:21    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'linehaul' (1.45s)
+13:28:21  [49/66] #49 [simple] Привет
+13:28:21  [Supervisor] Processing query: Привет
+13:28:21  [Supervisor] No issue key in regex, calling LLM
+13:28:21  Retrying request to /chat/completions in 0.493298 seconds
+13:28:21  Retrying request to /chat/completions in 0.994444 seconds
+13:28:22  Error invoking LLM: Connection error.
+13:28:22  [Supervisor] LLM classification failed: Connection error.
+13:28:22    PASS: all match (1.56s)
+13:28:22  [50/66] #50 [simple] Здравствуйте
+13:28:22  [Supervisor] Processing query: Здравствуйте
+13:28:22  [Supervisor] No issue key in regex, calling LLM
+13:28:22  Retrying request to /chat/completions in 0.388968 seconds
+13:28:23  Retrying request to /chat/completions in 0.997338 seconds
+13:28:24  Error invoking LLM: Connection error.
+13:28:24  [Supervisor] LLM classification failed: Connection error.
+13:28:24    PASS: all match (1.46s)
+13:28:24  [51/66] #51 [simple] Спасибо!
+13:28:24  [Supervisor] Processing query: Спасибо!
+13:28:24  [Supervisor] No issue key in regex, calling LLM
+13:28:24  Retrying request to /chat/completions in 0.494376 seconds
+13:28:24  Retrying request to /chat/completions in 0.833558 seconds
+13:28:25  Error invoking LLM: Connection error.
+13:28:25  [Supervisor] LLM classification failed: Connection error.
+13:28:25    PASS: all match (1.40s)
+13:28:25  [52/66] #52 [simple] Как дела?
+13:28:25  [Supervisor] Processing query: Как дела?
+13:28:25  [Supervisor] No issue key in regex, calling LLM
+13:28:25  Retrying request to /chat/completions in 0.459119 seconds
+13:28:26  Retrying request to /chat/completions in 0.942753 seconds
+13:28:27  Error invoking LLM: Connection error.
+13:28:27  [Supervisor] LLM classification failed: Connection error.
+13:28:27    PASS: all match (1.48s)
+13:28:27  [53/66] #53 [simple] Что ты умеешь?
+13:28:27  [Supervisor] Processing query: Что ты умеешь?
+13:28:27  [Supervisor] No issue key in regex, calling LLM
+13:28:27  Retrying request to /chat/completions in 0.482537 seconds
+13:28:27  Retrying request to /chat/completions in 0.894924 seconds
+13:28:28  Error invoking LLM: Connection error.
+13:28:28  [Supervisor] LLM classification failed: Connection error.
+13:28:28    PASS: all match (1.45s)
+13:28:28  [54/66] #54 [simple] Hi there
+13:28:28  [Supervisor] Processing query: Hi there
+13:28:28  [Supervisor] No issue key in regex, calling LLM
+13:28:28  Retrying request to /chat/completions in 0.440730 seconds
+13:28:29  Retrying request to /chat/completions in 0.939922 seconds
+13:28:30  Error invoking LLM: Connection error.
+13:28:30  [Supervisor] LLM classification failed: Connection error.
+13:28:30    PASS: all match (1.45s)
+13:28:30  [55/66] #55 [adversarial] Привет, расскажи про AL-38787
+13:28:30  [Supervisor] Processing query: Привет, расскажи про AL-38787
+13:28:30  [Supervisor] Fast path — issue key found: AL-38787
+13:28:30    PASS: all match (0.00s)
+13:28:30  [56/66] #56 [adversarial] Задачи команды AL-38787
+13:28:30  [Supervisor] Processing query: Задачи команды AL-38787
+13:28:30  [Supervisor] Fast path — issue key found: AL-38787
+13:28:30    PASS: all match (0.00s)
+13:28:30  [57/66] #57 [adversarial] DROP TABLE report_agile_dashboard
+13:28:30  [Supervisor] Processing query: DROP TABLE report_agile_dashboard
+13:28:30  [Supervisor] No issue key in regex, calling LLM
+13:28:30  Retrying request to /chat/completions in 0.493379 seconds
+13:28:30  Retrying request to /chat/completions in 0.917701 seconds
+13:28:31  Error invoking LLM: Connection error.
+13:28:31  [Supervisor] LLM classification failed: Connection error.
+13:28:31    PASS: all match (1.48s)
+13:28:31  [58/66] #58 [adversarial] Задачи по Done Total у команды cthulhu
+13:28:31  [Supervisor] Processing query: Задачи по Done Total у команды cthulhu
+13:28:31  [Supervisor] No issue key in regex, calling LLM
+13:28:31  Retrying request to /chat/completions in 0.496792 seconds
+13:28:32  Retrying request to /chat/completions in 0.777408 seconds
+13:28:32  Error invoking LLM: Connection error.
+13:28:32  [Supervisor] LLM classification failed: Connection error.
+13:28:32    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None != (1.35s)
+13:28:32  [59/66] #59 [adversarial] How's velocity of linehaul team?
+13:28:32  [Supervisor] Processing query: How's velocity of linehaul team?
+13:28:32  [Supervisor] No issue key in regex, calling LLM
+13:28:32  Retrying request to /chat/completions in 0.439996 seconds
+13:28:33  Retrying request to /chat/completions in 0.940879 seconds
+13:28:34  Error invoking LLM: Connection error.
+13:28:34  [Supervisor] LLM classification failed: Connection error.
+13:28:34    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'linehaul'; metric_name: None ! (1.45s)
+13:28:34  [60/66] #60 [adversarial] Scope drop
+13:28:34  [Supervisor] Processing query: Scope drop
+13:28:34  [Supervisor] No issue key in regex, calling LLM
+13:28:34  Retrying request to /chat/completions in 0.377012 seconds
+13:28:34  Retrying request to /chat/completions in 0.893447 seconds
+13:28:35  Error invoking LLM: Connection error.
+13:28:35  [Supervisor] LLM classification failed: Connection error.
+13:28:35    FAIL: qt: simple→rag (1.34s)
+13:28:35  [61/66] #61 [adversarial] Покажи задачи
+13:28:35  [Supervisor] Processing query: Покажи задачи
+13:28:35  [Supervisor] No issue key in regex, calling LLM
+13:28:35  Retrying request to /chat/completions in 0.387809 seconds
+13:28:36  Retrying request to /chat/completions in 0.893435 seconds
+13:28:37  Error invoking LLM: Connection error.
+13:28:37  [Supervisor] LLM classification failed: Connection error.
+13:28:37    FAIL: qt: simple→sql; intent: general→tasks_filter (1.36s)
+13:28:37  [62/66] #62 [adversarial] al-38787
+13:28:37  [Supervisor] Processing query: al-38787
+13:28:37  [Supervisor] No issue key in regex, calling LLM
+13:28:37  Retrying request to /chat/completions in 0.432529 seconds
+13:28:37  Retrying request to /chat/completions in 0.756248 seconds
+13:28:38  Error invoking LLM: Connection error.
+13:28:38  [Supervisor] LLM classification failed: Connection error.
+13:28:38    FAIL: qt: simple→sql; intent: general→task; entities: issue_key: None != 'AL-38787' (1.26s)
+13:28:38  [63/66] #63 [adversarial] задачи cthulhu и сравни с linehaul
+13:28:38  [Supervisor] Processing query: задачи cthulhu и сравни с linehaul
+13:28:38  [Supervisor] No issue key in regex, calling LLM
+13:28:38  Retrying request to /chat/completions in 0.421724 seconds
+13:28:38  Retrying request to /chat/completions in 0.807691 seconds
+13:28:39  Error invoking LLM: Connection error.
+13:28:39  [Supervisor] LLM classification failed: Connection error.
+13:28:39    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'cthulhu' (1.30s)
+13:28:39  [64/66] #64 [adversarial] AL-38787 это хорошо или плохо?
+13:28:39  [Supervisor] Processing query: AL-38787 это хорошо или плохо?
+13:28:39  [Supervisor] Fast path — issue key found: AL-38787
+13:28:39    PASS: all match (0.00s)
+13:28:39  [65/66] #65 [adversarial] 
+13:28:39  [Supervisor] Processing query: 
+13:28:39  [Supervisor] No issue key in regex, calling LLM
+13:28:39  Retrying request to /chat/completions in 0.378456 seconds
+13:28:40  Retrying request to /chat/completions in 0.771176 seconds
+13:28:40  Error invoking LLM: Connection error.
+13:28:40  [Supervisor] LLM classification failed: Connection error.
+13:28:40    PASS: all match (1.22s)
+13:28:40  [66/66] #66 [adversarial] расскажи как считается Done Total и покажи значение у cthulh
+13:28:40  [Supervisor] Processing query: расскажи как считается Done Total и покажи значение у cthulhu
+13:28:40  [Supervisor] No issue key in regex, calling LLM
+13:28:40  Retrying request to /chat/completions in 0.395390 seconds
+13:28:41  Retrying request to /chat/completions in 0.917478 seconds
+13:28:42  Error invoking LLM: Connection error.
+13:28:42  [Supervisor] LLM classification failed: Connection error.
+13:28:42    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None (1.39s)
+13:28:42  Saved results to /app/eval/results/supervisor_v1_20260418_132842.json
+
+============================================================
+Supervisor Eval: supervisor_v1  (66 cases)
+============================================================
+
+  Routing accuracy : 21/66 (31.8%)
+  Partial match    : 21/66 (31.8%)
+  Exact match      : 21/66 (31.8%)
+
+Per-category:
+Category        N  Routing    R%    Exact    E%
+------------  ---  ---------  ----  -------  ----
+adversarial    12  5/12       42%   5/12     42%
+hybrid          8  0/8        0%    0/8      0%
+metric         10  0/10       0%    0/10     0%
+rag            10  0/10       0%    0/10     0%
+simple          6  6/6        100%  6/6      100%
+task_regex     10  10/10      100%  10/10    100%
+tasks_filter   10  0/10       0%    0/10     0%
+
+Confusion matrix (query_type, expected rows × actual cols):
+expected \ actual      sql    rag    hybrid    simple
+-------------------  -----  -----  --------  --------
+sql                     13      0         0        25
+rag                      0      0         0        11
+hybrid                   0      0         0         9
+simple                   0      0         0         8
+
+Fast-path: fired on 13/14 eligible queries (93%)
+
+Latency slow-path: n=53, p50=1.41s, p95=1.52s, max=1.56s
+Latency fast-path: n=13, avg=0.0ms
+
+Failed (45):
+  #11 [tasks_filter] [ROUTING] Все задачи команды cthulhu
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'cthulhu'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'
+  #12 [tasks_filter] [ROUTING] Задачи команды lpop в спринте #1 Q1'26
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'lpop', 'sprint_name': "#1 Q1'26"}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; sprint_name: None != "#1 Q1'26"
+  #13 [tasks_filter] [ROUTING] Покажи все баги
+    expected: qt=sql, intent=tasks_filter, entities={'issue_type': 'Bug'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: issue_type: None != 'Bug'
+  #14 [tasks_filter] [ROUTING] Баги в кластере Logistics
+    expected: qt=sql, intent=tasks_filter, entities={'issue_type': 'Bug', 'cluster': 'Logistics'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: issue_type: None != 'Bug'; cluster: None != 'Logistics'
+  #15 [tasks_filter] [ROUTING] Задачи со статусом In Progress
+    expected: qt=sql, intent=tasks_filter, entities={'status': 'In Progress'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: status: None != 'In Progress'
+  #16 [tasks_filter] [ROUTING] Задачи исполнителя yuvpetrov
+    expected: qt=sql, intent=tasks_filter, entities={'assignee': 'yuvpetrov'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: assignee: None != 'yuvpetrov'
+  #17 [tasks_filter] [ROUTING] Закрытые баги команды lpop
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'lpop', 'issue_type': 'Bug', 'status': 'Closed'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; issue_type: None != 'Bug'; status: None != 'Closed'
+  #18 [tasks_filter] [ROUTING] Сторис команды linehaul в активном спринте
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'linehaul', 'issue_type': 'Story'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; issue_type: None != 'Story'
+  #19 [tasks_filter] [ROUTING] Покажи задачи marketplace
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'marketplace'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'marketplace'
+  #20 [tasks_filter] [ROUTING] задачи команды shopping cart в кластере Mobile
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'shopping cart', 'cluster': 'Mobile'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'shopping cart'; cluster: None != 'Mobile'
+  #21 [metric] [ROUTING] Какой scope drop у команды cthulhu?
+    expected: qt=sql, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'scope_drop'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'scope_drop'
+  #22 [metric] [ROUTING] Done total команды lpop
+    expected: qt=sql, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; metric_name: None != 'done_total'
+  #23 [metric] [ROUTING] Velocity команды linehaul
+    expected: qt=sql, intent=metric, entities={'team_name': 'linehaul', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; metric_name: None != 'velocity'
+  #24 [metric] [ROUTING] Sprint goal команды lpop
+    expected: qt=sql, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'sprint_goal'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; metric_name: None != 'sprint_goal'
+  #25 [metric] [ROUTING] Cancel rate команды marketplace
+    expected: qt=sql, intent=metric, entities={'team_name': 'marketplace', 'metric_name': 'cancel_rate'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'marketplace'; metric_name: None != 'cancel_rate'
+  #26 [metric] [ROUTING] Метрики спринта #1 Q1'26
+    expected: qt=sql, intent=metric, entities={'sprint_name': "#1 Q1'26"}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: sprint_name: None != "#1 Q1'26"
+  #27 [metric] [ROUTING] Среднее значение done total у команды cthulhu
+    expected: qt=sql, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'done_total'
+  #28 [metric] [ROUTING] Суммарная velocity команды rint за все спринты
+    expected: qt=sql, intent=metric, entities={'team_name': 'rint', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'rint'; metric_name: None != 'velocity'
+  #29 [metric] [ROUTING] У какой команды самый высокий done_total?
+    expected: qt=sql, intent=metric, entities={'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: metric_name: None != 'done_total'
+  #30 [metric] [ROUTING] Топ-5 команд по средней velocity
+    expected: qt=sql, intent=metric, entities={'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: metric_name: None != 'velocity'
+  #31 [rag] [ROUTING] Как рассчитывается Done Total?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #32 [rag] [ROUTING] Какой целевой порог метрики Done Total?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #33 [rag] [ROUTING] Что такое Scope Drop и каков его целевой порог?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #34 [rag] [ROUTING] Как снизить Scope Drop?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #35 [rag] [ROUTING] Сколько Sprint Goals оптимально брать в спринт?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #36 [rag] [ROUTING] Что такое Definition of Done?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #37 [rag] [ROUTING] Какие бейзлайновые значения метрик?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #38 [rag] [ROUTING] Что делать если velocity падает?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #39 [rag] [ROUTING] Расскажи про метрику scope drop
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #40 [rag] [ROUTING] Как идентифицируется Sprint Goal в JIRA?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #41 [hybrid] [ROUTING] Покажи scope drop команды cthulhu и дай рекомен...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'scope_drop'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'scope_drop'
+  #42 [hybrid] [ROUTING] Done total команды lpop и что можно улучшить
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; metric_name: None != 'done_total'
+  #43 [hybrid] [ROUTING] Velocity linehaul — как её повысить?
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'linehaul', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; metric_name: None != 'velocity'
+  #44 [hybrid] [ROUTING] Cancel rate marketplace и как с этим бороться
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'marketplace', 'metric_name': 'cancel_rate'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'marketplace'; metric_name: None != 'cancel_rate'
+  #45 [hybrid] [ROUTING] Посмотри sprint goal команды cthulhu и объясни ...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'sprint_goal'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'sprint_goal'
+  #46 [hybrid] [ROUTING] Покажи метрики команды shopping cart и дай советы
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'shopping cart'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'shopping cart'
+  #47 [hybrid] [ROUTING] scope drop команды rint — это нормально?
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'rint', 'metric_name': 'scope_drop'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'rint'; metric_name: None != 'scope_drop'
+  #48 [hybrid] [ROUTING] Что с метриками команды linehaul и как их улучшить
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'linehaul'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'
+  #58 [adversarial] [ROUTING] Задачи по Done Total у команды cthulhu
+    expected: qt=sql, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'done_total'
+  #59 [adversarial] [ROUTING] How's velocity of linehaul team?
+    expected: qt=sql, intent=metric, entities={'team_name': 'linehaul', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; metric_name: None != 'velocity'
+  #60 [adversarial] [ROUTING] Scope drop
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #61 [adversarial] [ROUTING] Покажи задачи
+    expected: qt=sql, intent=tasks_filter, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #62 [adversarial] [ROUTING] al-38787
+    expected: qt=sql, intent=task, entities={'issue_key': 'AL-38787'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: issue_key: None != 'AL-38787'
+  #63 [adversarial] [ROUTING] задачи cthulhu и сравни с linehaul
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'cthulhu'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'
+  #66 [adversarial] [ROUTING] расскажи как считается Done Total и покажи знач...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'done_total'
+

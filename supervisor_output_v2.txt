@@ -1,0 +1,629 @@
+13:41:39  Loaded 66 Supervisor test cases
+13:41:46  Initializing LLM client with base_url=http://vllm:8000/v1, model=/models/avibe-gptq-8bit
+13:41:46  [1/66] #1 [task_regex] Расскажи о задаче AL-38787
+13:41:46  [Supervisor] Processing query: Расскажи о задаче AL-38787
+13:41:46  [Supervisor] Fast path — issue key found: AL-38787
+13:41:46    PASS: all match (0.00s)
+13:41:46  [2/66] #2 [task_regex] Покажи данные по задаче AL-38799
+13:41:46  [Supervisor] Processing query: Покажи данные по задаче AL-38799
+13:41:46  [Supervisor] Fast path — issue key found: AL-38799
+13:41:46    PASS: all match (0.00s)
+13:41:46  [3/66] #3 [task_regex] AL-38787
+13:41:46  [Supervisor] Processing query: AL-38787
+13:41:46  [Supervisor] Fast path — issue key found: AL-38787
+13:41:46    PASS: all match (0.00s)
+13:41:46  [4/66] #4 [task_regex] Что там с AL-39041?
+13:41:46  [Supervisor] Processing query: Что там с AL-39041?
+13:41:46  [Supervisor] Fast path — issue key found: AL-39041
+13:41:46    PASS: all match (0.00s)
+13:41:46  [5/66] #5 [task_regex] Информация о задаче AL-99999
+13:41:46  [Supervisor] Processing query: Информация о задаче AL-99999
+13:41:46  [Supervisor] Fast path — issue key found: AL-99999
+13:41:46    PASS: all match (0.00s)
+13:41:46  [6/66] #6 [task_regex] Выведи задачу DATA-1234
+13:41:46  [Supervisor] Processing query: Выведи задачу DATA-1234
+13:41:46  [Supervisor] Fast path — issue key found: DATA-1234
+13:41:46    PASS: all match (0.00s)
+13:41:46  [7/66] #7 [task_regex] покажи AL-40001 в подробностях
+13:41:46  [Supervisor] Processing query: покажи AL-40001 в подробностях
+13:41:46  [Supervisor] Fast path — issue key found: AL-40001
+13:41:46    PASS: all match (0.00s)
+13:41:46  [8/66] #8 [task_regex] задача RND-55
+13:41:46  [Supervisor] Processing query: задача RND-55
+13:41:46  [Supervisor] Fast path — issue key found: RND-55
+13:41:46    PASS: all match (0.00s)
+13:41:46  [9/66] #9 [task_regex] open AL-38787
+13:41:46  [Supervisor] Processing query: open AL-38787
+13:41:46  [Supervisor] Fast path — issue key found: AL-38787
+13:41:46    PASS: all match (0.00s)
+13:41:46  [10/66] #10 [task_regex] Details for AL-38800
+13:41:46  [Supervisor] Processing query: Details for AL-38800
+13:41:46  [Supervisor] Fast path — issue key found: AL-38800
+13:41:46    PASS: all match (0.00s)
+13:41:46  [11/66] #11 [tasks_filter] Все задачи команды cthulhu
+13:41:46  [Supervisor] Processing query: Все задачи команды cthulhu
+13:41:46  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'cthulhu' (0.51s)
+13:41:47  [12/66] #12 [tasks_filter] Задачи команды lpop в спринте #1 Q1'26
+13:41:47  [Supervisor] Processing query: Задачи команды lpop в спринте #1 Q1'26
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4560 tokens (2512 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4560 tokens (2512 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'lpop'; sprint_name: None (0.01s)
+13:41:47  [13/66] #13 [tasks_filter] Покажи все баги
+13:41:47  [Supervisor] Processing query: Покажи все баги
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: issue_type: None != 'Bug' (0.01s)
+13:41:47  [14/66] #14 [tasks_filter] Баги в кластере Logistics
+13:41:47  [Supervisor] Processing query: Баги в кластере Logistics
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4551 tokens (2503 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4551 tokens (2503 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: issue_type: None != 'Bug'; cluster: None !=  (0.01s)
+13:41:47  [15/66] #15 [tasks_filter] Задачи со статусом In Progress
+13:41:47  [Supervisor] Processing query: Задачи со статусом In Progress
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4551 tokens (2503 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4551 tokens (2503 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: status: None != 'In Progress' (0.01s)
+13:41:47  [16/66] #16 [tasks_filter] Задачи исполнителя yuvpetrov
+13:41:47  [Supervisor] Processing query: Задачи исполнителя yuvpetrov
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: assignee: None != 'yuvpetrov' (0.01s)
+13:41:47  [17/66] #17 [tasks_filter] Закрытые баги команды lpop
+13:41:47  [Supervisor] Processing query: Закрытые баги команды lpop
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'lpop'; issue_type: None  (0.01s)
+13:41:47  [18/66] #18 [tasks_filter] Сторис команды linehaul в активном спринте
+13:41:47  [Supervisor] Processing query: Сторис команды linehaul в активном спринте
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'linehaul'; issue_type: N (0.01s)
+13:41:47  [19/66] #19 [tasks_filter] Покажи задачи marketplace
+13:41:47  [Supervisor] Processing query: Покажи задачи marketplace
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'marketplace' (0.01s)
+13:41:47  [20/66] #20 [tasks_filter] задачи команды shopping cart в кластере Mobile
+13:41:47  [Supervisor] Processing query: задачи команды shopping cart в кластере Mobile
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'shopping cart'; cluster: (0.01s)
+13:41:47  [21/66] #21 [metric] Какой scope drop у команды cthulhu?
+13:41:47  [Supervisor] Processing query: Какой scope drop у команды cthulhu?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None != (0.01s)
+13:41:47  [22/66] #22 [metric] Done total команды lpop
+13:41:47  [Supervisor] Processing query: Done total команды lpop
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'lpop'; metric_name: None != 'd (0.01s)
+13:41:47  [23/66] #23 [metric] Velocity команды linehaul
+13:41:47  [Supervisor] Processing query: Velocity команды linehaul
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'linehaul'; metric_name: None ! (0.02s)
+13:41:47  [24/66] #24 [metric] Sprint goal команды lpop
+13:41:47  [Supervisor] Processing query: Sprint goal команды lpop
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4551 tokens (2503 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4551 tokens (2503 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'lpop'; metric_name: None != 's (0.01s)
+13:41:47  [25/66] #25 [metric] Cancel rate команды marketplace
+13:41:47  [Supervisor] Processing query: Cancel rate команды marketplace
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'marketplace'; metric_name: Non (0.01s)
+13:41:47  [26/66] #26 [metric] Метрики спринта #1 Q1'26
+13:41:47  [Supervisor] Processing query: Метрики спринта #1 Q1'26
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: sprint_name: None != "#1 Q1'26" (0.01s)
+13:41:47  [27/66] #27 [metric] Среднее значение done total у команды cthulhu
+13:41:47  [Supervisor] Processing query: Среднее значение done total у команды cthulhu
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None != (0.01s)
+13:41:47  [28/66] #28 [metric] Суммарная velocity команды rint за все спринты
+13:41:47  [Supervisor] Processing query: Суммарная velocity команды rint за все спринты
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'rint'; metric_name: None != 'v (0.01s)
+13:41:47  [29/66] #29 [metric] У какой команды самый высокий done_total?
+13:41:47  [Supervisor] Processing query: У какой команды самый высокий done_total?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: metric_name: None != 'done_total' (0.01s)
+13:41:47  [30/66] #30 [metric] Топ-5 команд по средней velocity
+13:41:47  [Supervisor] Processing query: Топ-5 команд по средней velocity
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: metric_name: None != 'velocity' (0.01s)
+13:41:47  [31/66] #31 [rag] Как рассчитывается Done Total?
+13:41:47  [Supervisor] Processing query: Как рассчитывается Done Total?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [32/66] #32 [rag] Какой целевой порог метрики Done Total?
+13:41:47  [Supervisor] Processing query: Какой целевой порог метрики Done Total?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [33/66] #33 [rag] Что такое Scope Drop и каков его целевой порог?
+13:41:47  [Supervisor] Processing query: Что такое Scope Drop и каков его целевой порог?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4555 tokens (2507 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4555 tokens (2507 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [34/66] #34 [rag] Как снизить Scope Drop?
+13:41:47  [Supervisor] Processing query: Как снизить Scope Drop?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [35/66] #35 [rag] Сколько Sprint Goals оптимально брать в спринт?
+13:41:47  [Supervisor] Processing query: Сколько Sprint Goals оптимально брать в спринт?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [36/66] #36 [rag] Что такое Definition of Done?
+13:41:47  [Supervisor] Processing query: Что такое Definition of Done?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [37/66] #37 [rag] Какие бейзлайновые значения метрик?
+13:41:47  [Supervisor] Processing query: Какие бейзлайновые значения метрик?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [38/66] #38 [rag] Что делать если velocity падает?
+13:41:47  [Supervisor] Processing query: Что делать если velocity падает?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4550 tokens (2502 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [39/66] #39 [rag] Расскажи про метрику scope drop
+13:41:47  [Supervisor] Processing query: Расскажи про метрику scope drop
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [40/66] #40 [rag] Как идентифицируется Sprint Goal в JIRA?
+13:41:47  [Supervisor] Processing query: Как идентифицируется Sprint Goal в JIRA?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [41/66] #41 [hybrid] Покажи scope drop команды cthulhu и дай рекомендации
+13:41:47  [Supervisor] Processing query: Покажи scope drop команды cthulhu и дай рекомендации
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4557 tokens (2509 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4557 tokens (2509 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None (0.01s)
+13:41:47  [42/66] #42 [hybrid] Done total команды lpop и что можно улучшить
+13:41:47  [Supervisor] Processing query: Done total команды lpop и что можно улучшить
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4554 tokens (2506 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'lpop'; metric_name: None != (0.01s)
+13:41:47  [43/66] #43 [hybrid] Velocity linehaul — как её повысить?
+13:41:47  [Supervisor] Processing query: Velocity linehaul — как её повысить?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'linehaul'; metric_name: Non (0.01s)
+13:41:47  [44/66] #44 [hybrid] Cancel rate marketplace и как с этим бороться
+13:41:47  [Supervisor] Processing query: Cancel rate marketplace и как с этим бороться
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'marketplace'; metric_name:  (0.01s)
+13:41:47  [45/66] #45 [hybrid] Посмотри sprint goal команды cthulhu и объясни метрику
+13:41:47  [Supervisor] Processing query: Посмотри sprint goal команды cthulhu и объясни метрику
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4559 tokens (2511 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4559 tokens (2511 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None (0.01s)
+13:41:47  [46/66] #46 [hybrid] Покажи метрики команды shopping cart и дай советы
+13:41:47  [Supervisor] Processing query: Покажи метрики команды shopping cart и дай советы
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4555 tokens (2507 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4555 tokens (2507 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'shopping cart' (0.01s)
+13:41:47  [47/66] #47 [hybrid] scope drop команды rint — это нормально?
+13:41:47  [Supervisor] Processing query: scope drop команды rint — это нормально?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'rint'; metric_name: None != (0.01s)
+13:41:47  [48/66] #48 [hybrid] Что с метриками команды linehaul и как их улучшить
+13:41:47  [Supervisor] Processing query: Что с метриками команды linehaul и как их улучшить
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4557 tokens (2509 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4557 tokens (2509 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'linehaul' (0.01s)
+13:41:47  [49/66] #49 [simple] Привет
+13:41:47  [Supervisor] Processing query: Привет
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4546 tokens (2498 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4546 tokens (2498 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [50/66] #50 [simple] Здравствуйте
+13:41:47  [Supervisor] Processing query: Здравствуйте
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4546 tokens (2498 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4546 tokens (2498 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [51/66] #51 [simple] Спасибо!
+13:41:47  [Supervisor] Processing query: Спасибо!
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4546 tokens (2498 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4546 tokens (2498 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [52/66] #52 [simple] Как дела?
+13:41:47  [Supervisor] Processing query: Как дела?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4547 tokens (2499 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4547 tokens (2499 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [53/66] #53 [simple] Что ты умеешь?
+13:41:47  [Supervisor] Processing query: Что ты умеешь?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4549 tokens (2501 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [54/66] #54 [simple] Hi there
+13:41:47  [Supervisor] Processing query: Hi there
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4547 tokens (2499 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4547 tokens (2499 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [55/66] #55 [adversarial] Привет, расскажи про AL-38787
+13:41:47  [Supervisor] Processing query: Привет, расскажи про AL-38787
+13:41:47  [Supervisor] Fast path — issue key found: AL-38787
+13:41:47    PASS: all match (0.00s)
+13:41:47  [56/66] #56 [adversarial] Задачи команды AL-38787
+13:41:47  [Supervisor] Processing query: Задачи команды AL-38787
+13:41:47  [Supervisor] Fast path — issue key found: AL-38787
+13:41:47    PASS: all match (0.00s)
+13:41:47  [57/66] #57 [adversarial] DROP TABLE report_agile_dashboard
+13:41:47  [Supervisor] Processing query: DROP TABLE report_agile_dashboard
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [58/66] #58 [adversarial] Задачи по Done Total у команды cthulhu
+13:41:47  [Supervisor] Processing query: Задачи по Done Total у команды cthulhu
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None != (0.01s)
+13:41:47  [59/66] #59 [adversarial] How's velocity of linehaul team?
+13:41:47  [Supervisor] Processing query: How's velocity of linehaul team?
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4553 tokens (2505 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→metric; entities: team_name: None != 'linehaul'; metric_name: None ! (0.01s)
+13:41:47  [60/66] #60 [adversarial] Scope drop
+13:41:47  [Supervisor] Processing query: Scope drop
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4547 tokens (2499 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4547 tokens (2499 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→rag (0.01s)
+13:41:47  [61/66] #61 [adversarial] Покажи задачи
+13:41:47  [Supervisor] Processing query: Покажи задачи
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4548 tokens (2500 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4548 tokens (2500 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter (0.01s)
+13:41:47  [62/66] #62 [adversarial] al-38787
+13:41:47  [Supervisor] Processing query: al-38787
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4552 tokens (2504 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→task; entities: issue_key: None != 'AL-38787' (0.01s)
+13:41:47  [63/66] #63 [adversarial] задачи cthulhu и сравни с linehaul
+13:41:47  [Supervisor] Processing query: задачи cthulhu и сравни с linehaul
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4556 tokens (2508 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→sql; intent: general→tasks_filter; entities: team_name: None != 'cthulhu' (0.01s)
+13:41:47  [64/66] #64 [adversarial] AL-38787 это хорошо или плохо?
+13:41:47  [Supervisor] Processing query: AL-38787 это хорошо или плохо?
+13:41:47  [Supervisor] Fast path — issue key found: AL-38787
+13:41:47    PASS: all match (0.00s)
+13:41:47  [65/66] #65 [adversarial] 
+13:41:47  [Supervisor] Processing query: 
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4544 tokens (2496 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4544 tokens (2496 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    PASS: all match (0.01s)
+13:41:47  [66/66] #66 [adversarial] расскажи как считается Done Total и покажи значение у cthulh
+13:41:47  [Supervisor] Processing query: расскажи как считается Done Total и покажи значение у cthulhu
+13:41:47  [Supervisor] No issue key in regex, calling LLM
+13:41:47  HTTP Request: POST http://vllm:8000/v1/chat/completions "HTTP/1.1 400 Bad Request"
+13:41:47  Error invoking LLM: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4561 tokens (2513 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47  [Supervisor] LLM classification failed: Error code: 400 - {'object': 'error', 'message': "This model's maximum context length is 4096 tokens. However, you requested 4561 tokens (2513 in the messages, 2048 in the completion). Please reduce the length of the messages or completion. None", 'type': 'BadRequestError', 'param': None, 'code': 400}
+13:41:47    FAIL: qt: simple→hybrid; intent: general→metric; entities: team_name: None != 'cthulhu'; metric_name: None (0.01s)
+13:41:47  Saved results to /app/eval/results/supervisor_v2_20260418_134147.json
+
+============================================================
+Supervisor Eval: supervisor_v2  (66 cases)
+============================================================
+
+  Routing accuracy : 21/66 (31.8%)
+  Partial match    : 21/66 (31.8%)
+  Exact match      : 21/66 (31.8%)
+
+Per-category:
+Category        N  Routing    R%    Exact    E%
+------------  ---  ---------  ----  -------  ----
+adversarial    12  5/12       42%   5/12     42%
+hybrid          8  0/8        0%    0/8      0%
+metric         10  0/10       0%    0/10     0%
+rag            10  0/10       0%    0/10     0%
+simple          6  6/6        100%  6/6      100%
+task_regex     10  10/10      100%  10/10    100%
+tasks_filter   10  0/10       0%    0/10     0%
+
+Confusion matrix (query_type, expected rows × actual cols):
+expected \ actual      sql    rag    hybrid    simple
+-------------------  -----  -----  --------  --------
+sql                     13      0         0        25
+rag                      0      0         0        11
+hybrid                   0      0         0         9
+simple                   0      0         0         8
+
+Fast-path: fired on 13/14 eligible queries (93%)
+
+Latency slow-path: n=53, p50=0.01s, p95=0.01s, max=0.51s
+Latency fast-path: n=13, avg=0.0ms
+
+Failed (45):
+  #11 [tasks_filter] [ROUTING] Все задачи команды cthulhu
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'cthulhu'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'
+  #12 [tasks_filter] [ROUTING] Задачи команды lpop в спринте #1 Q1'26
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'lpop', 'sprint_name': "#1 Q1'26"}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; sprint_name: None != "#1 Q1'26"
+  #13 [tasks_filter] [ROUTING] Покажи все баги
+    expected: qt=sql, intent=tasks_filter, entities={'issue_type': 'Bug'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: issue_type: None != 'Bug'
+  #14 [tasks_filter] [ROUTING] Баги в кластере Logistics
+    expected: qt=sql, intent=tasks_filter, entities={'issue_type': 'Bug', 'cluster': 'Logistics'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: issue_type: None != 'Bug'; cluster: None != 'Logistics'
+  #15 [tasks_filter] [ROUTING] Задачи со статусом In Progress
+    expected: qt=sql, intent=tasks_filter, entities={'status': 'In Progress'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: status: None != 'In Progress'
+  #16 [tasks_filter] [ROUTING] Задачи исполнителя yuvpetrov
+    expected: qt=sql, intent=tasks_filter, entities={'assignee': 'yuvpetrov'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: assignee: None != 'yuvpetrov'
+  #17 [tasks_filter] [ROUTING] Закрытые баги команды lpop
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'lpop', 'issue_type': 'Bug', 'status': 'Closed'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; issue_type: None != 'Bug'; status: None != 'Closed'
+  #18 [tasks_filter] [ROUTING] Сторис команды linehaul в активном спринте
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'linehaul', 'issue_type': 'Story'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; issue_type: None != 'Story'
+  #19 [tasks_filter] [ROUTING] Покажи задачи marketplace
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'marketplace'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'marketplace'
+  #20 [tasks_filter] [ROUTING] задачи команды shopping cart в кластере Mobile
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'shopping cart', 'cluster': 'Mobile'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'shopping cart'; cluster: None != 'Mobile'
+  #21 [metric] [ROUTING] Какой scope drop у команды cthulhu?
+    expected: qt=sql, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'scope_drop'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'scope_drop'
+  #22 [metric] [ROUTING] Done total команды lpop
+    expected: qt=sql, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; metric_name: None != 'done_total'
+  #23 [metric] [ROUTING] Velocity команды linehaul
+    expected: qt=sql, intent=metric, entities={'team_name': 'linehaul', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; metric_name: None != 'velocity'
+  #24 [metric] [ROUTING] Sprint goal команды lpop
+    expected: qt=sql, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'sprint_goal'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; metric_name: None != 'sprint_goal'
+  #25 [metric] [ROUTING] Cancel rate команды marketplace
+    expected: qt=sql, intent=metric, entities={'team_name': 'marketplace', 'metric_name': 'cancel_rate'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'marketplace'; metric_name: None != 'cancel_rate'
+  #26 [metric] [ROUTING] Метрики спринта #1 Q1'26
+    expected: qt=sql, intent=metric, entities={'sprint_name': "#1 Q1'26"}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: sprint_name: None != "#1 Q1'26"
+  #27 [metric] [ROUTING] Среднее значение done total у команды cthulhu
+    expected: qt=sql, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'done_total'
+  #28 [metric] [ROUTING] Суммарная velocity команды rint за все спринты
+    expected: qt=sql, intent=metric, entities={'team_name': 'rint', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'rint'; metric_name: None != 'velocity'
+  #29 [metric] [ROUTING] У какой команды самый высокий done_total?
+    expected: qt=sql, intent=metric, entities={'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: metric_name: None != 'done_total'
+  #30 [metric] [ROUTING] Топ-5 команд по средней velocity
+    expected: qt=sql, intent=metric, entities={'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: metric_name: None != 'velocity'
+  #31 [rag] [ROUTING] Как рассчитывается Done Total?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #32 [rag] [ROUTING] Какой целевой порог метрики Done Total?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #33 [rag] [ROUTING] Что такое Scope Drop и каков его целевой порог?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #34 [rag] [ROUTING] Как снизить Scope Drop?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #35 [rag] [ROUTING] Сколько Sprint Goals оптимально брать в спринт?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #36 [rag] [ROUTING] Что такое Definition of Done?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #37 [rag] [ROUTING] Какие бейзлайновые значения метрик?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #38 [rag] [ROUTING] Что делать если velocity падает?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #39 [rag] [ROUTING] Расскажи про метрику scope drop
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #40 [rag] [ROUTING] Как идентифицируется Sprint Goal в JIRA?
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #41 [hybrid] [ROUTING] Покажи scope drop команды cthulhu и дай рекомен...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'scope_drop'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'scope_drop'
+  #42 [hybrid] [ROUTING] Done total команды lpop и что можно улучшить
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'lpop', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'lpop'; metric_name: None != 'done_total'
+  #43 [hybrid] [ROUTING] Velocity linehaul — как её повысить?
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'linehaul', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; metric_name: None != 'velocity'
+  #44 [hybrid] [ROUTING] Cancel rate marketplace и как с этим бороться
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'marketplace', 'metric_name': 'cancel_rate'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'marketplace'; metric_name: None != 'cancel_rate'
+  #45 [hybrid] [ROUTING] Посмотри sprint goal команды cthulhu и объясни ...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'sprint_goal'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'sprint_goal'
+  #46 [hybrid] [ROUTING] Покажи метрики команды shopping cart и дай советы
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'shopping cart'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'shopping cart'
+  #47 [hybrid] [ROUTING] scope drop команды rint — это нормально?
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'rint', 'metric_name': 'scope_drop'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'rint'; metric_name: None != 'scope_drop'
+  #48 [hybrid] [ROUTING] Что с метриками команды linehaul и как их улучшить
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'linehaul'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'
+  #58 [adversarial] [ROUTING] Задачи по Done Total у команды cthulhu
+    expected: qt=sql, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'done_total'
+  #59 [adversarial] [ROUTING] How's velocity of linehaul team?
+    expected: qt=sql, intent=metric, entities={'team_name': 'linehaul', 'metric_name': 'velocity'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'linehaul'; metric_name: None != 'velocity'
+  #60 [adversarial] [ROUTING] Scope drop
+    expected: qt=rag, intent=general, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #61 [adversarial] [ROUTING] Покажи задачи
+    expected: qt=sql, intent=tasks_filter, entities={}
+    actual  : qt=simple, intent=general, entities={}
+  #62 [adversarial] [ROUTING] al-38787
+    expected: qt=sql, intent=task, entities={'issue_key': 'AL-38787'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: issue_key: None != 'AL-38787'
+  #63 [adversarial] [ROUTING] задачи cthulhu и сравни с linehaul
+    expected: qt=sql, intent=tasks_filter, entities={'team_name': 'cthulhu'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'
+  #66 [adversarial] [ROUTING] расскажи как считается Done Total и покажи знач...
+    expected: qt=hybrid, intent=metric, entities={'team_name': 'cthulhu', 'metric_name': 'done_total'}
+    actual  : qt=simple, intent=general, entities={}
+    mismatches: team_name: None != 'cthulhu'; metric_name: None != 'done_total'
+
