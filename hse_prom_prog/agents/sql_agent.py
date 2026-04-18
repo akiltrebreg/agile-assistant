@@ -82,15 +82,19 @@ ORDER BY <col> DESC/ASC LIMIT 1
   SELECT MAX(<col>) FROM report_agile_dashboard
   (e.g. "максимальный storypoints у одной задачи" = MAX(storypoints_act))
 
-### Type A (default — NO aggregation)
+### Type A (default — NO aggregation, team specified)
 SELECT feature_teams, sprint_name, <metric> \
 FROM report_agile_dashboard_metrics \
-WHERE feature_teams ILIKE '%%team%%'
+WHERE feature_teams ILIKE '%%<actual_team_name>%%'
 
-### Type B (team AVG/SUM across sprints)
+### Type B (team AVG/SUM across sprints, team specified)
 SELECT feature_teams, AVG(<metric>) \
 FROM report_agile_dashboard_metrics \
-WHERE feature_teams ILIKE '%%team%%' GROUP BY feature_teams
+WHERE feature_teams ILIKE '%%<actual_team_name>%%' GROUP BY feature_teams
+
+NOTE: <actual_team_name> must be the real team from the user's question \
+(e.g. cthulhu, lpop, linehaul). If NO team is mentioned, OMIT the \
+WHERE clause — do NOT write the literal string 'team', '%team%', or '...'.
 
 ### Type C (compare teams — top/which team)
 SELECT feature_teams, AVG(<metric>) \
@@ -159,6 +163,14 @@ FROM report_agile_dashboard_metrics \
 GROUP BY feature_teams ORDER BY 2 DESC LIMIT 1
 BAD: ORDER BY done_total DESC LIMIT 1 \
 — returns a single best sprint, not the best team average
+
+Q: Команды со средним scope drop больше 25%%
+GOOD: SELECT feature_teams, AVG(scope_drop) \
+FROM report_agile_dashboard_metrics \
+GROUP BY feature_teams HAVING AVG(scope_drop) > 25
+BAD: WHERE feature_teams ILIKE '%%team%%' \
+— 'team' is a placeholder, not a value! No team named in question → \
+OMIT the WHERE clause.
 
 Q: Какой максимальный story points у одной задачи?
 GOOD: SELECT MAX(storypoints_act) FROM report_agile_dashboard
@@ -337,15 +349,22 @@ _COUNT_TASKS_WORDS = re.compile(
 _HAS_AVG_SUM = re.compile(r"\b(AVG|SUM)\s*\(", re.IGNORECASE)
 _HAS_MIN_MAX = re.compile(r"\b(MIN|MAX)\s*\(", re.IGNORECASE)
 _SELECTS_METRICS_TABLE = re.compile(r"FROM\s+report_agile_dashboard_metrics\b", re.IGNORECASE)
+# Placeholder patterns that leaked from the prompt template
+_PLACEHOLDER_PATTERNS = re.compile(
+    r"ILIKE\s+'%(team|actual_team_name|team_name|name|value|"
+    r"X|метрик|\.\.\.|<[^>]+>)%'",
+    re.IGNORECASE,
+)
 
 
 def _semantic_check(user_query: str, sql: str) -> str | None:
     """Return a hint string if SQL semantically mismatches the user query.
 
-    Detects three common errors:
+    Detects four common errors:
     1. Aggregation (AVG/SUM) without aggregator words in the question
     2. MIN/MAX used instead of ORDER BY ... LIMIT 1 (loses feature_teams)
     3. COUNT of tasks issued against metrics table (wrong granularity)
+    4. Placeholder leaked from prompt (e.g. WHERE feature_teams ILIKE '%team%')
     """
     is_metric_q = bool(_METRIC_WORDS.search(user_query))
     has_agg_word = bool(_AGG_WORDS.search(user_query))
@@ -361,7 +380,7 @@ def _semantic_check(user_query: str, sql: str) -> str | None:
             "'топ', etc.), but your SQL uses AVG/SUM. Rewrite as Type A: "
             "SELECT feature_teams, sprint_name, <metric> "
             "FROM report_agile_dashboard_metrics "
-            "WHERE feature_teams ILIKE '%team%' — no GROUP BY, no AVG."
+            "WHERE feature_teams ILIKE '%<actual_team_name>%' — no AVG."
         )
 
     # Check 2: MIN/MAX with team/sprint context but SQL returns a scalar.
@@ -381,6 +400,18 @@ def _semantic_check(user_query: str, sql: str) -> str | None:
         return (
             "You are counting tasks but querying report_agile_dashboard_metrics "
             "(1 row per team×sprint). Use report_agile_dashboard (1 row per task)."
+        )
+
+    # Check 4: placeholder leaked from prompt (e.g. ILIKE '%team%')
+    placeholder_match = _PLACEHOLDER_PATTERNS.search(sql)
+    if placeholder_match:
+        leaked = placeholder_match.group(0)
+        logger.info("[SQL Agent] Semantic check fired: reason=placeholder_leak")
+        return (
+            f"Your SQL contains a placeholder from the prompt template: "
+            f"{leaked!r}. This is NOT a real team name — it's a template "
+            "variable. If the user didn't mention a team, OMIT the WHERE "
+            "clause entirely. If they did, substitute the actual team name."
         )
 
     return None
