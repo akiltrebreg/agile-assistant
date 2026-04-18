@@ -301,13 +301,26 @@ def _call_model(state: AgentState) -> dict:
     tool_calls = getattr(response, "tool_calls", None) or []
     content_preview = str(response.content)[:300] if response.content else ""
 
-    usage = (response.response_metadata or {}).get("token_usage", {}) or {}
-    logger.info(
-        "[SQL Agent] Tokens: prompt=%d, completion=%d, total=%d",
-        usage.get("prompt_tokens", 0),
-        usage.get("completion_tokens", 0),
-        usage.get("total_tokens", 0),
-    )
+    # Try both LangChain-standard usage_metadata and OpenAI-style token_usage
+    um = getattr(response, "usage_metadata", None) or {}
+    legacy = (response.response_metadata or {}).get("token_usage", {}) or {}
+    prompt_tokens = um.get("input_tokens") or legacy.get("prompt_tokens") or 0
+    completion_tokens = um.get("output_tokens") or legacy.get("completion_tokens") or 0
+    total_tokens = um.get("total_tokens") or legacy.get("total_tokens") or 0
+    if prompt_tokens == 0 and total_tokens == 0:
+        logger.warning(
+            "[SQL Agent] Tokens: usage missing from vLLM response "
+            "(usage_metadata=%r, token_usage=%r)",
+            um,
+            legacy,
+        )
+    else:
+        logger.info(
+            "[SQL Agent] Tokens: prompt=%d, completion=%d, total=%d",
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+        )
     logger.info(
         "[SQL Agent] LLM response: tool_calls=%d, content=%r",
         len(tool_calls),
