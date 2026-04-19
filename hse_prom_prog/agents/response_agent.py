@@ -91,8 +91,12 @@ class ResponseAgent:
                 formatted[label] = self._format_value(val)
         return json.dumps(formatted, ensure_ascii=False, indent=2)
 
-    def _prepare_task_list(self, rows: list[dict[str, Any]]) -> str:
-        """Format a list of tasks as a compact summary."""
+    def _prepare_task_list(self, rows: list[dict[str, Any]], include_assignee: bool = False) -> str:
+        """Format a list of tasks as a compact summary.
+
+        If `include_assignee` is True, adds assignee_name column — useful
+        when the user filter is by assignee, so the model can confirm.
+        """
         total = len(rows)
         shown = rows[:_MAX_ROWS_IN_PROMPT]
         lines = []
@@ -102,7 +106,11 @@ class ResponseAgent:
             status = row.get("issue_status_act", "?")
             team = row.get("feature_teams", "?")
             sp = row.get("storypoints_act", "?")
-            lines.append(f"{i}. {key} | {status} | {team} | SP:{sp} | {summary}")
+            base = f"{i}. {key} | {status} | {team} | SP:{sp}"
+            if include_assignee:
+                assignee = row.get("assignee_name", "?")
+                base += f" | @{assignee}"
+            lines.append(f"{base} | {summary}")
         result = "\n".join(lines)
         if total > _MAX_ROWS_IN_PROMPT:
             extra = total - _MAX_ROWS_IN_PROMPT
@@ -149,18 +157,29 @@ class ResponseAgent:
             f"Вопрос: {original_query}\n\n"
             "Сформируй краткое описание задачи. Включи:\n"
             "- Ключ, тип и текущий статус\n"
-            "- Команду и исполнителя (если есть)\n"
+            "- Команду и исполнителя (если есть в данных)\n"
             "- Story Points и спринт\n"
             "- Другие поля, если они релевантны вопросу\n\n"
-            "Не перечисляй все поля подряд — выбери важное."
+            "Правила:\n"
+            "- Не перечисляй все поля подряд — выбери важное.\n"
+            "- Пропускай поля, значения которых отсутствуют в данных. "
+            "НЕ пиши «не указано», «отсутствует», «нет данных» — "
+            "просто не упоминай эти поля.\n"
+            "- Если в вопросе пользователя названы команда / исполнитель / "
+            "спринт — обязательно упомяни их в ответе."
         )
         return self.llm_client.invoke(prompt)
 
     def _generate_tasks_filter_response(
-        self, original_query: str, rows: list[dict[str, Any]]
+        self,
+        original_query: str,
+        rows: list[dict[str, Any]],
+        entities: dict[str, Any] | None = None,
     ) -> str:
         """Generate response for a filtered task list."""
-        task_list = self._prepare_task_list(rows)
+        entities = entities or {}
+        include_assignee = bool(entities.get("assignee"))
+        task_list = self._prepare_task_list(rows, include_assignee=include_assignee)
         total = len(rows)
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
@@ -172,6 +191,8 @@ class ResponseAgent:
             "- Перечисли задачи (ключ, статус, SP, краткое описание).\n"
             f"- Если задач больше {_MAX_ROWS_IN_PROMPT}, "
             f"укажи что показаны первые {_MAX_ROWS_IN_PROMPT}.\n"
+            "- Если в вопросе названы команда / исполнитель / спринт — "
+            "обязательно упомяни их в ответе.\n"
             "- Если полезно — сгруппируй по статусу или типу."
         )
         return self.llm_client.invoke(prompt)
@@ -231,7 +252,9 @@ class ResponseAgent:
             f"Контекст из базы знаний:\n{rag_response}\n\n"
             f"Вопрос: {original_query}\n\n"
             "Сформируй ответ в два блока:\n"
-            "1. ДАННЫЕ: приведи конкретные числа/факты из БД.\n"
+            "1. ДАННЫЕ: приведи конкретные числа/факты из БД. "
+            "Обязательно назови команду, спринт и конкретные числа из БД, "
+            "если они есть в данных.\n"
             "2. АНАЛИЗ: дай рекомендации на основе базы знаний. "
             "Укажи источники в формате [название документа]."
         )
@@ -274,11 +297,14 @@ class ResponseAgent:
                 msg = "По вашему запросу ничего не найдено.\n\n---\n*Попробуйте уточнить фильтры*"
             return {"final_response": msg}
 
+        entities = state.get("entities", {})
         try:
             if intent == "task":
                 response = self._generate_task_response(original_query, sql_result[0])
             elif intent == "tasks_filter":
-                response = self._generate_tasks_filter_response(original_query, sql_result)
+                response = self._generate_tasks_filter_response(
+                    original_query, sql_result, entities
+                )
             elif intent == "metric":
                 response = self._generate_metric_response(original_query, sql_result)
             else:
@@ -350,8 +376,8 @@ class ResponseAgent:
         rag_response = state.get("rag_response")
         rag_sources = state.get("rag_sources", [])
 
-        # --- Both failed ---
-        if note and not use_sql and not use_rag:
+        # --- Both failed (only hybrid/rag — sql-only handles empty in _process_sql_response) ---
+        if query_type != "sql" and note and not use_sql and not use_rag:
             logger.warning("[Response Agent] Validation note: %s", note)
             return {
                 "final_response": (
