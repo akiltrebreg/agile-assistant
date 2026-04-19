@@ -109,6 +109,18 @@ def _check_must_contain(response: str, terms: list[str]) -> list[str]:
     return [t for t in terms if t.lower() not in r]
 
 
+def _check_must_contain_any(response: str, groups: list[list[str]]) -> list[list[str]]:
+    """For each OR-group: pass if ANY term matches. Returns failed groups."""
+    if not groups:
+        return []
+    r = response.lower()
+    failed = []
+    for group in groups:
+        if not any(t.lower() in r for t in group):
+            failed.append(group)
+    return failed
+
+
 def _check_must_not_contain(response: str, terms: list[str]) -> list[str]:
     """Return list of FORBIDDEN terms that appeared (case-insensitive)."""
     if not terms:
@@ -137,6 +149,7 @@ def _check_sources(response: str, must_have: bool) -> bool:
 def _evaluate_checks(response: str, checks: dict[str, Any]) -> dict[str, Any]:
     """Run all checks and return per-check result + overall pass/fail."""
     missing = _check_must_contain(response, checks.get("must_contain", []))
+    missing_any = _check_must_contain_any(response, checks.get("must_contain_any", []))
     forbidden = _check_must_not_contain(response, checks.get("must_not_contain", []))
 
     lang_ok = True
@@ -151,11 +164,20 @@ def _evaluate_checks(response: str, checks: dict[str, Any]) -> dict[str, Any]:
     if "must_have_sources" in checks:
         sources_ok = _check_sources(response, checks["must_have_sources"])
 
-    all_ok = not missing and not forbidden and lang_ok and min_ok and max_ok and sources_ok
+    all_ok = (
+        not missing
+        and not missing_any
+        and not forbidden
+        and lang_ok
+        and min_ok
+        and max_ok
+        and sources_ok
+    )
 
     return {
         "pass": all_ok,
         "missing_terms": missing,
+        "missing_any_groups": missing_any,
         "forbidden_terms": forbidden,
         "language_ok": lang_ok,
         "length": length,
@@ -196,6 +218,8 @@ def _format_check_detail(check_result: dict, err: str | None) -> str:
     bits = []
     if check_result.get("missing_terms"):
         bits.append(f"missing={check_result['missing_terms']}")
+    if check_result.get("missing_any_groups"):
+        bits.append(f"missing_any={check_result['missing_any_groups']}")
     if check_result.get("forbidden_terms"):
         bits.append(f"forbidden={check_result['forbidden_terms']}")
     if not check_result.get("language_ok", True):
@@ -295,6 +319,8 @@ def _failure_tags(record: dict) -> str:
     tags = []
     if c.get("missing_terms"):
         tags.append(f"MISSING={c['missing_terms']}")
+    if c.get("missing_any_groups"):
+        tags.append(f"MISSING_ANY={c['missing_any_groups']}")
     if c.get("forbidden_terms"):
         tags.append(f"FORBIDDEN={c['forbidden_terms']}")
     if not c.get("language_ok", True):

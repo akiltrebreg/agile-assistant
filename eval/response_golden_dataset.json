@@ -277,7 +277,7 @@
       "query_type": "sql",
       "intent": "tasks_filter",
       "entities": { "team_name": "cthulhu" },
-      "sql_result": "<<GENERATE: 70 tasks with feature_teams=cthulhu, varying issue_keys AL-2001..AL-2070, mixed status (Done/In Progress/Open), mixed types>>",
+      "sql_result": "<<GENERATE: team=cthulhu, limit=70>>",
       "rag_response": null,
       "rag_sources": [],
       "validation_result": { "use_sql": true, "use_rag": false, "note": null }
@@ -386,7 +386,8 @@
       "validation_result": { "use_sql": true, "use_rag": false, "note": null }
     },
     "checks": {
-      "must_contain": ["AL-3001", "lpop", "In Progress"],
+      "must_contain": ["AL-3001", "lpop"],
+      "must_contain_any": [["In Progress", "в процессе", "в работе"]],
       "must_not_contain": ["SELECT", "Done", "Closed", "Resolved"],
       "language": "ru",
       "min_length": 100,
@@ -456,13 +457,14 @@
       "query_type": "sql",
       "intent": "tasks_filter",
       "entities": { "issue_type": "Bug" },
-      "sql_result": "<<GENERATE: 118 tasks with issue_type=Bug, mixed teams (lpop/cthulhu/testops), mixed status, AL-5001..AL-5118>>",
+      "sql_result": "<<GENERATE: type=Bug, limit=118>>",
       "rag_response": null,
       "rag_sources": [],
       "validation_result": { "use_sql": true, "use_rag": false, "note": null }
     },
     "checks": {
-      "must_contain": ["Bug", "118"],
+      "must_contain": ["118"],
+      "must_contain_any": [["Bug", "баг"]],
       "must_not_contain": ["SELECT", "report_agile_dashboard"],
       "language": "ru",
       "min_length": 100,
@@ -1205,7 +1207,7 @@
       "query_type": "sql",
       "intent": "tasks_filter",
       "entities": { "team_name": "shopping cart" },
-      "sql_result": "<<GENERATE: 50 tasks with feature_teams='shopping cart', AL-7001..AL-7050, mixed types/statuses>>",
+      "sql_result": "<<GENERATE: team=shopping cart, limit=50>>",
       "rag_response": null,
       "rag_sources": [],
       "validation_result": { "use_sql": true, "use_rag": false, "note": null }
