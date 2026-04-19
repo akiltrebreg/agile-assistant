@@ -16,6 +16,7 @@ import logging
 import re
 from typing import Any
 
+from hse_prom_prog.agents.entity_sanitizer import sanitize_entities
 from hse_prom_prog.agents.schema_description import (
     SCHEMA_DESCRIPTION,
     SUPERVISOR_FEW_SHOT_EXAMPLES,
@@ -36,6 +37,32 @@ _INTENT_TO_QUERY_TYPE: dict[str, str] = {
 
 # Valid query types
 _VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple"})
+
+# Deterministic post-processing markers
+_RAG_MARKERS = (
+    "целевой порог",
+    "бейзлайн",
+    "как рассчитывается",
+    "что такое",
+    "как снизить",
+    "как повысить",
+)
+_HYBRID_MARKERS = (
+    "это нормально",
+    "можно улучшить",
+    "что можно улучшить",
+    "дай совет",
+    "как с этим бороться",
+    "как улучшить",
+)
+_DANGEROUS_PREFIXES = (
+    "drop ",
+    "delete ",
+    "alter ",
+    "truncate ",
+    "insert ",
+    "update ",
+)
 
 
 # JSON schema for structured output — vLLM enforces this via guided decoding.
@@ -96,8 +123,22 @@ class SupervisorAgent:
         llm_client: LLM client for intent classification.
     """
 
-    def __init__(self, llm_client: LLMClient) -> None:
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        db_engine: Any | None = None,
+    ) -> None:
+        """Initialize the supervisor.
+
+        Args:
+            llm_client: LLM client for slow-path classification.
+            db_engine: Optional SQLAlchemy engine. When provided, the
+                entity sanitizer validates enum values against real
+                DB values (issue_type, status, metric_name columns).
+                Without engine, falls back to synonym-only normalization.
+        """
         self.llm_client = llm_client
+        self.db_engine = db_engine
 
     def _extract_issue_key_regex(self, text: str) -> str | None:
         """Extract Jira issue key using regex (fast path).
@@ -341,6 +382,52 @@ class SupervisorAgent:
 
         return {"intent": intent, "entities": entities, "query_type": query_type}
 
+    def _post_process_classification(self, query: str, result: dict[str, Any]) -> dict[str, Any]:
+        """Deterministic corrections applied after LLM classification.
+
+        Fixes residual misclassifications that the LLM keeps making despite
+        anti-examples. Rules:
+          1. Dangerous SQL prefix (DROP/DELETE/…) -> simple/general (safety).
+          2. rag-marker words without team/sprint -> rag/general.
+          3. hybrid-marker words WITH team/sprint -> hybrid (keep intent).
+        """
+        query_lower = query.lower()
+
+        # Rule 1: SQL-injection attempt -> block early
+        if any(query_lower.startswith(d) for d in _DANGEROUS_PREFIXES):
+            logger.info("[Supervisor] Post-process: dangerous prefix -> simple")
+            return {
+                "query_type": "simple",
+                "intent": "general",
+                "entities": {},
+            }
+
+        entities = result.get("entities", {}) or {}
+        qt = result.get("query_type")
+        has_team = bool(entities.get("team_name"))
+        has_sprint = bool(entities.get("sprint_name"))
+        has_ctx = has_team or has_sprint
+
+        # Rule 2: rag-marker without team/sprint -> rag
+        if qt == "sql" and not has_ctx and any(m in query_lower for m in _RAG_MARKERS):
+            logger.info("[Supervisor] Post-process: rag-marker, no team -> rag")
+            result = dict(result)
+            result["query_type"] = "rag"
+            result["intent"] = "general"
+            result["entities"] = {}
+            return result
+
+        # Rule 3: hybrid-marker + team/sprint -> hybrid
+        if qt in ("sql", "rag") and has_ctx and any(m in query_lower for m in _HYBRID_MARKERS):
+            logger.info("[Supervisor] Post-process: hybrid-marker + team -> hybrid")
+            result = dict(result)
+            result["query_type"] = "hybrid"
+            if not result.get("intent") or result["intent"] == "general":
+                result["intent"] = "metric"
+            return result
+
+        return result
+
     def process(self, user_query: str) -> dict[str, Any]:
         """Classify the user query and extract structured entities.
 
@@ -379,6 +466,18 @@ class SupervisorAgent:
                 "route": "direct_response",
                 "error": f"Classifier unavailable: {type(e).__name__}: {e}",
             }
+
+        # 1) Sanitize entities FIRST — drop hallucinated team_name etc.
+        #    Post-processing makes routing decisions based on entities
+        #    (has_team/has_sprint), so it must see clean data.
+        classification["entities"] = sanitize_entities(
+            classification.get("entities", {}),
+            user_query,
+            engine=self.db_engine,
+        )
+
+        # 2) Post-process classification — routing based on CLEAN entities
+        classification = self._post_process_classification(user_query, classification)
 
         intent = classification["intent"]
         entities = classification["entities"]

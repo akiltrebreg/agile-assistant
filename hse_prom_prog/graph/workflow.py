@@ -68,7 +68,8 @@ class AgileWorkflow:
 
         self.db = db_connection
 
-        self.supervisor = SupervisorAgent(llm_client)
+        db_engine = self.db.engine if self.db is not None else None
+        self.supervisor = SupervisorAgent(llm_client, db_engine=db_engine)
         self.sql_agent = SQLAgent(db_connection=self.db)
         self.rag_agent = self._build_rag_agent(llm_client, retriever)
         self.validator = ValidatorAgent()

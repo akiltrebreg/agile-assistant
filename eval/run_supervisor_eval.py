@@ -90,12 +90,20 @@ def _compare_entities(expected: dict[str, Any], actual: dict[str, Any]) -> tuple
 
 
 def _build_supervisor() -> Any:
-    """Build Supervisor with main LLM client."""
+    """Build Supervisor with main LLM client + DB engine for sanitizer."""
     from hse_prom_prog.agents.supervisor import SupervisorAgent
+    from hse_prom_prog.database.connection import get_database
     from hse_prom_prog.llm.client import LLMClient
 
     client = LLMClient()
-    return SupervisorAgent(llm_client=client)
+    try:
+        db = get_database()
+        engine = db.engine
+        logger.info("[Supervisor Eval] DB engine ready — DB validation enabled")
+    except Exception as e:
+        engine = None
+        logger.warning("[Supervisor Eval] DB unavailable (%s) — synonym-only mode", e)
+    return SupervisorAgent(llm_client=client, db_engine=engine)
 
 
 def _run_eval(supervisor: Any, dataset: list[dict]) -> list[dict]:
