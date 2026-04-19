@@ -37,12 +37,16 @@ _INTENT_TO_QUERY_TYPE: dict[str, str] = {
 # Valid query types
 _VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple"})
 
-# JSON schema for structured output — vLLM enforces this via guided decoding
+
+# JSON schema for structured output — vLLM enforces this via guided decoding.
+# Entity fields are OPTIONAL (no "required" list) so the model can OMIT
+# a field when it doesn't apply, instead of being forced to invent a value.
+# strict=False because OpenAI strict mode requires all properties in required.
 _RESPONSE_FORMAT: dict[str, Any] = {
     "type": "json_schema",
     "json_schema": {
         "name": "supervisor_classification",
-        "strict": True,
+        "strict": False,
         "schema": {
             "type": "object",
             "properties": {
@@ -72,16 +76,6 @@ _RESPONSE_FORMAT: dict[str, Any] = {
                         "assignee": {"type": ["string", "null"]},
                         "cluster": {"type": ["string", "null"]},
                     },
-                    "required": [
-                        "issue_key",
-                        "team_name",
-                        "sprint_name",
-                        "metric_name",
-                        "issue_type",
-                        "status",
-                        "assignee",
-                        "cluster",
-                    ],
                     "additionalProperties": False,
                 },
             },
