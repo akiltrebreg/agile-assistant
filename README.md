@@ -50,10 +50,12 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
   - [Шаг 5: Использование](#шаг-5-использование)
   - [Маршруты Ingress](#маршруты-ingress)
   - [Полезные команды](#полезные-команды)
-- [Оценка RAG-пайплайна (RAGAS)](#оценка-rag-пайплайна-ragas)
-  - [Golden Dataset](#golden-dataset)
-  - [Запуск оценки](#запуск-оценки)
-  - [Сравнение экспериментов](#сравнение-экспериментов)
+- [Оценка агентов](#оценка-агентов)
+  - [RAG-пайплайн (RAGAS)](#rag-пайплайн-ragas)
+  - [SQL Agent](#sql-agent)
+  - [Supervisor Agent](#supervisor-agent)
+  - [Response Agent](#response-agent)
+  - [Сравнение RAG-экспериментов](#сравнение-rag-экспериментов)
 - [Разработка](#разработка)
   - [Установка dev-зависимостей](#установка-dev-зависимостей)
   - [Code Quality](#code-quality)
@@ -100,7 +102,18 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - **Fast path**: regex находит issue key → `intent=task`, `query_type=sql`, LLM
   не вызывается
 - **Slow path**: LLM классифицирует запрос и возвращает JSON с intent +
-  entities + query_type
+  entities + query_type через structured output (vLLM guided decoding, JSON
+  schema). `temperature=0.0` для детерминизма
+- **Entity Sanitizer** (`entity_sanitizer.py`): пост-обработка выхода LLM в 5
+  слоёв — нормализация синонимов (enum значения), валидация по БД (реальные
+  issue_type / status), фильтр галлюцинаций (шаблонные имена, плейсхолдеры),
+  enum query-presence check, Russian morphology prefix match (4 символа) для
+  sprint_name / cluster
+- **DB enum cache**: реальные значения `issue_type`, `status` подтягиваются из
+  БД с TTL 1 час — сравнение с тем, что вернула LLM
+- **Error intent fallback**: при parse failure возвращает
+  `intent=error, query_type=error` вместо silent fallback — workflow корректно
+  маршрутизирует в Response Agent с заготовленным сообщением
 
 **2. SQL Agent** (LangGraph text-to-SQL с tool calling)
 
@@ -157,16 +170,29 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 
 **5. Response Agent** (генерация ответа)
 
-- Шесть режимов генерации ответа в зависимости от `query_type` и
+- Единая константа `_SYSTEM_ROLE` используется во всех промптах («ассистент для
+  анализа Jira-задач и Agile-метрик, по делу, без выдумывания данных»)
+- Семь веток обработки в зависимости от `query_type` / `intent` /
   `validation_result`:
-  - **task**: форматирует одну задачу с русскими лейблами → LLM генерирует ответ
-  - **tasks_filter**: компактный список задач → LLM описывает результат
-  - **metric**: метрики в JSON → LLM анализирует динамику
-  - **rag**: ответ из базы знаний с указанием источников
-  - **hybrid**: данные из БД + контекст из базы знаний → LLM объединяет
-  - **simple (прямой)**: отвечает на общие вопросы без внешних данных
-- Формирует контекстуальный ответ на русском языке
-- Обрабатывает ошибки, пустые результаты и таймауты LLM
+  - **error** (`query_type=error`): фиксированный ответ «классификатор
+    недоступен», LLM не вызывается
+  - **simple / direct**: приветствие, «что умеешь», мета-вопрос → LLM генерирует
+    короткий дружелюбный ответ
+  - **sql + intent=task**: форматирует одну задачу с русскими лейблами → LLM
+    генерирует описание (ключ, тип, статус, команда, исполнитель, SP, спринт),
+    пропуская поля с `None`
+  - **sql + intent=tasks_filter**: компактный список до 20 задач (обрезка
+    остатка), при `entities.assignee` в формат строки добавляется `@assignee` →
+    LLM описывает результат с упоминанием команды/исполнителя
+  - **sql + intent=metric**: метрики в JSON → LLM называет значения + динамику
+    по спринтам, без рекомендаций
+  - **rag**: passthrough `rag_response` + блок `**Источники:**` (без повторного
+    LLM-вызова)
+  - **hybrid**: SQL-данные + RAG-контекст → LLM строит ответ в два блока:
+    `ДАННЫЕ` (числа/команда/спринт из БД) и `АНАЛИЗ` (рекомендации + источники
+    **только** из переданного контекста, без галлюцинаций URL)
+- Обрабатывает ошибки, пустые результаты («Задача AL-99999 не найдена») и
+  таймауты LLM
 
 ### LLM Backend
 
@@ -223,13 +249,14 @@ hse-prom-prog/
 │   ├── agents/
 │   │   ├── __init__.py
 │   │   ├── supervisor.py              # Supervisor (intent + entities + query_type)
+│   │   ├── entity_sanitizer.py        # 5-слойная пост-обработка entities (synonyms, DB validation, hallucination filter)
 │   │   ├── sql_agent.py               # SQL agent (LangGraph + Qwen3 tool calling)
-│   │   ├── sql_tools.py                # run_query tool для LangGraph SQL Agent
-│   │   ├── schema_loader.py            # Загрузка DDL схемы БД для промпта
+│   │   ├── sql_tools.py               # run_query tool для LangGraph SQL Agent
+│   │   ├── schema_loader.py           # Загрузка DDL схемы БД для промпта
+│   │   ├── schema_description.py     # Описание схемы БД для Supervisor
 │   │   ├── rag_agent.py               # RAG agent (Qdrant + LLM)
 │   │   ├── validator_agent.py         # Validator (проверка результатов)
-│   │   ├── response_agent.py          # Response agent (LLM)
-│   │   └── schema_description.py      # Описание схемы БД для LLM
+│   │   └── response_agent.py          # Response agent (LLM, 7 веток)
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── app.py                     # FastAPI application
@@ -300,12 +327,19 @@ hse-prom-prog/
 │   └── config.toml                    # Streamlit theme
 ├── eval/
 │   ├── __init__.py
-│   ├── golden_dataset.json            # 41 вопрос для оценки RAG
-│   ├── metrics.py                     # RAGAS-метрики (GPT-5.2 as judge)
-│   ├── run_eval.py                    # CLI: запуск оценки
-│   ├── compare.py                     # CLI: сравнение экспериментов
-│   ├── spot_check.py                  # Точечная проверка retrieval без RAGAS
-│   └── results/                       # Результаты (gitignored)
+│   ├── golden_dataset.json                # 41 вопрос для оценки RAG
+│   ├── sql_golden_dataset.json            # 46 кейсов для SQL Agent
+│   ├── supervisor_golden_dataset.json     # 66 кейсов для Supervisor
+│   ├── response_golden_dataset.json       # 40 кейсов для Response Agent
+│   ├── metrics.py                         # RAGAS-метрики (GPT-5.2 as judge)
+│   ├── run_eval.py                        # CLI: оценка RAG-пайплайна
+│   ├── run_sql_eval.py                    # CLI: оценка SQL Agent
+│   ├── run_supervisor_eval.py             # CLI: оценка Supervisor (routing + entities)
+│   ├── run_response_eval.py               # CLI: оценка Response Agent (format + checks)
+│   ├── compare.py                         # CLI: сравнение RAG-экспериментов
+│   ├── analyze_tokens.py                  # Анализ prompt/completion токенов из логов
+│   ├── spot_check.py                      # Точечная проверка retrieval без RAGAS
+│   └── results/                           # Результаты (gitignored)
 ├── tests/
 │   ├── __init__.py
 │   └── test_workflow.py               # 65 тестов (все агенты + workflow)
@@ -336,7 +370,7 @@ cd hse-prom-prog
 git fetch --all
 
 # Переключитесь на актуальную ветку
-git checkout checkpoint_13
+git checkout checkpoint_15
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -1304,13 +1338,26 @@ minikube stop
 minikube delete
 ```
 
-## Оценка RAG-пайплайна (RAGAS)
+## Оценка агентов
 
-Модуль `eval/` реализует автоматическую оценку качества RAG-пайплайна с помощью
-фреймворка [RAGAS](https://docs.ragas.io/). В качестве LLM-as-judge используется
-GPT-5.2 через OpenAI-compatible API (vsellm).
+Модуль `eval/` содержит четыре независимых eval-пайплайна — по одному для
+каждого LLM-агента. Каждый использует свой golden dataset и свои rule-based или
+LLM-based метрики, результаты пишутся в
+`eval/results/{experiment}_{timestamp}.json`.
 
-### Метрики
+| Eval           | Dataset (кейсов)                      | Метрики                                                                                                         |
+| -------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| RAG-пайплайн   | `golden_dataset.json` (41)            | RAGAS (GPT-5.2 as judge): context_precision, context_recall, faithfulness, answer_relevancy, answer_correctness |
+| SQL Agent      | `sql_golden_dataset.json` (46)        | Rule-based: exact_match_fields, row_count_exact, value_exact, exact_match_grouped                               |
+| Supervisor     | `supervisor_golden_dataset.json` (66) | Routing accuracy, intent match, entity match (soft substring), confusion matrix                                 |
+| Response Agent | `response_golden_dataset.json` (40)   | Rule-based: must_contain / must_contain_any / must_not_contain / language / length / sources                    |
+
+### RAG-пайплайн (RAGAS)
+
+Оценка качества RAG-пайплайна через [RAGAS](https://docs.ragas.io/). В качестве
+LLM-as-judge используется GPT-5.2 через OpenAI-compatible API (vsellm).
+
+#### Метрики
 
 | Метрика              | Что оценивает                                | Категория  |
 | -------------------- | -------------------------------------------- | ---------- |
@@ -1320,7 +1367,7 @@ GPT-5.2 через OpenAI-compatible API (vsellm).
 | `answer_relevancy`   | Релевантность ответа вопросу                 | Generation |
 | `answer_correctness` | Корректность ответа (vs ground truth)        | End-to-end |
 
-### Golden Dataset
+#### Golden Dataset
 
 Файл `eval/golden_dataset.json` содержит 41 вопрос с эталонными ответами,
 составленными строго по документам из `knowledge_base/`:
@@ -1335,7 +1382,7 @@ GPT-5.2 через OpenAI-compatible API (vsellm).
 Негативные примеры прогоняются через пайплайн, но исключаются из RAGAS-оценки
 (нет ground truth для сравнения).
 
-### Запуск оценки
+#### Запуск оценки
 
 **Через Docker Compose** (рекомендуемый способ — всё поднимается автоматически):
 
@@ -1442,7 +1489,117 @@ docker compose run --rm \
 заданы в `.env` (см. [Конфигурация](#конфигурация)). Qdrant должен быть запущен
 с загруженной базой знаний.
 
-### Сравнение экспериментов
+### SQL Agent
+
+Оценивает качество text-to-SQL: сгенерированный запрос, количество строк,
+ключевые поля.
+
+**Датасет** `eval/sql_golden_dataset.json` (46 кейсов):
+
+| Категория      | Кейсов | Пример                                      |
+| -------------- | ------ | ------------------------------------------- |
+| `single_task`  | 2      | «Расскажи о задаче AL-38787»                |
+| `tasks_filter` | 7      | «Все задачи команды cthulhu»                |
+| `metric`       | 6      | «Velocity команды linehaul»                 |
+| `aggregation`  | 20     | «Сколько story points у команды cthulhu?»   |
+| `comparative`  | 7      | «У какой команды самый большой scope drop?» |
+| `cross_table`  | 1      | «Scope drop + Cancelled задачи» (2 таблицы) |
+| `negative`     | 3      | Задача / команда / фильтр без результатов   |
+
+**Стратегии проверки** (per-case `eval_strategy`): `exact_match_fields`,
+`row_count_exact`, `value_exact`, `value_approx`, `exact_match_rows`,
+`exact_match_grouped`, `composite`.
+
+**Запуск:**
+
+```bash
+docker compose up -d postgres vllm-sql
+docker compose run --rm --no-deps app \
+  python -m eval.run_sql_eval --experiment sql_v1
+```
+
+Сохраняет `eval/results/sql_v1_<timestamp>.json`. В консоль — per-category
+pass-rate, latency p50/p95, список failures с actual vs expected.
+
+### Supervisor Agent
+
+Оценивает маршрутизацию + извлечение сущностей. Реальный LLM через vLLM + entity
+sanitizer с DB-валидацией.
+
+**Датасет** `eval/supervisor_golden_dataset.json` (66 кейсов):
+
+| Категория      | Кейсов |
+| -------------- | ------ |
+| `task_regex`   | 10     |
+| `tasks_filter` | 10     |
+| `metric`       | 10     |
+| `rag`          | 10     |
+| `hybrid`       | 8      |
+| `simple`       | 6      |
+| `adversarial`  | 12     |
+
+**Метрики:**
+
+- **Routing accuracy** — совпал ли `query_type` (sql/rag/hybrid/simple)
+- **Intent match** — совпал ли `intent` (task/tasks_filter/metric/general)
+- **Entity match** — soft substring по ключевым полям (issue_key, team_name,
+  sprint_name, metric_name); список поддерживается для multi-team кейсов
+- **Confusion matrix** 4×4 по `query_type`
+- **Fast-path rate** — доля запросов с issue_key, где regex поймал до LLM
+- **Latency p50/p95** — отдельно для fast-path и slow-path
+
+**Запуск:**
+
+```bash
+docker compose up -d postgres vllm
+docker compose run --rm --no-deps app \
+  python -m eval.run_supervisor_eval --experiment supervisor_v1
+```
+
+Текущий baseline: ~98.5% routing, ~93.9% exact match при `temperature=0.0`.
+
+### Response Agent
+
+Оценивает формат финального ответа: обязательные/запрещённые термины, язык,
+длина, источники. Не вызывает Supervisor / SQL / RAG — весь входной `state`
+(включая `rag_response`, `sql_result`) зафиксирован в датасете.
+
+**Датасет** `eval/response_golden_dataset.json` (40 кейсов):
+
+| Категория          | Кейсов | Покрытие                                                     |
+| ------------------ | ------ | ------------------------------------------------------------ |
+| `sql_task`         | 6      | одна задача, NULL-поля, 0 rows, длинный summary, Bug, Epic   |
+| `sql_tasks_filter` | 6      | малый список, 70+ задач (обрезка), пустой, mixed status      |
+| `sql_metric`       | 6      | одна метрика, динамика по 3 спринтам, агрегат, топ-3, пустой |
+| `rag`              | 5      | с источниками / без, длинный / короткий, markdown            |
+| `hybrid`           | 6      | SQL+RAG, пустой RAG, пустой SQL, оба упали                   |
+| `simple`           | 4      | приветствие, «что умеешь», спасибо, мета                     |
+| `error`            | 3      | classifier error, SQL execution error, hybrid timeout        |
+| `edge`             | 4      | все NULL, 50 задач, пустой query, спецсимволы                |
+
+**Метрики (per-case):**
+
+- `must_contain` — AND-список обязательных подстрок (case-insensitive)
+- `must_contain_any` — ИЛИ-группы синонимов (например,
+  `[["In Progress", "в процессе", "в работе"]]`)
+- `must_not_contain` — запрещённые подстроки (raw SQL, `SELECT`, Traceback)
+- `language: ru` — ≥30% букв кириллицы
+- `min_length` / `max_length` — границы длины ответа
+- `must_have_sources` — наличие/отсутствие блока `**Источники:**`
+
+**Плейсхолдеры** `<<GENERATE: team=cthulhu, limit=70>>` в `sql_result`
+раскрываются во время загрузки через SQL-запрос к БД, чтобы кейсы с 70-118
+строками не раздували JSON-датасет.
+
+**Запуск:**
+
+```bash
+docker compose up -d postgres vllm
+docker compose run --rm --no-deps app \
+  python -m eval.run_response_eval --experiment response_v1
+```
+
+### Сравнение RAG-экспериментов
 
 ```bash
 # Сравнение двух экспериментов
