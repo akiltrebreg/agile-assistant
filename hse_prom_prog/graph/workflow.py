@@ -16,7 +16,12 @@ from typing import Annotated, Any, TypedDict
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
-from hse_prom_prog.agents.guardrails import OFF_TOPIC_RESPONSE, TopicGuard
+from hse_prom_prog.agents.guardrails import (
+    BLOCKED_RESPONSE,
+    OFF_TOPIC_RESPONSE,
+    ResponseGuard,
+    TopicGuard,
+)
 from hse_prom_prog.agents.rag_agent import RAGAgent
 from hse_prom_prog.agents.response_agent import ResponseAgent
 from hse_prom_prog.agents.sql_agent import SQLAgent
@@ -80,6 +85,7 @@ class AgileWorkflow:
         self.validator = ValidatorAgent()
         self.response_agent = ResponseAgent(llm_client)
         self.topic_guard = self._build_topic_guard(retriever)
+        self.response_guard = ResponseGuard()
 
         self.graph = self._build_graph()
         logger.info("[Workflow] Workflow graph built successfully")
@@ -181,6 +187,34 @@ class AgileWorkflow:
         logger.info("[Workflow] Entering Response Agent node")
         return self.response_agent.process(state)
 
+    def _output_guardrail_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Level 3 Output Guardrail: sanitize / block the final response."""
+        logger.info("[Workflow] Entering Output Guardrail node")
+        response = state.get("final_response", "")
+        if not response:
+            return {}
+        # Skip guard for off-topic placeholder — it's already safe content.
+        if response == OFF_TOPIC_RESPONSE:
+            return {}
+
+        result = self.response_guard.check(
+            response=response,
+            query_type=state.get("query_type", ""),
+            context_urls=state.get("rag_sources", []),
+        )
+
+        if result.blocked:
+            failed = [c.name for c in result.checks if not c.passed]
+            logger.warning("[Workflow] OutputGuard BLOCKED: %s", failed)
+            return {"final_response": BLOCKED_RESPONSE}
+
+        if not result.passed:
+            failed = [c.name for c in result.checks if not c.passed]
+            logger.info("[Workflow] OutputGuard SANITIZED: %s", failed)
+            return {"final_response": result.sanitized_response}
+
+        return {}
+
     # ------------------------------------------------------------------
     # Routing
     # ------------------------------------------------------------------
@@ -223,6 +257,7 @@ class AgileWorkflow:
         workflow.add_node("sql_and_rag", self._sql_and_rag_node)
         workflow.add_node("validator", self._validator_node)
         workflow.add_node("response_agent", self._response_agent_node)
+        workflow.add_node("output_guardrail", self._output_guardrail_node)
 
         workflow.set_entry_point("input_guardrail")
 
@@ -251,8 +286,9 @@ class AgileWorkflow:
         workflow.add_edge("sql_and_rag", "validator")
         workflow.add_edge("validator", "response_agent")
 
-        # simple goes directly to Response Agent
-        workflow.add_edge("response_agent", END)
+        # Response Agent → Output Guardrail → END
+        workflow.add_edge("response_agent", "output_guardrail")
+        workflow.add_edge("output_guardrail", END)
 
         return workflow.compile()
 

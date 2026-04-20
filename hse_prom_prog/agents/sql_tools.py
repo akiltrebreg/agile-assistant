@@ -15,6 +15,7 @@ from typing import Any
 from langchain_core.tools import tool
 from sqlalchemy.exc import SQLAlchemyError
 
+from hse_prom_prog.agents.guardrails import check_sql
 from hse_prom_prog.database.connection import DatabaseConnection
 
 logger = logging.getLogger(__name__)
@@ -50,11 +51,16 @@ def run_query(query: str) -> str:
     db = _get_db()
     sql = query.strip()
 
-    # Safety check
-    first_word = sql.split()[0].upper() if sql.split() else ""
-    forbidden = {"DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "CREATE"}
-    if first_word != "SELECT" or first_word in forbidden:
-        return "ERROR: Only SELECT queries are allowed."
+    # Level 2 SQL Guardrail: regex + AST + table whitelist + limits
+    guard = check_sql(sql)
+    if not guard.allowed:
+        logger.warning("[SQL Tools] Blocked by SQLGuard (%s): %s", guard.layer, guard.reason)
+        return (
+            f"ERROR: Query blocked by security policy "
+            f"(layer={guard.layer}, reason={guard.reason}). "
+            f"Only SELECT queries on report_agile_dashboard "
+            f"and report_agile_dashboard_metrics are allowed."
+        )
 
     logger.info("[SQL Tools] run_query: %s", sql[:200])
 
