@@ -16,13 +16,16 @@ from typing import Annotated, Any, TypedDict
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
+from hse_prom_prog.agents.guardrails import OFF_TOPIC_RESPONSE, TopicGuard
 from hse_prom_prog.agents.rag_agent import RAGAgent
 from hse_prom_prog.agents.response_agent import ResponseAgent
 from hse_prom_prog.agents.sql_agent import SQLAgent
 from hse_prom_prog.agents.supervisor import SupervisorAgent
 from hse_prom_prog.agents.validator_agent import ValidatorAgent
+from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.rag.embeddings import get_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,8 @@ class WorkflowState(TypedDict):
     error: str
     validation_result: dict[str, Any]
     final_response: str
+    blocked: bool
+    guard_result: dict[str, Any]
 
 
 class AgileWorkflow:
@@ -74,6 +79,7 @@ class AgileWorkflow:
         self.rag_agent = self._build_rag_agent(llm_client, retriever)
         self.validator = ValidatorAgent()
         self.response_agent = ResponseAgent(llm_client)
+        self.topic_guard = self._build_topic_guard(retriever)
 
         self.graph = self._build_graph()
         logger.info("[Workflow] Workflow graph built successfully")
@@ -88,9 +94,55 @@ class AgileWorkflow:
             return None
         return RAGAgent(llm_client, retriever)
 
+    @staticmethod
+    def _build_topic_guard(retriever: Any | None) -> TopicGuard | None:
+        """Build TopicGuard, reusing the retriever's embedding model.
+
+        If `guardrail_enabled=False` or no embedding model available,
+        returns None and the workflow skips the guardrail node.
+        """
+        if not settings.guardrail_enabled:
+            logger.info("[Workflow] TopicGuard disabled via settings")
+            return None
+        embeddings = getattr(retriever, "_embeddings", None) if retriever else None
+        if embeddings is None:
+            try:
+                embeddings = get_embeddings()
+            except Exception as e:
+                logger.warning("[Workflow] TopicGuard disabled — embeddings unavailable: %s", e)
+                return None
+        try:
+            return TopicGuard(
+                embeddings=embeddings,
+                threshold=settings.guardrail_threshold,
+            )
+        except Exception as e:
+            logger.warning("[Workflow] TopicGuard init failed: %s", e)
+            return None
+
     # ------------------------------------------------------------------
     # Node wrappers
     # ------------------------------------------------------------------
+
+    def _input_guardrail_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Level 1 Input Guardrail: off-topic / prompt-injection filter."""
+        logger.info("[Workflow] Entering Input Guardrail node")
+        if self.topic_guard is None:
+            return {"blocked": False, "guard_result": {"passed": True, "reason": "disabled"}}
+
+        result = self.topic_guard.check(state["original_query"])
+        guard_payload = {
+            "passed": result.passed,
+            "reason": result.reason,
+            "similarity": result.max_similarity,
+        }
+        if not result.passed:
+            return {
+                "blocked": True,
+                "guard_result": guard_payload,
+                "final_response": OFF_TOPIC_RESPONSE,
+            }
+        return {"blocked": False, "guard_result": guard_payload}
 
     def _supervisor_node(self, state: WorkflowState) -> dict[str, Any]:
         logger.info("[Workflow] Entering Supervisor node")
@@ -133,6 +185,16 @@ class AgileWorkflow:
     # Routing
     # ------------------------------------------------------------------
 
+    def _route_after_guardrail(self, state: WorkflowState) -> str:
+        """If guardrail blocked the query — skip to END; otherwise Supervisor."""
+        if state.get("blocked"):
+            logger.info(
+                "[Workflow] Input blocked by guardrail: %s",
+                state.get("guard_result", {}).get("reason"),
+            )
+            return "end"
+        return "supervisor"
+
     def _route_after_supervisor(self, state: WorkflowState) -> str:
         """Route based on Supervisor's query_type."""
         query_type = state.get("query_type", "sql")
@@ -154,6 +216,7 @@ class AgileWorkflow:
     def _build_graph(self) -> Any:
         workflow = StateGraph(WorkflowState)
 
+        workflow.add_node("input_guardrail", self._input_guardrail_node)
         workflow.add_node("supervisor", self._supervisor_node)
         workflow.add_node("sql_agent", self._sql_agent_node)
         workflow.add_node("rag_agent", self._rag_agent_node)
@@ -161,7 +224,14 @@ class AgileWorkflow:
         workflow.add_node("validator", self._validator_node)
         workflow.add_node("response_agent", self._response_agent_node)
 
-        workflow.set_entry_point("supervisor")
+        workflow.set_entry_point("input_guardrail")
+
+        # Level 1 guardrail: block off-topic before Supervisor
+        workflow.add_conditional_edges(
+            "input_guardrail",
+            self._route_after_guardrail,
+            {"end": END, "supervisor": "supervisor"},
+        )
 
         # Conditional routing after Supervisor
         workflow.add_conditional_edges(
@@ -215,6 +285,8 @@ class AgileWorkflow:
             "error": "",
             "validation_result": {},
             "final_response": "",
+            "blocked": False,
+            "guard_result": {},
         }
 
         try:

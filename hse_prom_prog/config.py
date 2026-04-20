@@ -224,6 +224,18 @@ class Settings(BaseSettings):
         description="Max documents to keep after reranking",
     )
 
+    # Input Guardrail (TopicGuard)
+    guardrail_enabled: bool = Field(
+        default=True,
+        description="Enable input topic guardrail (off-topic filter before Supervisor)",
+    )
+    guardrail_threshold: float = Field(
+        default=0.45,
+        ge=0.0,
+        le=1.0,
+        description="Min cosine similarity between query and reference topics to pass",
+    )
+
     # Application mode
     debug: bool = Field(
         default=False,
