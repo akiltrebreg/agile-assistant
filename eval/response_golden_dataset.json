@@ -440,7 +440,7 @@
     },
     "checks": {
       "must_contain": ["yuvpetrov", "AL-4001"],
-      "must_not_contain": ["SELECT", "ivanov", "petrov "],
+      "must_not_contain": ["SELECT", "ivanov"],
       "language": "ru",
       "min_length": 80,
       "max_length": 2000,
@@ -862,7 +862,7 @@
       "min_length": 50,
       "max_length": 2000,
       "expected_branch": "hybrid",
-      "must_have_sources": false,
+      "must_have_sources": true,
       "note": "Только RAG доступен. Ответ должен быть теоретическим без выдуманных данных по zzz_unknown"
     }
   },
