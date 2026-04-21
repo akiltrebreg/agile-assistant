@@ -191,9 +191,9 @@ services:
       - --model=/models/avibe-gptq-8bit
       - --quantization=gptq
       - --dtype=float16
-      - --max-model-len=2048
+      - --max-model-len=3072
       - --gpu-memory-utilization=0.55
-      - --max-num-seqs=4
+      - --max-num-seqs=2
       - --enforce-eager
     volumes:
       - vllm-cache:/models

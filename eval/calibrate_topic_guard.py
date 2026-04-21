@@ -140,7 +140,7 @@ def main() -> None:
         tabulate(
             [
                 [
-                    f"{r['threshold']:.2f}",
+                    f"{r['threshold']:.3f}",
                     r["tp"],
                     r["fn"],
                     r["fp"],
@@ -159,7 +159,7 @@ def main() -> None:
 
     best = max(table, key=lambda r: r["f1"])
     print(
-        f"\nBest by F1: threshold={best['threshold']:.2f}, "
+        f"\nBest by F1: threshold={best['threshold']:.3f}, "
         f"F1={best['f1']:.3f}, P={best['precision']:.3f}, R={best['recall']:.3f}"
     )
 
