@@ -69,6 +69,12 @@ A: {"query_type": "hybrid", "intent": "metric", \
 
 Q: "Привет"
 A: {"query_type": "simple", "intent": "general", "entities": {}}
+
+Q: "Расскажи анекдот"
+A: {"query_type": "off_topic", "intent": "general", "entities": {}}
+
+Q: "Какая погода в Москве?"
+A: {"query_type": "off_topic", "intent": "general", "entities": {}}
 """.strip()
 
 ALLOWED_TABLES = frozenset(
