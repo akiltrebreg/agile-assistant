@@ -300,6 +300,88 @@ def _print_summary(results: list[dict], experiment: str) -> None:
     print()
 
 
+# ── Deploy gate ─────────────────────────────────────────────
+
+# Explicit pass/fail criteria — defined BEFORE the run, checked AFTER.
+# Prevents ad-hoc interpretation of "good enough".
+_BASELINE_CATEGORIES = frozenset(
+    {"task_regex", "tasks_filter", "metric", "rag", "hybrid", "simple", "adversarial"}
+)
+
+
+def _check_deploy_gate(results: list[dict]) -> bool:
+    """Check results against hard pass/fail criteria. Return True if all pass."""
+    baseline = [r for r in results if r["category"] in _BASELINE_CATEGORIES]
+    off_topic = [r for r in results if r["category"] == "off_topic"]
+    boundary = [r for r in results if r["category"] == "off_topic_boundary"]
+
+    baseline_correct = sum(1 for r in baseline if r["routing_match"])
+    off_topic_caught = sum(1 for r in off_topic if r["actual"]["query_type"] == "off_topic")
+    boundary_misclassified = sum(1 for r in boundary if r["actual"]["query_type"] == "off_topic")
+
+    # Thresholds
+    baseline_threshold = max(0, len(baseline) - 1)  # allow 1 regression
+    off_topic_threshold = max(0, len(off_topic) - 1)  # allow 1 miss
+    boundary_threshold = 0  # zero tolerance for blocking legit queries
+
+    rows = [
+        (
+            "Baseline routing",
+            f"{baseline_correct}/{len(baseline)}",
+            f"≥ {baseline_threshold}",
+            baseline_correct >= baseline_threshold,
+        ),
+        (
+            "off_topic caught",
+            f"{off_topic_caught}/{len(off_topic)}",
+            f"≥ {off_topic_threshold}",
+            off_topic_caught >= off_topic_threshold,
+        ),
+        (
+            "boundary NOT off_topic",
+            f"{len(boundary) - boundary_misclassified}/{len(boundary)}",
+            f"= {len(boundary)}",
+            boundary_misclassified <= boundary_threshold,
+        ),
+    ]
+
+    print("\n" + "=" * 60)
+    print("DEPLOY GATE")
+    print("=" * 60)
+    print(
+        tabulate(
+            [[name, actual, thr, "PASS" if ok else "FAIL"] for name, actual, thr, ok in rows],
+            headers=["Criterion", "Result", "Threshold", "Verdict"],
+            tablefmt="simple",
+        )
+    )
+
+    all_pass = all(ok for _, _, _, ok in rows)
+    if all_pass:
+        print("\nVerdict: GO — safe to deploy.\n")
+    else:
+        failed = [name for name, _, _, ok in rows if not ok]
+        print(f"\nVerdict: NO-GO — failed: {failed}")
+        if "boundary NOT off_topic" in failed:
+            print(
+                "  → fail-open rule in Supervisor prompt is not working. "
+                "Legit queries blocked. FIX PROMPT before deploy."
+            )
+        if "Baseline routing" in failed:
+            print(
+                "  → new off_topic block broke existing classification. "
+                "ROLLBACK prompt and investigate which cases regressed."
+            )
+        if "off_topic caught" in failed:
+            print(
+                "  → OFF-topic list in prompt too weak, LLM lets through. "
+                "Strengthen OFF examples in prompt."
+            )
+        print()
+
+    return all_pass
+
+
 # ── Main ─────────────────────────────────────────────────────
 
 
@@ -344,6 +426,7 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Saved results to %s", out_path)
 
     _print_summary(results, args.experiment)
+    _check_deploy_gate(results)
 
 
 if __name__ == "__main__":

@@ -613,5 +613,146 @@
     },
     "category": "adversarial",
     "notes": "theory + specific data — hybrid"
+  },
+  {
+    "id": 67,
+    "query": "Расскажи анекдот про программиста",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "entertainment, not work"
+  },
+  {
+    "id": 68,
+    "query": "Напиши мне стихотворение о любви",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "creative writing, not work"
+  },
+  {
+    "id": 69,
+    "query": "Какая погода сегодня в Москве?",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "weather, not work"
+  },
+  {
+    "id": 70,
+    "query": "Как приготовить борщ?",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "recipe, not work"
+  },
+  {
+    "id": 71,
+    "query": "Какой курс доллара сегодня?",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "finance, not work"
+  },
+  {
+    "id": 72,
+    "query": "Посоветуй фильм на вечер",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "entertainment recommendation, not work"
+  },
+  {
+    "id": 73,
+    "query": "Опиши симптомы гриппа",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "medical, not work"
+  },
+  {
+    "id": 74,
+    "query": "Переведи эту фразу на английский",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "translation, not work"
+  },
+  {
+    "id": 75,
+    "query": "Как мотивировать разработчиков?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "fail-open boundary: team motivation IS work-related, must NOT be off_topic"
+  },
+  {
+    "id": 76,
+    "query": "Что делать, если спринт провален?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "fail-open boundary: sprint retro question IS on-topic, must NOT be off_topic"
+  },
+  {
+    "id": 77,
+    "query": "Что такое Scope Drop?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "definition question; embedding-guard blocked this at 0.816, LLM must classify as rag"
+  },
+  {
+    "id": 78,
+    "query": "Как считается метрика Done Total?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "how-is-calculated question; was blocked by embedding at 0.818"
+  },
+  {
+    "id": 79,
+    "query": "Что такое груминг бэклога?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "Agile practice definition; was blocked by embedding at 0.801"
+  },
+  {
+    "id": 80,
+    "query": "Советы по планированию спринта",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "general Agile advice; must be rag, not off_topic"
+  },
+  {
+    "id": 81,
+    "query": "Расскажи анекдот про Scrum-мастера",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "trickiest case: off-topic request (joke) dressed in Agile vocabulary. LLM must recognize intent (entertainment) over surface keywords (Scrum)"
   }
 ]

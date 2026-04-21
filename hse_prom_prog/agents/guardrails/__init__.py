@@ -1,6 +1,7 @@
 """Guardrails for input / SQL / output layers.
 
-Level 1 (TopicGuard): off-topic filter via embedding cosine similarity.
+Level 1 (TopicGuard): regex-only pre-filter (prompt injection + whitelist);
+    off-topic classification is delegated to Supervisor.
 Level 2 (SQLGuard): three-layer defense for run_query (regex + AST + limits).
 Level 3 (ResponseGuard): rule-based post-processing of the final response.
 """

@@ -101,65 +101,47 @@ class AgileWorkflow:
 
     @staticmethod
     def _build_topic_guard(retriever: Any | None) -> TopicGuard | None:
-        """Build TopicGuard with its own NLI classifier.
-
-        Independent from RAG embeddings — uses a dedicated multilingual
-        zero-shot classifier on CPU. If `guardrail_enabled=False` or model
-        loading fails, returns None and the workflow skips the guardrail.
+        """Build regex-only TopicGuard. No model, no thresholds.
 
         ``retriever`` parameter kept for API compatibility (unused).
         """
-        del retriever  # classifier is loaded inside TopicGuard
+        del retriever
         if not settings.guardrail_enabled:
             logger.info("[Workflow] TopicGuard disabled via settings")
             return None
-        try:
-            return TopicGuard(
-                threshold=settings.guardrail_threshold,
-                hard_block_threshold=settings.guardrail_hard_block_threshold,
-            )
-        except Exception as e:
-            logger.warning("[Workflow] TopicGuard init failed: %s", e)
-            return None
+        return TopicGuard()
 
     # ------------------------------------------------------------------
     # Node wrappers
     # ------------------------------------------------------------------
 
     def _input_guardrail_node(self, state: WorkflowState) -> dict[str, Any]:
-        """Level 1 Input Guardrail: off-topic / prompt-injection filter.
+        """Level 1 Input Guardrail: prompt-injection filter + whitelist.
 
-        Two-zone logic (see TopicGuard):
-          * Hard block → set final_response, skip workflow
-          * Borderline (low_confidence) → pass through to Supervisor, just log
-          * Confident on-topic → pass through
+        Off-topic classification is handled by Supervisor — this node only
+        hard-blocks prompt-injection attempts and logs whitelist fast-paths.
         """
         logger.info("[Workflow] Entering Input Guardrail node")
         if self.topic_guard is None:
             return {"blocked": False, "guard_result": {"passed": True, "reason": "disabled"}}
 
         result = self.topic_guard.check(state["original_query"])
-        guard_payload = {
-            "passed": result.passed,
-            "reason": result.reason,
-            "similarity": result.max_similarity,
-            "low_confidence": result.low_confidence,
-        }
+        guard_payload = {"passed": result.passed, "reason": result.reason}
         if not result.passed:
             return {
                 "blocked": True,
                 "guard_result": guard_payload,
                 "final_response": OFF_TOPIC_RESPONSE,
             }
-        if result.low_confidence:
-            logger.warning(
-                "[Workflow] Borderline on-topic (sim=%.3f, reason=%s): %r — "
-                "passing to Supervisor as second-line filter",
-                result.max_similarity,
-                result.reason,
-                state["original_query"][:100],
-            )
         return {"blocked": False, "guard_result": guard_payload}
+
+    def _off_topic_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Fixed response for off-topic queries classified by Supervisor."""
+        logger.info(
+            "[Workflow] Supervisor classified as off_topic: %r",
+            state.get("original_query", "")[:100],
+        )
+        return {"final_response": OFF_TOPIC_RESPONSE}
 
     def _supervisor_node(self, state: WorkflowState) -> dict[str, Any]:
         logger.info("[Workflow] Entering Supervisor node")
@@ -245,6 +227,8 @@ class AgileWorkflow:
         query_type = state.get("query_type", "sql")
         logger.info("[Workflow] Routing decision: query_type=%s", query_type)
 
+        if query_type == "off_topic":
+            return "off_topic"
         if query_type in ("simple", "error"):
             return "response_agent"
         if query_type == "rag":
@@ -263,6 +247,7 @@ class AgileWorkflow:
 
         workflow.add_node("input_guardrail", self._input_guardrail_node)
         workflow.add_node("supervisor", self._supervisor_node)
+        workflow.add_node("off_topic", self._off_topic_node)
         workflow.add_node("sql_agent", self._sql_agent_node)
         workflow.add_node("rag_agent", self._rag_agent_node)
         workflow.add_node("sql_and_rag", self._sql_and_rag_node)
@@ -288,8 +273,12 @@ class AgileWorkflow:
                 "rag_agent": "rag_agent",
                 "sql_and_rag": "sql_and_rag",
                 "response_agent": "response_agent",
+                "off_topic": "off_topic",
             },
         )
+
+        # Off-topic skips Response Agent entirely — fixed text, straight to END
+        workflow.add_edge("off_topic", END)
 
         # sql / rag / hybrid all go through Validator -> Response Agent
         workflow.add_edge("sql_agent", "validator")

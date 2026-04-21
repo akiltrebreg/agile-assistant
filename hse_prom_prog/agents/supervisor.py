@@ -36,7 +36,7 @@ _INTENT_TO_QUERY_TYPE: dict[str, str] = {
 }
 
 # Valid query types
-_VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple"})
+_VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple", "off_topic"})
 
 # Deterministic post-processing markers
 _RAG_MARKERS = (
@@ -79,7 +79,7 @@ _RESPONSE_FORMAT: dict[str, Any] = {
             "properties": {
                 "query_type": {
                     "type": "string",
-                    "enum": ["sql", "rag", "hybrid", "simple"],
+                    "enum": ["sql", "rag", "hybrid", "simple", "off_topic"],
                 },
                 "intent": {
                     "type": "string",
@@ -161,7 +161,7 @@ class SupervisorAgent:
             "Верни ТОЛЬКО JSON (без пояснений, без markdown):\n"
             "{\n"
             '  "intent": "task" | "tasks_filter" | "metric" | "general",\n'
-            '  "query_type": "sql" | "rag" | "hybrid" | "simple",\n'
+            '  "query_type": "sql" | "rag" | "hybrid" | "simple" | "off_topic",\n'
             '  "entities": {\n'
             '    "issue_key": "ABC-123" | null,\n'
             '    "team_name": "..." | ["...", "..."] | null,\n'
@@ -208,7 +208,38 @@ class SupervisorAgent:
             'Одна команда -> team_name="cthulhu" (строка, не массив).\n'
             "Ни одной -> team_name=null.\n"
             "Сохраняй порядок упоминания.\n\n"
+            "## Off-topic: что разрешено и что запрещено\n"
+            "\n"
+            "ON-TOPIC (всё, что относится к управлению проектами и командной\n"
+            "работе — пропускать, обрабатывать по алгоритму ниже):\n"
+            "  • Любые вопросы о задачах Jira (по ключу, по фильтрам, по команде)\n"
+            "  • Метрики команд и спринтов (velocity, scope drop, done total и т.д.)\n"
+            "  • Agile-практики, Scrum, Kanban, ретроспективы, планирование\n"
+            "  • Вопросы о дашбордах, бэклоге, Definition of Done/Ready\n"
+            "  • Вопросы о внутренних процессах и регламентах компании\n"
+            "  • Приветствия, вопросы «что ты умеешь», благодарности\n"
+            "\n"
+            "OFF-TOPIC (запросы вне домена — query_type=off_topic,\n"
+            "intent=general, entities={}):\n"
+            "  • Личная жизнь, отношения, здоровье\n"
+            "  • Погода, новости, политика, спорт\n"
+            "  • Рецепты, развлечения, фильмы, музыка\n"
+            "  • Генерация кода, стихов, историй, анекдотов\n"
+            "  • Финансовые советы, инвестиции, курсы валют\n"
+            "  • Любые запросы, не связанные с управлением проектами\n"
+            "    и командной работой\n"
+            "\n"
+            "ПРАВИЛО FAIL-OPEN: если запрос хоть отдалённо связан с работой\n"
+            "команды, проектами или процессами разработки — считай on-topic.\n"
+            "Сомневаешься — НЕ помечай off_topic. Лучше пропустить пограничный\n"
+            "запрос (пусть дальше отработает simple/rag), чем заблокировать\n"
+            "легитимный вопрос про мотивацию команды или рабочие процессы.\n\n"
             "## Алгоритм классификации (следуй строго по шагам)\n"
+            "\n"
+            "Шаг 0. Запрос явно off-topic по списку выше (погода, рецепт,\n"
+            "стихотворение, анекдот, курс валют, спорт и т.п.)?\n"
+            "  ДА → query_type=off_topic, intent=general, entities={}. СТОП.\n"
+            "  НЕТ или СОМНЕВАЕШЬСЯ → к шагу 1.\n"
             "\n"
             "Шаг 1. Есть ли в запросе issue_key в формате [A-Z]+-число "
             "(например, AL-123)?\n"
