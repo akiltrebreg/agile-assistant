@@ -30,7 +30,6 @@ from hse_prom_prog.agents.validator_agent import ValidatorAgent
 from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection
 from hse_prom_prog.llm.client import LLMClient
-from hse_prom_prog.rag.embeddings import get_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -102,25 +101,22 @@ class AgileWorkflow:
 
     @staticmethod
     def _build_topic_guard(retriever: Any | None) -> TopicGuard | None:
-        """Build TopicGuard, reusing the retriever's embedding model.
+        """Build TopicGuard with its own NLI classifier.
 
-        If `guardrail_enabled=False` or no embedding model available,
-        returns None and the workflow skips the guardrail node.
+        Independent from RAG embeddings — uses a dedicated multilingual
+        zero-shot classifier on CPU. If `guardrail_enabled=False` or model
+        loading fails, returns None and the workflow skips the guardrail.
+
+        ``retriever`` parameter kept for API compatibility (unused).
         """
+        del retriever  # classifier is loaded inside TopicGuard
         if not settings.guardrail_enabled:
             logger.info("[Workflow] TopicGuard disabled via settings")
             return None
-        embeddings = getattr(retriever, "_embeddings", None) if retriever else None
-        if embeddings is None:
-            try:
-                embeddings = get_embeddings()
-            except Exception as e:
-                logger.warning("[Workflow] TopicGuard disabled — embeddings unavailable: %s", e)
-                return None
         try:
             return TopicGuard(
-                embeddings=embeddings,
                 threshold=settings.guardrail_threshold,
+                hard_block_threshold=settings.guardrail_hard_block_threshold,
             )
         except Exception as e:
             logger.warning("[Workflow] TopicGuard init failed: %s", e)
@@ -131,7 +127,13 @@ class AgileWorkflow:
     # ------------------------------------------------------------------
 
     def _input_guardrail_node(self, state: WorkflowState) -> dict[str, Any]:
-        """Level 1 Input Guardrail: off-topic / prompt-injection filter."""
+        """Level 1 Input Guardrail: off-topic / prompt-injection filter.
+
+        Two-zone logic (see TopicGuard):
+          * Hard block → set final_response, skip workflow
+          * Borderline (low_confidence) → pass through to Supervisor, just log
+          * Confident on-topic → pass through
+        """
         logger.info("[Workflow] Entering Input Guardrail node")
         if self.topic_guard is None:
             return {"blocked": False, "guard_result": {"passed": True, "reason": "disabled"}}
@@ -141,6 +143,7 @@ class AgileWorkflow:
             "passed": result.passed,
             "reason": result.reason,
             "similarity": result.max_similarity,
+            "low_confidence": result.low_confidence,
         }
         if not result.passed:
             return {
@@ -148,6 +151,14 @@ class AgileWorkflow:
                 "guard_result": guard_payload,
                 "final_response": OFF_TOPIC_RESPONSE,
             }
+        if result.low_confidence:
+            logger.warning(
+                "[Workflow] Borderline on-topic (sim=%.3f, reason=%s): %r — "
+                "passing to Supervisor as second-line filter",
+                result.max_similarity,
+                result.reason,
+                state["original_query"][:100],
+            )
         return {"blocked": False, "guard_result": guard_payload}
 
     def _supervisor_node(self, state: WorkflowState) -> dict[str, Any]:

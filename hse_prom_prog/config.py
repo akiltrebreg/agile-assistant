@@ -224,16 +224,29 @@ class Settings(BaseSettings):
         description="Max documents to keep after reranking",
     )
 
-    # Input Guardrail (TopicGuard)
+    # Input Guardrail (TopicGuard) — two-zone threshold
     guardrail_enabled: bool = Field(
         default=True,
         description="Enable input topic guardrail (off-topic filter before Supervisor)",
     )
-    guardrail_threshold: float = Field(
-        default=0.45,
+    guardrail_hard_block_threshold: float = Field(
+        default=0.2,
         ge=0.0,
         le=1.0,
-        description="Min cosine similarity between query and reference topics to pass",
+        description=(
+            "Hard block: below this NLI on-topic probability the query is "
+            "treated as clearly off-topic and blocked without reaching Supervisor."
+        ),
+    )
+    guardrail_threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confident-pass threshold on NLI probability. Queries in "
+            "[hard_block, threshold) pass through as low_confidence — "
+            "Supervisor acts as second-line filter."
+        ),
     )
 
     # Application mode

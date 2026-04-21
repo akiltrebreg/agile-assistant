@@ -1,7 +1,8 @@
-"""Calibrate TopicGuard threshold on labelled on-/off-topic examples.
+"""Calibrate TopicGuard thresholds on labelled on-/off-topic examples.
 
-Prints precision / recall / F1 for a grid of thresholds, so you can pick
-the best trade-off for the project.
+Scores queries via zero-shot NLI classifier (same model used by TopicGuard)
+and sweeps the confident-pass threshold. Also suggests a safe hard-block
+threshold (highest value that does not block any on-topic example).
 
 Usage:
     docker compose run --rm --no-deps app python -m eval.calibrate_topic_guard
@@ -17,7 +18,6 @@ from hse_prom_prog.agents.guardrails.topic_guard import (
     _HARD_DENY_PATTERNS,
     TopicGuard,
 )
-from hse_prom_prog.rag.embeddings import get_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -68,17 +68,13 @@ def _is_hard_deny(query: str) -> bool:
 
 
 def _score(guard: TopicGuard, examples: list[str]) -> list[float]:
-    """Return raw cosine similarity (bypassing whitelist / hard-deny)."""
-    import numpy as np
-
+    """Return raw NLI on-topic probability (bypass whitelist / hard-deny)."""
     scores = []
     for q in examples:
         if _is_hard_deny(q):
             scores.append(0.0)
             continue
-        vec = np.asarray(guard.embeddings.embed_query(f"query: {q}"), dtype=np.float32)
-        sims = guard._ref_matrix @ vec
-        scores.append(float(np.max(sims)))
+        scores.append(guard._classify(q))
     return scores
 
 
@@ -107,38 +103,21 @@ def _metrics(on_scores: list[float], off_scores: list[float], threshold: float) 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
-    logger.info("Loading embedding model...")
-    embeddings = get_embeddings()
-    guard = TopicGuard(embeddings=embeddings)
+    logger.info("Loading zero-shot NLI classifier...")
+    guard = TopicGuard()
 
     logger.info("Scoring on-topic examples (%d)...", len(ON_TOPIC))
     on_scores = _score(guard, ON_TOPIC)
     logger.info("Scoring off-topic examples (%d)...", len(OFF_TOPIC))
     off_scores = _score(guard, OFF_TOPIC)
 
-    print("\n── Per-example scores ──")
+    print("\n── Per-example NLI on-topic probability ──")
     rows = [["ON", q[:60], f"{s:.3f}"] for q, s in zip(ON_TOPIC, on_scores, strict=True)]
     rows += [["OFF", q[:60], f"{s:.3f}"] for q, s in zip(OFF_TOPIC, off_scores, strict=True)]
-    print(tabulate(rows, headers=["Label", "Query", "MaxSim"], tablefmt="simple"))
+    print(tabulate(rows, headers=["Label", "Query", "P_on"], tablefmt="simple"))
 
-    print("\n── Threshold sweep ──")
-    thresholds = [
-        0.50,
-        0.60,
-        0.70,
-        0.75,
-        0.78,
-        0.80,
-        0.81,
-        0.82,
-        0.825,
-        0.83,
-        0.835,
-        0.84,
-        0.85,
-        0.87,
-        0.90,
-    ]
+    print("\n── Threshold sweep (confident-pass) ──")
+    thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     table = [_metrics(on_scores, off_scores, t) for t in thresholds]
     print(
         tabulate(
@@ -165,6 +144,19 @@ def main() -> None:
     print(
         f"\nBest by F1: threshold={best['threshold']:.3f}, "
         f"F1={best['f1']:.3f}, P={best['precision']:.3f}, R={best['recall']:.3f}"
+    )
+
+    # Two-zone recommendation: T_hard ≤ min(ON) keeps recall at 1.0 on block.
+    max_safe_hard = min(on_scores)
+    print("\n── Two-zone mode suggestion ──")
+    print(f"Confident-pass threshold (Best F1):  {best['threshold']:.3f}")
+    print(f"Hard-block threshold (safe max):     ≤ {max_safe_hard:.3f}")
+    hard_off_blocked = sum(1 for s in off_scores if s < max_safe_hard)
+    hard_off_passed = len(off_scores) - hard_off_blocked
+    print(
+        f"At T_hard = {max_safe_hard:.3f}: off-topic hard-blocked = "
+        f"{hard_off_blocked}/{len(off_scores)}, "
+        f"routed to Supervisor (borderline) = {hard_off_passed}/{len(off_scores)}"
     )
 
 

@@ -1,14 +1,19 @@
-"""Level 1: Input Guardrail — off-topic filter via embedding cosine similarity.
+"""Level 1: Input Guardrail — zero-shot NLI topic classification.
 
-Reuses the RAG embedding model (`multilingual-e5-base`, loaded via
-`langchain_huggingface.HuggingFaceEmbeddings`). Reference topics are
-pre-embedded once at startup; each user query gets one `embed_query` call
-(~2ms on CPU) and a dot product against the reference matrix.
+Uses ``MoritzLaurer/mDeBERTa-v3-base-mnli-xnli`` (multilingual XNLI, ~280 MB,
+CPU). Unlike embedding cosine similarity (baseline similarity ≈0.75 between
+any two Russian sentences, tiny on/off-topic gap ~0.02), NLI answers the
+direct question «Does this text belong to topic X?» and returns class
+probabilities with wide gaps (typically ≥0.7 between on-topic and off-topic).
 
 Three stages:
-  1. Hard deny — regex for prompt injection / role hijacking
-  2. Fast-path whitelist — issue key, greetings, meta-questions
-  3. Embedding cosine similarity — query vs reference topics, threshold gate
+  1. Hard-deny regex — prompt injection / role hijacking (≥ the classifier)
+  2. Fast-path whitelist — issue keys, greetings, meta-questions
+  3. Zero-shot NLI classification — two candidate labels (on/off-topic),
+     ``on_topic_score`` thresholded via two-zone logic:
+       * `score < hard_block_threshold`   → hard BLOCK
+       * `hard_block ≤ score < threshold` → PASS, low_confidence=True
+       * `score ≥ threshold`              → confident PASS
 """
 
 from __future__ import annotations
@@ -16,35 +21,27 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
+from transformers import pipeline
 
 if TYPE_CHECKING:
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
-# E5-family models expect "query: ..." / "passage: ..." prefixes
-_REFERENCE_TOPICS: list[str] = [
-    "passage: задача в Jira, issue key, тикет, баг, story, эпик",
-    "passage: статус задачи, In Progress, Done, Open, Closed, Resolved",
-    "passage: исполнитель задачи, assignee, reporter, ответственный",
-    "passage: story points, оценка задачи, estimate, трудозатраты",
-    "passage: спринт, sprint, итерация, планирование спринта",
-    "passage: команда разработки, feature team, Scrum-команда",
-    "passage: velocity, done total, scope drop, cancel rate, lead time",
-    "passage: метрики команды, agile-метрики, KPI, дашборд",
-    "passage: groomed backlog, бэклог, backlog dynamics",
-    "passage: Scrum, Kanban, Agile, ретроспектива, daily standup",
-    "passage: Definition of Done, Definition of Ready, acceptance criteria",
-    "passage: sprint goal, sprint review, sprint planning",
-    "passage: что такое метрика, определение термина, как считается показатель",
-    "passage: как улучшить метрику команды, как снизить scope drop, советы по Agile",
-    "passage: как улучшить работу команды, наладить процессы, проблемы с коллективом",
-    "passage: что делать при провале спринта, почему не успели, разбор причин",
-    "passage: привет, здравствуйте, что ты умеешь, помощь, help",
-]
+_DEFAULT_MODEL = "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
+
+# Two candidate labels: first is "on-topic", second is "off-topic".
+# The NLI model assigns probabilities to each via the hypothesis template
+# (see `_HYPOTHESIS_TEMPLATE` below) — we take the score of the on-topic label.
+_ON_TOPIC_LABEL = "управление проектами, Jira, Agile, Scrum, спринты, метрики команд"
+_OFF_TOPIC_LABEL = "не связано с работой: личное, развлечения, еда, погода, политика"
+_HYPOTHESIS_TEMPLATE = "Этот текст о: {}"
+
+# Two-zone thresholds on the NLI on-topic probability (not cosine similarity).
+_DEFAULT_THRESHOLD = 0.5
+_DEFAULT_HARD_BLOCK_THRESHOLD = 0.2
 
 _ALWAYS_PASS_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"[A-Z]{2,10}-\d+", re.IGNORECASE),
@@ -64,53 +61,99 @@ _HARD_DENY_PATTERNS: list[re.Pattern[str]] = [
     ),
 ]
 
-_DEFAULT_THRESHOLD = 0.45
-
 
 @dataclass
 class GuardResult:
-    """Result of an input guardrail check."""
+    """Result of an input guardrail check.
+
+    Three outcomes:
+      * `score < hard_block_threshold`        → passed=False (clearly off-topic)
+      * `hard_block ≤ score < threshold`      → passed=True, low_confidence=True
+      * `score ≥ threshold`                   → passed=True (confident)
+
+    `max_similarity` holds the NLI on-topic probability (kept name for
+    backward compat with logging / monitoring).
+    """
 
     passed: bool
     reason: str = ""
     max_similarity: float = 0.0
     matched_topic: str = ""
+    low_confidence: bool = False
+
+
+def _build_default_classifier() -> Callable[..., dict[str, Any]]:
+    """Load the mDeBERTa NLI pipeline on CPU. Called lazily in `TopicGuard`."""
+    logger.info("[TopicGuard] Loading zero-shot classifier: %s", _DEFAULT_MODEL)
+    return pipeline(
+        "zero-shot-classification",
+        model=_DEFAULT_MODEL,
+        device=-1,  # CPU; GPU is shared by vLLM models already
+    )
 
 
 @dataclass
 class TopicGuard:
-    """Embedding-based topic filter.
+    """Zero-shot NLI topic filter with two-zone thresholds.
 
-    Shares the embedding model with the RAG pipeline — no extra memory cost.
-    Reference topic embeddings are pre-computed once in `__post_init__`.
+    The classifier produces a probability per candidate label; we use the
+    on-topic probability as the decision score. Defaults are tuned for the
+    two labels defined in this module; if you replace labels, recalibrate.
 
     Args:
-        embeddings: HuggingFaceEmbeddings (same instance used by RAG retriever).
-        threshold: Minimum cosine similarity to pass. Default 0.45.
-        reference_topics: Anchor phrases (each prefixed with "passage: ").
+        classifier: Optional pre-built ``transformers`` zero-shot pipeline.
+            If ``None``, loads ``MoritzLaurer/mDeBERTa-v3-base-mnli-xnli`` on
+            CPU at initialisation.
+        threshold: Confident-pass threshold on on-topic probability.
+            Default 0.5.
+        hard_block_threshold: Below this probability — clearly off-topic.
+            Default 0.2.
+        on_topic_label / off_topic_label: Candidate labels for NLI.
+        hypothesis_template: NLI hypothesis template.
     """
 
-    embeddings: HuggingFaceEmbeddings
+    classifier: Any = None
     threshold: float = _DEFAULT_THRESHOLD
-    reference_topics: list[str] = field(default_factory=lambda: list(_REFERENCE_TOPICS))
-    _ref_matrix: np.ndarray = field(init=False, repr=False)
+    hard_block_threshold: float = _DEFAULT_HARD_BLOCK_THRESHOLD
+    on_topic_label: str = _ON_TOPIC_LABEL
+    off_topic_label: str = _OFF_TOPIC_LABEL
+    hypothesis_template: str = _HYPOTHESIS_TEMPLATE
+    _candidate_labels: list[str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        vectors = self.embeddings.embed_documents(self.reference_topics)
-        self._ref_matrix = np.asarray(vectors, dtype=np.float32)
+        if self.hard_block_threshold >= self.threshold:
+            msg = (
+                f"hard_block_threshold ({self.hard_block_threshold}) must be strictly "
+                f"less than threshold ({self.threshold})"
+            )
+            raise ValueError(msg)
+        if self.classifier is None:
+            self.classifier = _build_default_classifier()
+        self._candidate_labels = [self.on_topic_label, self.off_topic_label]
         logger.info(
-            "[TopicGuard] initialized: %d reference topics, threshold=%.2f",
-            len(self.reference_topics),
+            "[TopicGuard] initialized: NLI classifier, hard_block=%.3f, confident=%.3f",
+            self.hard_block_threshold,
             self.threshold,
         )
 
+    def _classify(self, query: str) -> float:
+        """Return the NLI on-topic probability for *query*."""
+        result = self.classifier(
+            query,
+            candidate_labels=self._candidate_labels,
+            hypothesis_template=self.hypothesis_template,
+        )
+        # pipeline returns labels/scores sorted by score desc — re-index by label
+        scores_by_label = dict(zip(result["labels"], result["scores"], strict=True))
+        return float(scores_by_label[self.on_topic_label])
+
     def check(self, query: str) -> GuardResult:
-        """Classify a user query as on-topic / off-topic.
+        """Classify a user query using two-zone thresholds on NLI probability.
 
         Order:
           1. Hard-deny regex → block with reason='blocked:prompt_injection'
           2. Whitelist regex → pass with reason='whitelist'
-          3. Embedding cosine vs reference anchors → threshold gate
+          3. Zero-shot NLI classification → two-zone gate
         """
         for pattern in _HARD_DENY_PATTERNS:
             if pattern.search(query):
@@ -125,39 +168,48 @@ class TopicGuard:
             if pattern.search(query):
                 return GuardResult(passed=True, reason="whitelist", max_similarity=1.0)
 
-        query_vec = np.asarray(
-            self.embeddings.embed_query(f"query: {query}"),
-            dtype=np.float32,
-        )
-        similarities = self._ref_matrix @ query_vec
-        max_idx = int(np.argmax(similarities))
-        max_sim = float(similarities[max_idx])
+        on_score = self._classify(query)
 
-        if max_sim < self.threshold:
+        if on_score < self.hard_block_threshold:
             logger.info(
-                "[TopicGuard] BLOCKED (sim=%.3f < %.3f): %r",
-                max_sim,
-                self.threshold,
+                "[TopicGuard] BLOCKED (P_on=%.3f < hard_block=%.3f): %r",
+                on_score,
+                self.hard_block_threshold,
                 query[:100],
             )
             return GuardResult(
                 passed=False,
                 reason="off_topic",
-                max_similarity=max_sim,
-                matched_topic=self.reference_topics[max_idx],
+                max_similarity=on_score,
+                matched_topic=self.on_topic_label,
+            )
+
+        if on_score < self.threshold:
+            logger.info(
+                "[TopicGuard] BORDERLINE (P_on=%.3f in [%.3f, %.3f)): %r",
+                on_score,
+                self.hard_block_threshold,
+                self.threshold,
+                query[:100],
+            )
+            return GuardResult(
+                passed=True,
+                reason="borderline",
+                max_similarity=on_score,
+                matched_topic=self.on_topic_label,
+                low_confidence=True,
             )
 
         logger.debug(
-            "[TopicGuard] PASSED (sim=%.3f): %r → %r",
-            max_sim,
+            "[TopicGuard] PASSED (P_on=%.3f): %r",
+            on_score,
             query[:80],
-            self.reference_topics[max_idx][:60],
         )
         return GuardResult(
             passed=True,
             reason="on_topic",
-            max_similarity=max_sim,
-            matched_topic=self.reference_topics[max_idx],
+            max_similarity=on_score,
+            matched_topic=self.on_topic_label,
         )
 
 
