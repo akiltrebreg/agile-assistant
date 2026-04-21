@@ -39,6 +39,8 @@ _REFERENCE_TOPICS: list[str] = [
     "passage: Scrum, Kanban, Agile, ретроспектива, daily standup",
     "passage: Definition of Done, Definition of Ready, acceptance criteria",
     "passage: sprint goal, sprint review, sprint planning",
+    "passage: что такое метрика, определение термина, как считается показатель",
+    "passage: как улучшить метрику команды, как снизить scope drop, советы по Agile",
     "passage: привет, здравствуйте, что ты умеешь, помощь, help",
 ]
 

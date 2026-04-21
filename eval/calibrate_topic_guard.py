@@ -118,7 +118,23 @@ def main() -> None:
     print(tabulate(rows, headers=["Label", "Query", "MaxSim"], tablefmt="simple"))
 
     print("\n── Threshold sweep ──")
-    thresholds = [0.30, 0.35, 0.40, 0.42, 0.44, 0.45, 0.46, 0.48, 0.50, 0.55, 0.60]
+    thresholds = [
+        0.50,
+        0.60,
+        0.70,
+        0.75,
+        0.78,
+        0.80,
+        0.81,
+        0.82,
+        0.825,
+        0.83,
+        0.835,
+        0.84,
+        0.85,
+        0.87,
+        0.90,
+    ]
     table = [_metrics(on_scores, off_scores, t) for t in thresholds]
     print(
         tabulate(
