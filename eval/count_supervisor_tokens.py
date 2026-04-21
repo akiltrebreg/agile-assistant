@@ -1,11 +1,14 @@
-"""Count exact tokens in Supervisor's prompt using the real avibe tokenizer.
+"""Count exact tokens in Supervisor's prompt via vLLM's /tokenize endpoint.
 
-Loads the tokenizer from the vLLM-mounted model path, reconstructs the
-full Supervisor prompt (schema + enum rules + algorithm + few-shots +
-off-topic + user query), and reports:
+Reconstructs the full Supervisor prompt (schema + enum rules + algorithm +
+few-shots + off-topic + user query) and sends it to the live vLLM server
+for tokenisation — same tokenizer the server uses at inference, so the
+count is exact. No filesystem access to model weights required (the
+app container doesn't mount `vllm-cache`).
 
+Reports:
   * prompt_tokens                          (what vLLM counts as input)
-  * prompt_tokens + max_completion (512)   (total request size)
+  * prompt_tokens + max_completion         (total request size)
   * Verdict vs max-model-len=3072
 
 Usage:
@@ -16,7 +19,7 @@ from __future__ import annotations
 
 import logging
 
-from transformers import AutoTokenizer
+import requests
 
 from hse_prom_prog.agents.supervisor import SupervisorAgent
 from hse_prom_prog.config import settings
@@ -24,7 +27,6 @@ from hse_prom_prog.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
 
-_MODEL_PATH = "/models/avibe-gptq-8bit"
 _MAX_COMPLETION = 256  # matches supervisor.py max_tokens
 _MAX_MODEL_LEN = 3072
 
@@ -60,10 +62,31 @@ def _build_supervisor_prompt(query: str) -> str:
     return captured["prompt"]
 
 
+def _count_tokens_via_vllm(prompt: str, base_url: str, model: str) -> int:
+    """Call vLLM's /tokenize endpoint and return token count."""
+    # base_url comes as "http://vllm:8000/v1" → strip trailing /v1
+    root = base_url.rstrip("/").removesuffix("/v1")
+    resp = requests.post(
+        f"{root}/tokenize",
+        json={"prompt": prompt, "model": model},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    # vLLM returns either {"count": N, "tokens": [...]} or just tokens
+    if "count" in data:
+        return int(data["count"])
+    if "tokens" in data:
+        return len(data["tokens"])
+    msg = f"Unexpected /tokenize response: {data}"
+    raise RuntimeError(msg)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(message)s")
-    logger.info("Loading tokenizer: %s", _MODEL_PATH)
-    tokenizer = AutoTokenizer.from_pretrained(_MODEL_PATH, trust_remote_code=True)
+    base_url = settings.vllm_base_url
+    model = settings.vllm_model
+    logger.info("Tokenizing via vLLM /tokenize: base_url=%s model=%s", base_url, model)
 
     budget = _MAX_MODEL_LEN - _MAX_COMPLETION
     logger.info(
@@ -72,12 +95,11 @@ def main() -> None:
         _MAX_COMPLETION,
         budget,
     )
-    logger.info("Configured vllm temperature=%s", settings.vllm_temperature)
 
     any_fail = False
     for query in _SAMPLE_QUERIES:
         prompt = _build_supervisor_prompt(query)
-        n_tokens = len(tokenizer.encode(prompt))
+        n_tokens = _count_tokens_via_vllm(prompt, base_url, model)
         total = n_tokens + _MAX_COMPLETION
         fits = total <= _MAX_MODEL_LEN
         mark = "OK " if fits else "FAIL"
