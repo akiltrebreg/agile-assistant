@@ -55,10 +55,14 @@ class ResponseGuard:
     _URL_PATTERN = re.compile(r"https?://[^\s\]\)\"'<>]{10,}", re.IGNORECASE)
     _EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
-    # Raw SQL leak (model regurgitated SELECT…FROM / INSERT INTO / WHERE x=…)
+    # Raw SQL leak: SQL-keyword + one of our whitelist / system tables.
+    # Blocks `SELECT ... FROM report_agile_dashboard WHERE ...`
+    # but NOT natural-language "необходимо select подходящий вариант from ...".
     _SQL_LEAK_PATTERN = re.compile(
-        r"\b(SELECT\s+.+?\s+FROM|INSERT\s+INTO|WHERE\s+\w+\s*[=<>])\b",
-        re.IGNORECASE | re.DOTALL,
+        r"\b(?:SELECT|INSERT|UPDATE|DELETE|WHERE)\b"
+        r"[^\n]{0,200}?\b"
+        r"(report_agile_dashboard(?:_metrics)?|pg_\w+)\b",
+        re.IGNORECASE,
     )
 
     # Python traceback fragments
@@ -71,13 +75,25 @@ class ResponseGuard:
         re.IGNORECASE,
     )
 
-    # Internal system details we never want to leak
+    # Internal system details we never want to leak.
+    # Technology names (qdrant/redis/vllm/celery) are FINE as words — model may
+    # legitimately explain "how RAG works". Block only connection-string context
+    # (URI schemes, host:port, env vars) which is always a real leak.
     _INTERNAL_LEAK_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
+        # Our table names — always a leak
         re.compile(r"\breport_agile_dashboard\w*\b", re.IGNORECASE),
-        re.compile(r"\b(system prompt|system message|instructions?:)\b", re.IGNORECASE),
-        re.compile(r"\b(vllm|langraph|langgraph|celery|redis|qdrant)\b", re.IGNORECASE),
+        # PostgreSQL system tables
         re.compile(r"\bpg_\w+\b"),
+        # Prompt / instructions leak
+        re.compile(r"\b(system prompt|system message|instructions?:)\b", re.IGNORECASE),
+        # LLM params leak
         re.compile(r"temperature\s*=\s*[\d.]+"),
+        # Connection strings: URI schemes (qdrant://, redis://, postgres://)
+        re.compile(r"\b(qdrant|redis|postgresql?|vllm)s?://", re.IGNORECASE),
+        # host:port patterns (qdrant:6333, redis:6379)
+        re.compile(r"\b(qdrant|redis|postgres|vllm)[-\w]*:\d{2,5}\b", re.IGNORECASE),
+        # Environment variables (VLLM_BASE_URL, QDRANT_URL, REDIS_HOST, etc.)
+        re.compile(r"\b(QDRANT_\w+|REDIS_\w+|POSTGRES_\w+|VLLM_\w+|VSELLM_\w+|CELERY_\w+)\b"),
     ]
 
     # Whitelist URL prefixes (extend if RAG ever surfaces http-links)

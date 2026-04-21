@@ -28,22 +28,35 @@ logger = logging.getLogger(__name__)
 # ── Layer 2: Regex blacklist ────────────────────────────────────────
 
 _DANGEROUS_PATTERNS: list[re.Pattern[str]] = [
-    # DDL
-    re.compile(r"\b(DROP|CREATE|ALTER|TRUNCATE|RENAME)\b", re.IGNORECASE),
-    # DML (кроме SELECT)
-    re.compile(r"\b(INSERT|UPDATE|DELETE|MERGE|UPSERT)\b", re.IGNORECASE),
-    # DCL / TCL
+    # DDL — keyword ДОЛЖЕН быть перед типом объекта (TABLE/INDEX/...),
+    # иначе ловятся false positives в строковых литералах вроде 'DROP-123'.
+    re.compile(
+        r"\b(DROP|CREATE|ALTER|TRUNCATE|RENAME)\s+"
+        r"(TABLE|INDEX|VIEW|DATABASE|SCHEMA|SEQUENCE|FUNCTION|"
+        r"PROCEDURE|TRIGGER|USER|ROLE|CONSTRAINT|COLUMN|MATERIALIZED)\b",
+        re.IGNORECASE,
+    ),
+    # DML — требуем специфичную структуру (INTO/SET/FROM), не голое слово.
+    re.compile(
+        r"\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|"
+        r"MERGE\s+INTO|UPSERT\s+INTO)\b",
+        re.IGNORECASE,
+    ),
+    # DCL / TCL — редко попадают в литералы, keep as-is.
     re.compile(r"\b(GRANT|REVOKE|COMMIT|ROLLBACK|SAVEPOINT)\b", re.IGNORECASE),
-    # Опасные функции PostgreSQL
-    re.compile(r"\b(pg_sleep|dblink|dblink_exec|lo_import|lo_export)\b", re.IGNORECASE),
-    # COPY (PostgreSQL)
-    re.compile(r"\bCOPY\b", re.IGNORECASE),
-    # SET / LOAD / DO (процедурные блоки)
-    re.compile(r"\b(SET\s+|LOAD\s+|DO\s+\$)", re.IGNORECASE),
-    # Stacked queries: `;` за которым следует не-пробельный символ
-    re.compile(r";\s*\S"),
-    # SQL-комментарии могут скрывать payload
+    # Опасные функции PostgreSQL — требуем `(` после (вызов функции).
+    re.compile(
+        r"\b(pg_sleep|dblink|dblink_exec|lo_import|lo_export)\s*\(",
+        re.IGNORECASE,
+    ),
+    # COPY — только как statement (в начале или после `;`).
+    re.compile(r"(?:^|;\s*)COPY\s", re.IGNORECASE),
+    # SET / LOAD / DO (процедурные блоки).
+    re.compile(r"(?:^|;\s*)(SET\s+|LOAD\s+|DO\s+\$)", re.IGNORECASE),
+    # SQL-комментарии могут скрывать payload.
     re.compile(r"(--|/\*|\*/)"),
+    # Примечание: stacked queries (`;` + следующий statement) ловит AST-слой
+    # через len(statements) > 1 — regex для этого удалён, т.к. был хрупкий.
 ]
 
 
