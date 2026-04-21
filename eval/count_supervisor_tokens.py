@@ -28,7 +28,7 @@ from hse_prom_prog.llm.client import LLMClient
 logger = logging.getLogger(__name__)
 
 _MAX_COMPLETION = 256  # matches supervisor.py max_tokens
-_MAX_MODEL_LEN = 3072
+_MAX_MODEL_LEN = 4096  # matches docker-compose.yml vllm --max-model-len
 
 _SAMPLE_QUERIES = [
     "Расскажи анекдот про Scrum-мастера",  # off_topic — worst case, hits all prompt branches
