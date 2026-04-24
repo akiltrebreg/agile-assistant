@@ -29,7 +29,10 @@ def create_celery_app() -> Celery:
         "hse_prom_prog",
         broker=settings.celery_broker,
         backend=None,  # No result backend - PostgreSQL stores all state
-        include=["hse_prom_prog.tasks.workflow_task"],  # Auto-discover tasks
+        include=[
+            "hse_prom_prog.tasks.workflow_task",
+            "hse_prom_prog.tasks.memory_tasks",
+        ],
     )
 
     # Configure Celery settings

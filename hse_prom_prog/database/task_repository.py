@@ -41,12 +41,14 @@ class TaskRepository:
         self,
         query: str,
         celery_task_id: str | None = None,
+        conversation_id: UUID | None = None,
     ) -> Task:
         """Create a new task with PENDING status.
 
         Args:
             query: User query to process.
             celery_task_id: Optional Celery task ID for tracking.
+            conversation_id: Optional memory-layer conversation id.
 
         Returns:
             Created Task instance with generated task_id.
@@ -55,10 +57,11 @@ class TaskRepository:
             SQLAlchemyError: If database operation fails.
         """
         sql = """
-            INSERT INTO tasks (query, status, celery_task_id)
-            VALUES (:query, :status, :celery_task_id)
+            INSERT INTO tasks (query, status, celery_task_id, conversation_id)
+            VALUES (:query, :status, :celery_task_id, :conversation_id)
             RETURNING task_id, query, status, result, error, celery_task_id,
-                      created_at, started_at, completed_at, workflow_state
+                      created_at, started_at, completed_at, workflow_state,
+                      conversation_id
         """
 
         try:
@@ -69,6 +72,7 @@ class TaskRepository:
                         "query": query,
                         "status": TaskStatus.PENDING.value,
                         "celery_task_id": celery_task_id,
+                        "conversation_id": (str(conversation_id) if conversation_id else None),
                     },
                 )
                 session.commit()
@@ -94,7 +98,8 @@ class TaskRepository:
         """
         sql = """
             SELECT task_id, query, status, result, error, celery_task_id,
-                   created_at, started_at, completed_at, workflow_state
+                   created_at, started_at, completed_at, workflow_state,
+                   conversation_id
             FROM tasks
             WHERE task_id = :task_id
         """
@@ -204,4 +209,5 @@ class TaskRepository:
             started_at=row.started_at,
             completed_at=row.completed_at,
             workflow_state=row.workflow_state,  # Already parsed from JSONB
+            conversation_id=getattr(row, "conversation_id", None),
         )

@@ -6,20 +6,28 @@ Includes retry logic with exponential backoff for transient failures.
 """
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from celery import Task as CeleryTask
 from celery.exceptions import SoftTimeLimitExceeded
 
-from hse_prom_prog.database.connection import get_database
+from hse_prom_prog.database.connection import DatabaseConnection, get_database
 from hse_prom_prog.database.task_repository import TaskRepository
 from hse_prom_prog.graph.workflow import AgileWorkflow
 from hse_prom_prog.llm.client import get_llm_client
+from hse_prom_prog.memory.manager import MemoryManager
+from hse_prom_prog.models.memory import ConversationContext
 from hse_prom_prog.models.task import TaskStatus
 from hse_prom_prog.rag.retriever import get_retriever
 from hse_prom_prog.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+# Default token budget for the history slot injected into prompts.
+# 1200 ≈ the Response Agent's hybrid-branch floor; context builder
+# trims older turns when the total would exceed this.
+HISTORY_TOKEN_BUDGET = 1200
 
 
 class WorkflowTask(CeleryTask):
@@ -49,56 +57,74 @@ class WorkflowTask(CeleryTask):
     retry_jitter=True,  # Add randomness to prevent thundering herd
     max_retries=3,  # Up to 3 retries for transient failures
 )
-def execute_workflow(self, task_id: str, query: str) -> None:
+def execute_workflow(  # noqa: PLR0913
+    self,
+    task_id: str,
+    query: str,
+    conversation_id: str | None = None,
+    user_external_id: str | None = None,
+    user_id: str | None = None,
+) -> None:
     """Execute AgileWorkflow for a given task.
 
     Status flow: PENDING -> PROCESSING -> COMPLETED / FAILED.
 
-    Retries automatically on transient network/DB/timeout errors
-    with exponential backoff. Non-retryable errors (e.g. bad query)
-    go directly to FAILED.
+    Memory integration: if ``conversation_id`` is set, the task loads the
+    short-term context and (when a user is present) the long-term profile,
+    passes them through the workflow, and persists the resulting turn on
+    success.
 
     Args:
         self: Celery task instance (injected by bind=True).
         task_id: Application task UUID (from tasks table).
         query: User query to process.
+        conversation_id: Memory-layer conversation id (pre-created by API).
+        user_external_id: External (cookie / SSO) user id.
+        user_id: Deprecated alias for ``user_external_id`` — accepted so
+            older Celery messages in the queue don't crash after deploy.
     """
     task_uuid = UUID(task_id)
-    db = None
+    db: DatabaseConnection | None = None
+    external_id = user_external_id or user_id
 
     try:
         db = get_database()
         repo = TaskRepository(db)
+        _mark_processing_if_first(self, repo, task_uuid, task_id)
 
-        # Set PROCESSING only on first attempt, not on retries
-        if self.request.retries == 0:
-            logger.info(f"[WorkflowTask {task_id}] Starting workflow execution")
-            repo.update_task_status(task_uuid, TaskStatus.PROCESSING)
-        else:
-            logger.info(f"[WorkflowTask {task_id}] Retry {self.request.retries}/{self.max_retries}")
+        memory = MemoryManager(db)
+        conv_uuid, internal_user_uuid = _resolve_memory_ids(memory, conversation_id, external_id)
+        ctx, user_profile = _load_memory_payloads(memory, conv_uuid, internal_user_uuid)
 
-        # Build workflow with optional RAG retriever
         llm_client = get_llm_client()
         retriever = _get_retriever_safe()
         workflow = AgileWorkflow(llm_client, db_connection=db, retriever=retriever)
 
         logger.info(f"[WorkflowTask {task_id}] Running AgileWorkflow for: {query[:50]}...")
-        result = workflow.run(query)
+        result = workflow.run(
+            query,
+            conversation_id=str(conv_uuid) if conv_uuid else None,
+            user_id=str(internal_user_uuid) if internal_user_uuid else None,
+            conversation_context=ctx,
+            user_profile=user_profile,
+        )
 
-        # Update to COMPLETED
-        final_response = result.get("final_response", "No response generated")
+        if conv_uuid is not None:
+            _persist_turn_safe(memory, conv_uuid, query, result, task_id)
+            if internal_user_uuid is not None:
+                _enqueue_profile_refresh(internal_user_uuid, conv_uuid)
+
         entities = result.get("entities") or {}
-        issue_key = entities.get("issue_key")  # None for non-task intents
         query_type = result.get("query_type", "sql")
-
         logger.info(f"[WorkflowTask {task_id}] Workflow completed (query_type={query_type})")
         repo.update_task_status(
             task_uuid,
             TaskStatus.COMPLETED,
             result={
-                "final_response": final_response,
-                "issue_key": issue_key,
+                "final_response": result.get("final_response", "No response generated"),
+                "issue_key": entities.get("issue_key"),
                 "query_type": query_type,
+                "conversation_id": str(conv_uuid) if conv_uuid else None,
             },
             workflow_state=result,
         )
@@ -128,6 +154,103 @@ def execute_workflow(self, task_id: str, query: str) -> None:
     finally:
         if db is not None:
             db.close()
+
+
+def _mark_processing_if_first(
+    task: Any,
+    repo: TaskRepository,
+    task_uuid: UUID,
+    task_id: str,
+) -> None:
+    """Flip the task to PROCESSING on attempt 0; log retries otherwise."""
+    if task.request.retries == 0:
+        logger.info(f"[WorkflowTask {task_id}] Starting workflow execution")
+        repo.update_task_status(task_uuid, TaskStatus.PROCESSING)
+    else:
+        logger.info(
+            "[WorkflowTask %s] Retry %s/%s", task_id, task.request.retries, task.max_retries
+        )
+
+
+def _resolve_memory_ids(
+    memory: MemoryManager,
+    conversation_id: str | None,
+    external_id: str | None,
+) -> tuple[UUID | None, UUID | None]:
+    """Resolve request identifiers to internal UUIDs for the memory layer.
+
+    Returns ``(conversation_uuid, internal_user_uuid)``; either may be
+    ``None`` (anonymous session / no conversation).
+    """
+    internal_user_uuid: UUID | None = None
+    if external_id:
+        internal_user_uuid = memory.profile_repo.get_or_create(external_id).id
+
+    conv_uuid: UUID | None = None
+    if conversation_id:
+        conv = memory.get_or_create_conversation(UUID(conversation_id), internal_user_uuid)
+        conv_uuid = conv.id
+    return conv_uuid, internal_user_uuid
+
+
+def _load_memory_payloads(
+    memory: MemoryManager,
+    conv_uuid: UUID | None,
+    user_uuid: UUID | None,
+) -> tuple[ConversationContext | None, dict[str, Any] | None]:
+    """Load short-term context and long-term profile dict for the workflow."""
+    ctx: ConversationContext | None = None
+    if conv_uuid is not None:
+        ctx = memory.get_context(conv_uuid, token_budget=HISTORY_TOKEN_BUDGET)
+    profile = memory.get_profile(user_uuid) if user_uuid is not None else None
+    return ctx, profile
+
+
+def _persist_turn_safe(
+    memory: MemoryManager,
+    conv_uuid: UUID,
+    query: str,
+    result: dict[str, Any],
+    task_id: str,
+) -> None:
+    """Save the user + assistant turn. Logs and swallows failures — a
+    persistence error must not hide the answer from the user."""
+    metadata: dict[str, Any] = {
+        "query_type": result.get("query_type"),
+        "intent": result.get("intent"),
+        "entities": result.get("entities") or {},
+    }
+    if sql := result.get("sql_query"):
+        metadata["last_sql"] = sql
+    try:
+        memory.save_turn(
+            conversation_id=conv_uuid,
+            user_message=query,
+            bot_message=result.get("final_response", ""),
+            metadata=metadata,
+        )
+    except Exception as save_err:
+        logger.error(
+            "[WorkflowTask %s] save_turn failed for conv %s: %s",
+            task_id,
+            conv_uuid,
+            save_err,
+        )
+
+
+def _enqueue_profile_refresh(user_id: UUID, conversation_id: UUID) -> None:
+    """Schedule an async profile refresh without blocking the response.
+
+    Uses a late import to avoid a circular dependency between
+    ``workflow_task`` and ``memory_tasks`` at module load time.
+    """
+    try:
+        # Lazy import to break the workflow_task <-> memory_tasks cycle.
+        from hse_prom_prog.tasks.memory_tasks import update_profile_async  # noqa: PLC0415
+
+        update_profile_async.apply_async(args=[str(user_id), str(conversation_id)])
+    except Exception as e:
+        logger.warning("[WorkflowTask] Could not enqueue profile refresh: %s", e)
 
 
 def _get_retriever_safe():

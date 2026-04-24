@@ -57,6 +57,7 @@ class Task:
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
         workflow_state: dict[str, Any] | None = None,
+        conversation_id: UUID | None = None,
     ) -> None:
         """Initialize Task instance.
 
@@ -71,6 +72,7 @@ class Task:
             started_at: Task start timestamp.
             completed_at: Task completion timestamp.
             workflow_state: Optional full workflow state for debugging.
+            conversation_id: Optional short-term memory conversation id.
         """
         self.task_id = task_id
         self.query = query
@@ -82,6 +84,7 @@ class Task:
         self.started_at = started_at
         self.completed_at = completed_at
         self.workflow_state = workflow_state
+        self.conversation_id = conversation_id
 
     def to_dict(self) -> dict[str, Any]:
         """Convert Task to dictionary for JSON serialization.
@@ -98,6 +101,7 @@ class Task:
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "conversation_id": (str(self.conversation_id) if self.conversation_id else None),
         }
 
     def __repr__(self) -> str:

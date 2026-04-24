@@ -8,7 +8,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from hse_prom_prog.api.routers import tasks
+from hse_prom_prog.api.routers import conversations, tasks
 from hse_prom_prog.config import settings
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,8 @@ def create_app() -> FastAPI:
 
     # Include task management router
     app.include_router(tasks.router)
+    # Memory-layer conversations + transcripts
+    app.include_router(conversations.router)
 
     # Health check endpoint
     @app.get("/health", tags=["health"])
