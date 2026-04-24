@@ -14,6 +14,9 @@ from datetime import datetime
 from typing import Any
 
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.memory.formatter import format_history
+from hse_prom_prog.memory.token_estimator import estimate_tokens
+from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,21 @@ _MAX_ROWS_IN_PROMPT = 20
 _SYSTEM_ROLE = (
     "Ты — ассистент для анализа данных о Jira-задачах и Agile-метриках. "
     "Отвечай на русском языке, по делу, без воды и без выдумывания данных."
+)
+
+# Per-branch history budget, in tokens, for the short-term memory block
+# injected into the user prompt. The hybrid branch is the tightest because
+# it already carries both SQL payload and RAG context.
+_BRANCH_HISTORY_BUDGET: dict[str, int] = {
+    "sql": 1500,
+    "rag": 1000,
+    "hybrid": 800,
+    "simple": 1500,
+}
+_MIN_HISTORY_BUDGET_TOKENS = 300
+_HISTORY_INSTRUCTION = (
+    "Не повторяй то, что уже было сказано в истории. "
+    "На уточняющий вопрос отвечай кратко, без повторения контекста."
 )
 
 
@@ -130,13 +148,63 @@ class ResponseAgent:
         return json.dumps(formatted, ensure_ascii=False, indent=2)
 
     # ------------------------------------------------------------------
+    # Conversation history injection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_history_budget(
+        query_type: str,
+        intent: str,
+        data_length: int,
+    ) -> int:
+        """Return available history tokens for a branch given the data size.
+
+        ``data_length`` is chars of the DB/RAG payload already in the prompt.
+        We subtract its rough token cost from the branch's base budget and
+        floor at ``_MIN_HISTORY_BUDGET_TOKENS`` so some history always fits.
+        """
+        del intent  # kept in signature for future per-intent tuning
+        base = _BRANCH_HISTORY_BUDGET.get(query_type, 1000)
+        # estimate_tokens is char_len // 3, matching what the context
+        # builder used when accounting for the payload upstream.
+        return max(_MIN_HISTORY_BUDGET_TOKENS, base - estimate_tokens(" " * data_length))
+
+    @staticmethod
+    def _history_prefix(ctx: ConversationContext | None, budget_tokens: int) -> str:
+        """Format a history prefix that fits within ``budget_tokens``.
+
+        Drops oldest turns from a *copy* of the context until the rendered
+        block is within budget. Returns ``""`` if no turns survive — caller
+        gets a clean prompt in that case.
+        """
+        if ctx is None:
+            return ""
+        turns = list(ctx.get("recent_turns") or [])
+        if not turns:
+            return ""
+
+        while turns:
+            trimmed: ConversationContext = {
+                "summary": ctx.get("summary") or "",
+                "recent_turns": turns,
+                "history_token_count": 0,
+                "needs_summarization": ctx.get("needs_summarization", False),
+            }
+            block = format_history(trimmed)
+            if estimate_tokens(block) <= budget_tokens:
+                return f"{block}\n{_HISTORY_INSTRUCTION}\n\n" if block else ""
+            turns = turns[1:]  # drop the oldest turn and retry
+        return ""
+
+    # ------------------------------------------------------------------
     # LLM response generators
     # ------------------------------------------------------------------
 
-    def _generate_direct_response(self, original_query: str) -> str:
+    def _generate_direct_response(self, original_query: str, history: str = "") -> str:
         """Generate a direct LLM response without external context."""
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
             "Пользователь задал общий вопрос или поздоровался.\n\n"
             f"Вопрос: {original_query}\n\n"
             "Ответь кратко и дружелюбно. Если это приветствие — представься "
@@ -147,11 +215,17 @@ class ResponseAgent:
         logger.info("[Response Agent] Generated direct response")
         return response
 
-    def _generate_task_response(self, original_query: str, data: dict[str, Any]) -> str:
+    def _generate_task_response(
+        self,
+        original_query: str,
+        data: dict[str, Any],
+        history: str = "",
+    ) -> str:
         """Generate response for a single task lookup."""
         structured = self._prepare_single_task(data)
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
             "Пользователь спросил о конкретной задаче. Вот её данные:\n\n"
             f"{structured}\n\n"
             f"Вопрос: {original_query}\n\n"
@@ -175,6 +249,7 @@ class ResponseAgent:
         original_query: str,
         rows: list[dict[str, Any]],
         entities: dict[str, Any] | None = None,
+        history: str = "",
     ) -> str:
         """Generate response for a filtered task list."""
         entities = entities or {}
@@ -183,6 +258,7 @@ class ResponseAgent:
         total = len(rows)
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
             f"Пользователь запросил список задач. Найдено: {total}.\n\n"
             f"{task_list}\n\n"
             f"Вопрос: {original_query}\n\n"
@@ -197,11 +273,17 @@ class ResponseAgent:
         )
         return self.llm_client.invoke(prompt)
 
-    def _generate_metric_response(self, original_query: str, rows: list[dict[str, Any]]) -> str:
+    def _generate_metric_response(
+        self,
+        original_query: str,
+        rows: list[dict[str, Any]],
+        history: str = "",
+    ) -> str:
         """Generate response for metric queries."""
         metrics_data = self._prepare_metrics(rows)
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
             "Пользователь запросил метрики. Вот данные:\n\n"
             f"{metrics_data}\n\n"
             f"Вопрос: {original_query}\n\n"
@@ -225,13 +307,14 @@ class ResponseAgent:
         suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
         return f"{rag_response}{suffix}"
 
-    def _generate_hybrid_response(
+    def _generate_hybrid_response(  # noqa: PLR0913
         self,
         original_query: str,
         sql_result: list[dict[str, Any]],
         intent: str,
         rag_response: str,
         rag_sources: list[str],
+        history: str = "",
     ) -> str:
         """Combine DB data + RAG context into one answer."""
         # Prepare SQL data section
@@ -246,6 +329,7 @@ class ResponseAgent:
 
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
             "Пользователь задал вопрос, требующий и данных из БД, "
             "и контекста из базы знаний.\n\n"
             f"Данные из БД:\n{sql_section}\n\n"
@@ -301,17 +385,27 @@ class ResponseAgent:
             return {"final_response": msg}
 
         entities = state.get("entities", {})
+        ctx = state.get("conversation_context")
+        data_chars = sum(len(str(row)) for row in sql_result[:_MAX_ROWS_IN_PROMPT])
+        budget = self._get_history_budget("sql", intent, data_chars)
+        history = self._history_prefix(ctx, budget)
         try:
             if intent == "task":
-                response = self._generate_task_response(original_query, sql_result[0])
+                response = self._generate_task_response(
+                    original_query, sql_result[0], history=history
+                )
             elif intent == "tasks_filter":
                 response = self._generate_tasks_filter_response(
-                    original_query, sql_result, entities
+                    original_query, sql_result, entities, history=history
                 )
             elif intent == "metric":
-                response = self._generate_metric_response(original_query, sql_result)
+                response = self._generate_metric_response(
+                    original_query, sql_result, history=history
+                )
             else:
-                response = self._generate_task_response(original_query, sql_result[0])
+                response = self._generate_task_response(
+                    original_query, sql_result[0], history=history
+                )
 
             logger.info("[Response Agent] Generated SQL response for intent=%s", intent)
 
@@ -359,8 +453,10 @@ class ResponseAgent:
         # --- Direct response (simple) ---
         if route == "direct_response" or query_type == "simple":
             logger.info("[Response Agent] Generating direct response")
+            ctx = state.get("conversation_context")
+            history = self._history_prefix(ctx, self._get_history_budget("simple", intent, 0))
             try:
-                response = self._generate_direct_response(original_query)
+                response = self._generate_direct_response(original_query, history=history)
             except Exception as e:
                 logger.error("[Response Agent] Direct response error: %s", e)
                 response = (
@@ -406,6 +502,12 @@ class ResponseAgent:
         # --- Hybrid ---
         if query_type == "hybrid" and (use_sql or use_rag):
             logger.info("[Response Agent] Hybrid response")
+            ctx = state.get("conversation_context")
+            sql_chars = sum(len(str(r)) for r in (sql_result or [])[:_MAX_ROWS_IN_PROMPT])
+            data_chars = sql_chars + len(rag_response or "")
+            history = self._history_prefix(
+                ctx, self._get_history_budget("hybrid", intent, data_chars)
+            )
             try:
                 response = self._generate_hybrid_response(
                     original_query,
@@ -413,6 +515,7 @@ class ResponseAgent:
                     intent,
                     rag_response or "",
                     rag_sources,
+                    history=history,
                 )
             except Exception as e:
                 logger.error("[Response Agent] Hybrid response error: %s", e)

@@ -11,10 +11,9 @@ Graph topology:
 """
 
 import logging
-from typing import Annotated, Any, TypedDict
+from typing import Any
 
 from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
 
 from hse_prom_prog.agents.guardrails import (
     BLOCKED_RESPONSE,
@@ -29,29 +28,11 @@ from hse_prom_prog.agents.supervisor import SupervisorAgent
 from hse_prom_prog.agents.validator_agent import ValidatorAgent
 from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection
+from hse_prom_prog.graph.state import WorkflowState
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
-
-
-class WorkflowState(TypedDict):
-    """State schema for the LangGraph workflow."""
-
-    messages: Annotated[list, add_messages]
-    original_query: str
-    intent: str
-    entities: dict[str, Any]
-    query_type: str
-    route: str
-    sql_query: str
-    sql_result: list[dict[str, Any]]
-    rag_response: str
-    rag_sources: list[str]
-    error: str
-    validation_result: dict[str, Any]
-    final_response: str
-    blocked: bool
-    guard_result: dict[str, Any]
 
 
 class AgileWorkflow:
@@ -145,7 +126,10 @@ class AgileWorkflow:
 
     def _supervisor_node(self, state: WorkflowState) -> dict[str, Any]:
         logger.info("[Workflow] Entering Supervisor node")
-        return self.supervisor.process(state["original_query"])
+        return self.supervisor.process(
+            state["original_query"],
+            conversation_context=state.get("conversation_context"),
+        )
 
     def _sql_agent_node(self, state: WorkflowState) -> dict[str, Any]:
         logger.info("[Workflow] Entering SQL Agent node")
@@ -296,11 +280,27 @@ class AgileWorkflow:
     # Public API
     # ------------------------------------------------------------------
 
-    def run(self, user_query: str) -> dict[str, Any]:
+    def run(
+        self,
+        user_query: str,
+        *,
+        conversation_id: str | None = None,
+        user_id: str | None = None,
+        conversation_context: ConversationContext | None = None,
+        user_profile: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute the workflow with a user query.
+
+        The memory-layer kwargs are optional. Callers that don't use the
+        memory layer (tests, direct invocations, pre-memory deployments)
+        get the original stateless behaviour.
 
         Args:
             user_query: The user's natural language query.
+            conversation_id: Short-term memory conversation id (if any).
+            user_id: Long-term memory user id (if any).
+            conversation_context: Pre-assembled history to inject.
+            user_profile: Pre-loaded preferences to inject.
 
         Returns:
             Final state after processing through all agents.
@@ -323,6 +323,10 @@ class AgileWorkflow:
             "final_response": "",
             "blocked": False,
             "guard_result": {},
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "conversation_context": conversation_context,
+            "user_profile": user_profile,
         }
 
         try:

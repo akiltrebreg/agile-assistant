@@ -467,10 +467,80 @@ def _sanitize_field(
     return _sanitize_passthrough(value)
 
 
+# Anaphoric markers that signal the user is referring back to a previously
+# mentioned entity ("эта команда", "тот спринт", "покажи ещё"). Matched as
+# lowercase substrings against the query — kept permissive on purpose since
+# the surrounding guard (sanitizer layers 1-5) already drops hallucinated or
+# empty values before carry-forward runs.
+_ANAPHORA_MARKERS: tuple[str, ...] = (
+    "эт",  # covers этот/эта/это/эти/этой/этом
+    "так",  # такой/такая/такие/также
+    "тот",
+    "та ",
+    "те ",
+    "той",
+    "тех",
+    "ещё",
+    "еще",
+    "тоже",
+    "аналогич",
+    "по ней",
+    "по нему",
+    "по ним",
+    "у них",
+    "у неё",
+    "у нее",
+    "у него",
+)
+
+# Fields eligible for carry-forward from the prior turn. issue_type / status
+# / metric_name / issue_key are excluded intentionally: they are enums or
+# unique keys that the user typically re-states explicitly when relevant.
+_CARRY_FORWARD_FIELDS: tuple[str, ...] = (
+    "team_name",
+    "sprint_name",
+    "cluster",
+    "assignee",
+)
+
+
+def _has_anaphora(user_query: str) -> bool:
+    """Return True if the query contains at least one anaphoric marker."""
+    query_lower = user_query.lower()
+    return any(marker in query_lower for marker in _ANAPHORA_MARKERS)
+
+
+def _carry_forward_entities(
+    entities: dict[str, Any],
+    prev_entities: dict[str, Any] | None,
+    user_query: str,
+) -> dict[str, Any]:
+    """Fill empty ``entities`` fields from ``prev_entities`` on anaphora.
+
+    Called as layer 6 of the sanitizer. Runs *after* layers 1-5 so any
+    LLM-introduced value takes precedence; we only fill what Supervisor
+    genuinely couldn't extract from the current query.
+    """
+    if not prev_entities or not _has_anaphora(user_query):
+        return entities
+
+    result = dict(entities)
+    for field in _CARRY_FORWARD_FIELDS:
+        if not result.get(field) and prev_entities.get(field):
+            result[field] = prev_entities[field]
+            logger.info(
+                "[EntitySanitizer] carry-forward %s=%r from previous turn",
+                field,
+                prev_entities[field],
+            )
+    return result
+
+
 def sanitize_entities(
     entities: dict[str, Any],
     user_query: str,
     engine: Any | None = None,
+    prev_entities: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Sanitize all entity fields extracted by Supervisor.
 
@@ -480,11 +550,15 @@ def sanitize_entities(
       - enum fields -> synonyms -> DB validation -> query-presence check
       - free-text fields -> hallucination filter
       - unknown field -> passthrough
+      - [layer 6] carry-forward from ``prev_entities`` when the query
+        contains an anaphoric marker and the field is still empty
 
     Args:
         entities: Raw entities from LLM.
         user_query: Original query for hallucination detection.
         engine: Optional SQLAlchemy engine for DB validation.
+        prev_entities: Entities extracted from the previous user turn —
+            used for anaphora-driven carry-forward. ``None`` disables it.
 
     Returns:
         Cleaned entities (only valid values).
@@ -495,4 +569,4 @@ def sanitize_entities(
         cleaned = _sanitize_field(field, value, user_query, db_enums)
         if cleaned is not None:
             result[field] = cleaned
-    return result
+    return _carry_forward_entities(result, prev_entities, user_query)

@@ -22,6 +22,8 @@ from hse_prom_prog.agents.schema_description import (
     SUPERVISOR_FEW_SHOT_EXAMPLES,
 )
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.memory.formatter import format_history
+from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +151,50 @@ class SupervisorAgent:
         match = _ISSUE_KEY_RE.search(text)
         return match.group(1).upper() if match else None
 
-    def _classify_with_llm(self, user_query: str) -> dict[str, Any]:
+    @staticmethod
+    def _format_history_block(ctx: ConversationContext | None) -> str:
+        """Render the ``<conversation_history>`` block for the classifier prompt.
+
+        Returns an empty string when there's no context — keeps the prompt
+        identical to the pre-memory behaviour so old eval cases stay stable.
+        """
+        block = format_history(ctx)
+        if not block:
+            return ""
+        return (
+            f"{block}\n"
+            "Используй историю для разрешения местоимений и ссылок. "
+            "Если пользователь говорит «эта команда», «тот спринт», «покажи "
+            "ещё» — найди конкретные значения (team_name, sprint_name и т.д.) "
+            "в истории и заполни ими entities.\n\n"
+        )
+
+    @staticmethod
+    def _prev_entities_from_context(
+        ctx: ConversationContext | None,
+    ) -> dict[str, Any] | None:
+        """Pick the most-recent user-turn entities for carry-forward.
+
+        We look at user turns because that's where Supervisor's own
+        extraction was stored — assistant turns carry the response payload,
+        not the entity dict.
+        """
+        if ctx is None:
+            return None
+        for turn in reversed(ctx.get("recent_turns") or []):
+            if turn.get("role") != "user":
+                continue
+            meta = turn.get("metadata") or {}
+            entities = meta.get("entities")
+            if isinstance(entities, dict) and entities:
+                return entities
+        return None
+
+    def _classify_with_llm(
+        self,
+        user_query: str,
+        conversation_context: ConversationContext | None = None,
+    ) -> dict[str, Any]:
         """Classify query intent, entities, and query_type via LLM.
 
         Returns:
@@ -353,6 +398,7 @@ class SupervisorAgent:
             "      entities. Примеры issue_key (AL-38787, ABC-123) —\n"
             "      это иллюстрация формата, а не значение для подстановки.\n"
             "\n"
+            f"{self._format_history_block(conversation_context)}"
             f'Запрос пользователя: "{user_query}"\n'
             "JSON:"
         )
@@ -457,11 +503,19 @@ class SupervisorAgent:
 
         return result
 
-    def process(self, user_query: str) -> dict[str, Any]:
+    def process(
+        self,
+        user_query: str,
+        conversation_context: ConversationContext | None = None,
+    ) -> dict[str, Any]:
         """Classify the user query and extract structured entities.
 
         Fast path: if regex finds an issue key and the query is simple
         (just the key or "задача KEY"), skip the LLM call entirely.
+
+        ``conversation_context`` is optional — when provided, it is injected
+        into the classifier prompt for anaphora resolution and used to
+        carry-forward entities from prior turns via ``sanitize_entities``.
 
         Returns state update with: original_query, intent, entities,
         query_type, route.
@@ -484,7 +538,7 @@ class SupervisorAgent:
         # Slow path: LLM classification
         logger.info("[Supervisor] No issue key in regex, calling LLM")
         try:
-            classification = self._classify_with_llm(user_query)
+            classification = self._classify_with_llm(user_query, conversation_context)
         except Exception as e:
             logger.error("[Supervisor] LLM classification failed: %s", e)
             return {
@@ -503,6 +557,7 @@ class SupervisorAgent:
             classification.get("entities", {}),
             user_query,
             engine=self.db_engine,
+            prev_entities=self._prev_entities_from_context(conversation_context),
         )
 
         # 2) Post-process classification — routing based on CLEAN entities

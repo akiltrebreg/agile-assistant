@@ -36,6 +36,7 @@ from hse_prom_prog.agents.schema_loader import get_schema_compact
 from hse_prom_prog.agents.sql_tools import SQL_TOOLS, set_db
 from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
+from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
 
@@ -629,6 +630,10 @@ class SQLAgent:
         schema_ddl = get_schema_compact(self.db.engine)
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(schema=schema_ddl)
 
+        prev_sql = _extract_previous_sql(state.get("conversation_context"))
+        if prev_sql:
+            system_prompt += f"\n\nПредыдущий SQL-запрос пользователя:\n{prev_sql}"
+
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=original_query),
@@ -675,6 +680,26 @@ class SQLAgent:
 
 
 # ── Utilities ────────────────────────────────────────────────
+
+
+def _extract_previous_sql(ctx: ConversationContext | None) -> str | None:
+    """Return the most-recent prior SQL query from ``ctx``, if any.
+
+    Walks newest → oldest and picks the first assistant turn whose metadata
+    was produced by a SQL branch (``query_type == "sql"``) and contains a
+    non-empty ``last_sql`` string. Limited to a single prior statement to
+    keep the prompt bounded.
+    """
+    if ctx is None:
+        return None
+    for turn in reversed(ctx.get("recent_turns") or []):
+        meta = turn.get("metadata") or {}
+        if meta.get("query_type") != "sql":
+            continue
+        last_sql = meta.get("last_sql")
+        if isinstance(last_sql, str) and last_sql.strip():
+            return last_sql.strip()
+    return None
 
 
 def _parse_tool_result(content: str) -> list[dict[str, Any]]:

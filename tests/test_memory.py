@@ -6,6 +6,10 @@ Covers:
   * ContextBuilder            (5 tests)
   * ProfileExtractor          (4 tests)
   * MemoryManager.save_turn   (3 tests)
+  * format_history            (3 tests)
+  * EntitySanitizer carry-fwd (3 tests)
+  * Supervisor + context      (2 tests)
+  * ResponseAgent + history   (2 tests)
 """
 
 from datetime import datetime
@@ -14,12 +18,23 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 
+from hse_prom_prog.agents.entity_sanitizer import (
+    _carry_forward_entities,
+    _has_anaphora,
+)
+from hse_prom_prog.agents.response_agent import (
+    _BRANCH_HISTORY_BUDGET,
+    _MIN_HISTORY_BUDGET_TOKENS,
+    ResponseAgent,
+)
+from hse_prom_prog.agents.supervisor import SupervisorAgent
 from hse_prom_prog.memory.context_builder import ContextBuilder
+from hse_prom_prog.memory.formatter import format_history
 from hse_prom_prog.memory.manager import BOT_TRUNCATE_TOKENS, MemoryManager
 from hse_prom_prog.memory.profile_extractor import ProfileExtractor
 from hse_prom_prog.memory.token_estimator import CHARS_PER_TOKEN, estimate_tokens
 from hse_prom_prog.memory.truncator import ELLIPSIS, truncate_message
-from hse_prom_prog.models.memory import Conversation, Message
+from hse_prom_prog.models.memory import Conversation, ConversationContext, Message
 
 # ────────────────────────────────────────────────────────────────
 # Helpers
@@ -406,3 +421,202 @@ class TestMemoryManagerSaveTurn:
 
         assert (user_idx, bot_idx) == (3, 4)
         assert conv_repo.get_latest_turn_index.call_count == 2
+
+
+# ────────────────────────────────────────────────────────────────
+# format_history
+# ────────────────────────────────────────────────────────────────
+
+
+def _ctx(
+    recent: list[dict] | None = None,
+    summary: str = "",
+) -> ConversationContext:
+    """Build a minimal ConversationContext for tests."""
+    return {
+        "summary": summary,
+        "recent_turns": recent or [],
+        "history_token_count": 0,
+        "needs_summarization": False,
+    }
+
+
+class TestFormatHistory:
+    def test_empty_recent_returns_empty_string(self) -> None:
+        assert format_history(_ctx()) == ""
+
+    def test_none_context_returns_empty_string(self) -> None:
+        assert format_history(None) == ""
+
+    def test_summary_and_recent_are_rendered_in_order(self) -> None:
+        ctx = _ctx(
+            recent=[
+                {"role": "user", "content": "Привет"},
+                {"role": "assistant", "content": "Здравствуйте"},
+            ],
+            summary="Раньше обсуждали команду lpop.",
+        )
+
+        out = format_history(ctx)
+
+        assert out.startswith("<conversation_history>")
+        assert out.endswith("</conversation_history>")
+        assert "<summary>Раньше обсуждали команду lpop.</summary>" in out
+        # Recent turns appear inside <recent> with English role labels.
+        assert out.index("<summary>") < out.index("<recent>")
+        assert "User: Привет" in out
+        assert "Assistant: Здравствуйте" in out
+        # No <summary> when summary is empty.
+        out_no_sum = format_history(_ctx(recent=[{"role": "user", "content": "x"}]))
+        assert "<summary>" not in out_no_sum
+
+
+# ────────────────────────────────────────────────────────────────
+# EntitySanitizer: carry-forward (layer 6)
+# ────────────────────────────────────────────────────────────────
+
+
+class TestCarryForwardEntities:
+    def test_anaphora_with_prev_team_substitutes(self) -> None:
+        result = _carry_forward_entities(
+            entities={"metric_name": "velocity"},
+            prev_entities={"team_name": "cthulhu", "sprint_name": "#1 Q1'26"},
+            user_query="А что по velocity у этой команды?",
+        )
+
+        assert result["team_name"] == "cthulhu"
+        assert result["sprint_name"] == "#1 Q1'26"
+        assert result["metric_name"] == "velocity"  # current entities preserved
+
+    def test_no_anaphora_leaves_entities_untouched(self) -> None:
+        result = _carry_forward_entities(
+            entities={"metric_name": "velocity"},
+            prev_entities={"team_name": "cthulhu"},
+            user_query="Посчитай velocity",  # no anaphoric marker
+        )
+
+        assert "team_name" not in result
+        assert result == {"metric_name": "velocity"}
+
+    def test_current_value_beats_prev_even_with_anaphora(self) -> None:
+        """Supervisor extracted a team from this turn — do not overwrite."""
+        result = _carry_forward_entities(
+            entities={"team_name": "newteam"},
+            prev_entities={"team_name": "cthulhu"},
+            user_query="А у этой команды newteam как дела?",
+        )
+
+        assert result["team_name"] == "newteam"
+
+    def test_has_anaphora_detects_common_markers(self) -> None:
+        assert _has_anaphora("А что по этой команде?")
+        assert _has_anaphora("Покажи ещё")
+        assert _has_anaphora("По ней тоже посмотри")
+        assert not _has_anaphora("Какой velocity у команды cthulhu?")
+
+
+# ────────────────────────────────────────────────────────────────
+# Supervisor + conversation_context
+# ────────────────────────────────────────────────────────────────
+
+
+class TestSupervisorWithContext:
+    def test_context_is_injected_into_llm_prompt(self) -> None:
+        """Supervisor should include history block + resolution instruction."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"metric","query_type":"sql","entities":{"metric_name":"velocity"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        ctx = _ctx(
+            recent=[
+                {
+                    "role": "user",
+                    "content": "Задачи команды cthulhu",
+                    "metadata": {"entities": {"team_name": "cthulhu"}},
+                }
+            ]
+        )
+        result = agent.process(
+            "А что по velocity у этой команды?",
+            conversation_context=ctx,
+        )
+
+        # Carry-forward filled team_name from prior turn.
+        assert result["entities"].get("team_name") == "cthulhu"
+        assert result["entities"].get("metric_name") == "velocity"
+        # The history block reached the LLM prompt.
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "<conversation_history>" in prompt
+        assert "cthulhu" in prompt
+        assert "Используй историю" in prompt
+
+    def test_no_context_leaves_prompt_unchanged(self) -> None:
+        """Without context, Supervisor prompt does not contain history tags."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = '{"intent":"general","query_type":"simple","entities":{}}'
+        agent = SupervisorAgent(mock_llm)
+
+        agent.process("Как дела?")
+
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "<conversation_history>" not in prompt
+        assert "Используй историю" not in prompt
+
+
+# ────────────────────────────────────────────────────────────────
+# ResponseAgent + conversation_context
+# ────────────────────────────────────────────────────────────────
+
+
+class TestResponseAgentHistory:
+    def test_direct_response_prompt_includes_history_and_instruction(self) -> None:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = "Готов помочь."
+        agent = ResponseAgent(mock_llm)
+
+        ctx = _ctx(
+            recent=[
+                {"role": "user", "content": "Какой velocity у cthulhu?"},
+                {"role": "assistant", "content": "Velocity: 42 SP."},
+            ]
+        )
+        state = {
+            "query_type": "simple",
+            "intent": "general",
+            "original_query": "Спасибо!",
+            "route": "direct_response",
+            "conversation_context": ctx,
+        }
+
+        agent.process(state)
+
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "<conversation_history>" in prompt
+        assert "Velocity: 42 SP." in prompt
+        assert "Не повторяй" in prompt  # anti-duplication instruction
+
+    def test_hybrid_branch_history_fits_within_budget(self) -> None:
+        """With a large SQL payload the hybrid budget never underflows the floor."""
+        agent = ResponseAgent(MagicMock())
+
+        # Huge payload should push base - data tokens below the floor, but
+        # the helper must still return a sane positive budget.
+        big_rows = [{"row": "x" * 2000}] * 10
+        data_chars = sum(len(str(r)) for r in big_rows[:20])
+        budget = agent._get_history_budget("hybrid", "metric", data_chars)
+
+        assert budget == _MIN_HISTORY_BUDGET_TOKENS
+        # And it stays ≤ the nominal hybrid base (never above).
+        assert budget <= _BRANCH_HISTORY_BUDGET["hybrid"]
+
+        # When context has history that doesn't fit, prefix should be empty
+        # rather than blow the budget.
+        long_turns = [
+            {"role": "user", "content": "x" * 5000},
+            {"role": "assistant", "content": "y" * 5000},
+        ]
+        prefix = agent._history_prefix(_ctx(recent=long_turns), budget_tokens=50)
+        # Budget too small for any turn → formatter drops them all → empty.
+        assert prefix == "" or estimate_tokens(prefix) <= 50
