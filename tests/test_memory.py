@@ -566,6 +566,56 @@ class TestSupervisorWithContext:
 
 
 # ────────────────────────────────────────────────────────────────
+# Supervisor + user_profile (long-term memory)
+# ────────────────────────────────────────────────────────────────
+
+
+class TestSupervisorWithProfile:
+    def test_default_team_fills_in_missing_team_entity(self) -> None:
+        """default_team in profile → LLM instructed to use it, entities reflect it.
+
+        With a mocked LLM we can't test the model's actual behaviour — but
+        we CAN verify (a) the instruction reached the prompt and (b) the
+        entity returned by the LLM round-trips through the pipeline.
+        """
+        mock_llm = MagicMock()
+        # Model "obeys" the default_team instruction.
+        mock_llm.invoke.return_value = (
+            '{"intent":"metric","query_type":"sql",'
+            '"entities":{"metric_name":"velocity","team_name":"cthulhu"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        profile = {
+            "preferences": {"default_team": "cthulhu"},
+            "context_summary": "Пользователь — скрам-мастер команды cthulhu.",
+        }
+        result = agent.process("Покажи velocity", user_profile=profile)
+
+        assert result["entities"].get("team_name") == "cthulhu"
+        # The profile block made it into the LLM prompt.
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "<user_profile>" in prompt
+        assert "cthulhu" in prompt
+        assert "Команда пользователя по умолчанию" in prompt
+        assert "скрам-мастер" in prompt  # context_summary was rendered too
+
+    def test_no_profile_leaves_prompt_unchanged(self) -> None:
+        """Without a profile, no <user_profile> tag should appear."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"metric","query_type":"sql","entities":{"metric_name":"velocity"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        agent.process("Покажи velocity")
+
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "<user_profile>" not in prompt
+        assert "Команда пользователя по умолчанию" not in prompt
+
+
+# ────────────────────────────────────────────────────────────────
 # ResponseAgent + conversation_context
 # ────────────────────────────────────────────────────────────────
 
@@ -596,6 +646,50 @@ class TestResponseAgentHistory:
         assert "<conversation_history>" in prompt
         assert "Velocity: 42 SP." in prompt
         assert "Не повторяй" in prompt  # anti-duplication instruction
+
+    def test_brief_preference_adds_brevity_instruction(self) -> None:
+        """preferences.preferred_detail_level='brief' → prompt carries the nudge."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = "Velocity: 42."
+        agent = ResponseAgent(mock_llm)
+
+        state = {
+            "query_type": "simple",
+            "intent": "general",
+            "original_query": "Какой velocity?",
+            "route": "direct_response",
+            "conversation_context": None,
+            "user_profile": {
+                "preferences": {"preferred_detail_level": "brief"},
+            },
+        }
+
+        agent.process(state)
+
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "Пользователь предпочитает краткие" in prompt
+
+    def test_detailed_preference_adds_no_instruction(self) -> None:
+        """detailed is the default tone — no extra line should be injected."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = "ok"
+        agent = ResponseAgent(mock_llm)
+
+        state = {
+            "query_type": "simple",
+            "intent": "general",
+            "original_query": "Что умеешь?",
+            "route": "direct_response",
+            "conversation_context": None,
+            "user_profile": {
+                "preferences": {"preferred_detail_level": "detailed"},
+            },
+        }
+
+        agent.process(state)
+
+        prompt = mock_llm.invoke.call_args.args[0]
+        assert "Пользователь предпочитает краткие" not in prompt
 
     def test_hybrid_branch_history_fits_within_budget(self) -> None:
         """With a large SQL payload the hybrid budget never underflows the floor."""

@@ -42,6 +42,10 @@ _HISTORY_INSTRUCTION = (
     "Не повторяй то, что уже было сказано в истории. "
     "На уточняющий вопрос отвечай кратко, без повторения контекста."
 )
+_BRIEF_PREFERENCE_INSTRUCTION = (
+    "Пользователь предпочитает краткие ответы. "
+    "Давай только ключевые цифры и факты без развёрнутых пояснений.\n\n"
+)
 
 
 class ResponseAgent:
@@ -168,6 +172,20 @@ class ResponseAgent:
         # estimate_tokens is char_len // 3, matching what the context
         # builder used when accounting for the payload upstream.
         return max(_MIN_HISTORY_BUDGET_TOKENS, base - estimate_tokens(" " * data_length))
+
+    @staticmethod
+    def _profile_instruction(user_profile: dict[str, Any] | None) -> str:
+        """Return the response-style nudge for the LLM, or an empty string.
+
+        ``brief`` → explicit brevity line; ``detailed`` → no-op (the default
+        prompt is already detailed, and the extra line would just eat budget).
+        """
+        if not user_profile:
+            return ""
+        preferences = user_profile.get("preferences") or {}
+        if preferences.get("preferred_detail_level") == "brief":
+            return _BRIEF_PREFERENCE_INSTRUCTION
+        return ""
 
     @staticmethod
     def _history_prefix(ctx: ConversationContext | None, budget_tokens: int) -> str:
@@ -388,23 +406,25 @@ class ResponseAgent:
         ctx = state.get("conversation_context")
         data_chars = sum(len(str(row)) for row in sql_result[:_MAX_ROWS_IN_PROMPT])
         budget = self._get_history_budget("sql", intent, data_chars)
-        history = self._history_prefix(ctx, budget)
+        prefix = self._history_prefix(ctx, budget) + self._profile_instruction(
+            state.get("user_profile")
+        )
         try:
             if intent == "task":
                 response = self._generate_task_response(
-                    original_query, sql_result[0], history=history
+                    original_query, sql_result[0], history=prefix
                 )
             elif intent == "tasks_filter":
                 response = self._generate_tasks_filter_response(
-                    original_query, sql_result, entities, history=history
+                    original_query, sql_result, entities, history=prefix
                 )
             elif intent == "metric":
                 response = self._generate_metric_response(
-                    original_query, sql_result, history=history
+                    original_query, sql_result, history=prefix
                 )
             else:
                 response = self._generate_task_response(
-                    original_query, sql_result[0], history=history
+                    original_query, sql_result[0], history=prefix
                 )
 
             logger.info("[Response Agent] Generated SQL response for intent=%s", intent)
@@ -454,9 +474,11 @@ class ResponseAgent:
         if route == "direct_response" or query_type == "simple":
             logger.info("[Response Agent] Generating direct response")
             ctx = state.get("conversation_context")
-            history = self._history_prefix(ctx, self._get_history_budget("simple", intent, 0))
+            prefix = self._history_prefix(
+                ctx, self._get_history_budget("simple", intent, 0)
+            ) + self._profile_instruction(state.get("user_profile"))
             try:
-                response = self._generate_direct_response(original_query, history=history)
+                response = self._generate_direct_response(original_query, history=prefix)
             except Exception as e:
                 logger.error("[Response Agent] Direct response error: %s", e)
                 response = (
@@ -505,9 +527,9 @@ class ResponseAgent:
             ctx = state.get("conversation_context")
             sql_chars = sum(len(str(r)) for r in (sql_result or [])[:_MAX_ROWS_IN_PROMPT])
             data_chars = sql_chars + len(rag_response or "")
-            history = self._history_prefix(
+            prefix = self._history_prefix(
                 ctx, self._get_history_budget("hybrid", intent, data_chars)
-            )
+            ) + self._profile_instruction(state.get("user_profile"))
             try:
                 response = self._generate_hybrid_response(
                     original_query,
@@ -515,7 +537,7 @@ class ResponseAgent:
                     intent,
                     rag_response or "",
                     rag_sources,
-                    history=history,
+                    history=prefix,
                 )
             except Exception as e:
                 logger.error("[Response Agent] Hybrid response error: %s", e)

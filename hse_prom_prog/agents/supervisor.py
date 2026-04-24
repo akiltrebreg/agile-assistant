@@ -152,6 +152,41 @@ class SupervisorAgent:
         return match.group(1).upper() if match else None
 
     @staticmethod
+    def _format_profile_block(profile: dict[str, Any] | None) -> str:
+        """Render the long-term profile block for the classifier prompt.
+
+        Adds two pieces:
+          * ``default_team`` — Supervisor should use it when the query has
+            no explicit team mention (tiny bias, ~20 tokens).
+          * ``context_summary`` — rolling roll-up of prior sessions, helps
+            disambiguate intent for repeat users (~50-100 tokens).
+
+        Returns an empty string when the profile is missing or empty so
+        anonymous / first-time users keep the pre-memory prompt verbatim.
+        """
+        if not profile:
+            return ""
+        preferences = profile.get("preferences") or {}
+        lines: list[str] = []
+
+        default_team = preferences.get("default_team")
+        if default_team:
+            lines.append(
+                f"Команда пользователя по умолчанию: {default_team}. "
+                "Если пользователь спрашивает без указания команды — "
+                "используй эту команду в entities.team_name."
+            )
+
+        context_summary = profile.get("context_summary")
+        if context_summary:
+            lines.append(f"Контекст пользователя: {context_summary}")
+
+        if not lines:
+            return ""
+        body = "\n".join(lines)
+        return f"<user_profile>\n{body}\n</user_profile>\n\n"
+
+    @staticmethod
     def _format_history_block(ctx: ConversationContext | None) -> str:
         """Render the ``<conversation_history>`` block for the classifier prompt.
 
@@ -194,6 +229,7 @@ class SupervisorAgent:
         self,
         user_query: str,
         conversation_context: ConversationContext | None = None,
+        user_profile: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Classify query intent, entities, and query_type via LLM.
 
@@ -398,6 +434,7 @@ class SupervisorAgent:
             "      entities. Примеры issue_key (AL-38787, ABC-123) —\n"
             "      это иллюстрация формата, а не значение для подстановки.\n"
             "\n"
+            f"{self._format_profile_block(user_profile)}"
             f"{self._format_history_block(conversation_context)}"
             f'Запрос пользователя: "{user_query}"\n'
             "JSON:"
@@ -507,6 +544,7 @@ class SupervisorAgent:
         self,
         user_query: str,
         conversation_context: ConversationContext | None = None,
+        user_profile: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Classify the user query and extract structured entities.
 
@@ -516,6 +554,11 @@ class SupervisorAgent:
         ``conversation_context`` is optional — when provided, it is injected
         into the classifier prompt for anaphora resolution and used to
         carry-forward entities from prior turns via ``sanitize_entities``.
+
+        ``user_profile`` is optional — when provided, ``preferences``
+        (notably ``default_team``) and ``context_summary`` are surfaced in
+        the classifier prompt so the LLM can default team fields and bias
+        intent toward the user's usual queries.
 
         Returns state update with: original_query, intent, entities,
         query_type, route.
@@ -538,7 +581,11 @@ class SupervisorAgent:
         # Slow path: LLM classification
         logger.info("[Supervisor] No issue key in regex, calling LLM")
         try:
-            classification = self._classify_with_llm(user_query, conversation_context)
+            classification = self._classify_with_llm(
+                user_query,
+                conversation_context,
+                user_profile,
+            )
         except Exception as e:
             logger.error("[Supervisor] LLM classification failed: %s", e)
             return {
@@ -559,6 +606,20 @@ class SupervisorAgent:
             engine=self.db_engine,
             prev_entities=self._prev_entities_from_context(conversation_context),
         )
+
+        # 1b) Profile-driven fallback: if the sanitizer ended up with no
+        #     team (either the LLM didn't pick it up, or the team wasn't
+        #     mentioned in the query and got dropped as a "hallucination"),
+        #     substitute the user's default team. Runs AFTER sanitization
+        #     on purpose — the profile value is a trusted signal, not LLM
+        #     output, and does not need hallucination filtering.
+        default_team = ((user_profile or {}).get("preferences") or {}).get("default_team")
+        if default_team and not classification["entities"].get("team_name"):
+            classification["entities"]["team_name"] = default_team
+            logger.info(
+                "[Supervisor] Applied profile default_team=%s to empty entities.team_name",
+                default_team,
+            )
 
         # 2) Post-process classification — routing based on CLEAN entities
         classification = self._post_process_classification(user_query, classification)

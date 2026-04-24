@@ -129,6 +129,7 @@ class AgileWorkflow:
         return self.supervisor.process(
             state["original_query"],
             conversation_context=state.get("conversation_context"),
+            user_profile=state.get("user_profile"),
         )
 
     def _sql_agent_node(self, state: WorkflowState) -> dict[str, Any]:
