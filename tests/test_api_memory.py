@@ -10,9 +10,10 @@ They validate the wiring added in Part 5:
   * GET /conversations?user_id=... → returns the user's list
   * workflow_task._persist_turn_safe → save_turn called with the full
     metadata expected by downstream memory layers
+  * workflow_task._maybe_rotate_stale_conversation → idle rotation (Part 8)
 """
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -22,7 +23,11 @@ from hse_prom_prog.api.app import app
 from hse_prom_prog.api.dependencies import get_db, get_memory_manager
 from hse_prom_prog.models.memory import Conversation, Message, UserProfile
 from hse_prom_prog.models.task import Task, TaskStatus
-from hse_prom_prog.tasks.workflow_task import _persist_turn_safe
+from hse_prom_prog.tasks.workflow_task import (
+    INACTIVITY_THRESHOLD,
+    _maybe_rotate_stale_conversation,
+    _persist_turn_safe,
+)
 
 # ────────────────────────────────────────────────────────────────
 # Fixtures / helpers
@@ -260,6 +265,83 @@ class TestPersistTurnSafe:
             "t-2",
         )
         memory.save_turn.assert_called_once()
+
+
+# ────────────────────────────────────────────────────────────────
+# workflow_task._maybe_rotate_stale_conversation (Part 8)
+# ────────────────────────────────────────────────────────────────
+
+
+def _stale_conv(
+    *,
+    user_id: UUID,
+    idle: timedelta,
+    is_active: bool = True,
+) -> Conversation:
+    """Conversation whose updated_at is ``idle`` behind now."""
+    now = datetime.now(UTC)
+    return Conversation(
+        id=uuid4(),
+        user_id=user_id,
+        title="existing",
+        summary=None,
+        summary_turn_index=0,
+        created_at=now - idle,
+        updated_at=now - idle,
+        is_active=is_active,
+    )
+
+
+class TestMaybeRotateStaleConversation:
+    def test_rotates_when_idle_past_threshold_and_messages_exist(self) -> None:
+        user_id = uuid4()
+        stale = _stale_conv(user_id=user_id, idle=INACTIVITY_THRESHOLD + timedelta(minutes=1))
+        fresh = _stale_conv(user_id=user_id, idle=timedelta(seconds=0))
+
+        memory = MagicMock()
+        memory.conversation_repo.count_messages.return_value = 4
+        memory.conversation_repo.create.return_value = fresh
+
+        result = _maybe_rotate_stale_conversation(memory, stale, user_id)
+
+        assert result.id == fresh.id
+        memory.conversation_repo.close.assert_called_once_with(stale.id)
+        memory.conversation_repo.create.assert_called_once()
+
+    def test_keeps_conversation_when_recently_updated(self) -> None:
+        user_id = uuid4()
+        fresh = _stale_conv(user_id=user_id, idle=timedelta(minutes=5))
+
+        memory = MagicMock()
+        result = _maybe_rotate_stale_conversation(memory, fresh, user_id)
+
+        assert result is fresh
+        memory.conversation_repo.close.assert_not_called()
+        memory.conversation_repo.create.assert_not_called()
+
+    def test_skips_rotation_for_empty_stale_conversation(self) -> None:
+        """No messages → nothing worth summarising, reuse the empty shell."""
+        user_id = uuid4()
+        stale = _stale_conv(user_id=user_id, idle=timedelta(hours=2))
+
+        memory = MagicMock()
+        memory.conversation_repo.count_messages.return_value = 0
+
+        result = _maybe_rotate_stale_conversation(memory, stale, user_id)
+
+        assert result is stale
+        memory.conversation_repo.close.assert_not_called()
+        memory.conversation_repo.create.assert_not_called()
+
+    def test_skips_rotation_for_anonymous_user(self) -> None:
+        """Anon conversations can't be summarised (no profile) — leave alone."""
+        stale = _stale_conv(user_id=uuid4(), idle=timedelta(hours=2))
+
+        memory = MagicMock()
+        result = _maybe_rotate_stale_conversation(memory, stale, user_uuid=None)
+
+        assert result is stale
+        memory.conversation_repo.close.assert_not_called()
 
 
 # ────────────────────────────────────────────────────────────────

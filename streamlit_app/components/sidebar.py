@@ -87,6 +87,21 @@ def _render_conversation_controls(
             st.session_state.conversation_id = None
             st.rerun()
 
+    # "Завершить диалог" — only meaningful when there IS an active one.
+    # Explicit close triggers summarisation; after that we reuse the
+    # same on_new_chat callback to reset local + URL state.
+    if current_conversation_id and st.button(
+        "Завершить диалог",
+        use_container_width=True,
+    ):
+        client.close_conversation(current_conversation_id)
+        if on_new_chat is not None:
+            on_new_chat()
+        else:
+            st.session_state.messages = []
+            st.session_state.conversation_id = None
+            st.rerun()
+
     st.divider()
     st.markdown("**История диалогов**")
 

@@ -6,6 +6,7 @@ Includes retry logic with exponential backoff for transient failures.
 """
 
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -17,7 +18,7 @@ from hse_prom_prog.database.task_repository import TaskRepository
 from hse_prom_prog.graph.workflow import AgileWorkflow
 from hse_prom_prog.llm.client import get_llm_client
 from hse_prom_prog.memory.manager import MemoryManager
-from hse_prom_prog.models.memory import ConversationContext
+from hse_prom_prog.models.memory import Conversation, ConversationContext
 from hse_prom_prog.models.task import TaskStatus
 from hse_prom_prog.rag.retriever import get_retriever
 from hse_prom_prog.tasks.celery_app import celery_app
@@ -28,6 +29,12 @@ logger = logging.getLogger(__name__)
 # 1200 ≈ the Response Agent's hybrid-branch floor; context builder
 # trims older turns when the total would exceed this.
 HISTORY_TOKEN_BUDGET = 1200
+
+# Any message-bearing conversation idle for longer than this gets closed
+# and replaced with a fresh one on the next user request. Keeps sessions
+# scoped to a single working context (so the sidebar doesn't accumulate
+# one giant "ever-living" chat) and lets the summariser run periodically.
+INACTIVITY_THRESHOLD = timedelta(minutes=30)
 
 
 class WorkflowTask(CeleryTask):
@@ -180,7 +187,9 @@ def _resolve_memory_ids(
     """Resolve request identifiers to internal UUIDs for the memory layer.
 
     Returns ``(conversation_uuid, internal_user_uuid)``; either may be
-    ``None`` (anonymous session / no conversation).
+    ``None`` (anonymous session / no conversation). Also rotates
+    conversations idle for more than :data:`INACTIVITY_THRESHOLD` so
+    long breaks start a fresh session with a summarised predecessor.
     """
     internal_user_uuid: UUID | None = None
     if external_id:
@@ -189,8 +198,57 @@ def _resolve_memory_ids(
     conv_uuid: UUID | None = None
     if conversation_id:
         conv = memory.get_or_create_conversation(UUID(conversation_id), internal_user_uuid)
+        conv = _maybe_rotate_stale_conversation(memory, conv, internal_user_uuid)
         conv_uuid = conv.id
     return conv_uuid, internal_user_uuid
+
+
+def _maybe_rotate_stale_conversation(
+    memory: MemoryManager,
+    conv: Conversation,
+    user_uuid: UUID | None,
+) -> Conversation:
+    """Close an idle conversation and hand back a fresh one.
+
+    Rotates only when:
+      * the user is identified (rotation for anon users would leave
+        orphan closed conversations nobody can see in the sidebar),
+      * the conversation is still active and has at least one message
+        (rotating an empty conversation just wastes a row), and
+      * ``now - conv.updated_at > INACTIVITY_THRESHOLD``.
+
+    The stale conversation is closed and submitted for summarisation;
+    failures at either step degrade gracefully — the new conversation
+    is still returned so the user's current request is never blocked.
+    """
+    if user_uuid is None or not conv.is_active or conv.updated_at is None:
+        return conv
+
+    now = datetime.now(conv.updated_at.tzinfo or UTC)
+    if now - conv.updated_at <= INACTIVITY_THRESHOLD:
+        return conv
+    if memory.conversation_repo.count_messages(conv.id) == 0:
+        return conv
+
+    logger.info(
+        "[WorkflowTask] Rotating stale conversation %s (idle=%s)",
+        conv.id,
+        now - conv.updated_at,
+    )
+    try:
+        memory.conversation_repo.close(conv.id)
+    except Exception as e:
+        logger.warning("[WorkflowTask] Failed to close stale conv %s: %s", conv.id, e)
+
+    try:
+        # Lazy import to keep the memory_tasks <-> workflow_task cycle broken.
+        from hse_prom_prog.tasks.memory_tasks import summarize_session  # noqa: PLC0415
+
+        summarize_session.apply_async(args=[str(conv.id), str(user_uuid)])
+    except Exception as e:
+        logger.warning("[WorkflowTask] Failed to enqueue summarisation: %s", e)
+
+    return memory.conversation_repo.create(user_id=user_uuid)
 
 
 def _load_memory_payloads(

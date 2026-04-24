@@ -185,6 +185,14 @@ if prompt := st.chat_input("Введите запрос..."):
             # 3. Display result
             final_status = task_data.get("status", "")
             if final_status == "COMPLETED":
+                # The worker may have rotated the conversation (e.g. the
+                # prior one had been idle for 30+ min) — the result carries
+                # the authoritative id. Keep local + URL state in sync.
+                final_conv_id = (task_data.get("result") or {}).get("conversation_id")
+                if final_conv_id and final_conv_id != st.session_state.conversation_id:
+                    st.session_state.conversation_id = final_conv_id
+                    pin_conversation_id(final_conv_id)
+
                 answer = render_result(task_data)
                 st.markdown(answer)
                 render_task_details(task_data)
