@@ -5,6 +5,7 @@ interact with the backend through this client.
 """
 
 import logging
+from http import HTTPStatus
 
 import requests
 
@@ -34,21 +35,38 @@ class APIClient:
         except requests.RequestException:
             return False
 
-    def submit_task(self, query: str) -> dict:
+    # ------------------------------------------------------------------
+    # Tasks
+    # ------------------------------------------------------------------
+
+    def submit_task(
+        self,
+        query: str,
+        *,
+        conversation_id: str | None = None,
+        user_id: str | None = None,
+    ) -> dict:
         """POST /tasks — create a new task.
 
         Args:
             query: User query string.
+            conversation_id: Existing conversation id (``None`` = new).
+            user_id: External user id (cookie UUID / SSO).
 
         Returns:
-            Dict with task_id, status, message.
+            Dict with ``task_id``, ``conversation_id``, ``status``, ``message``.
 
         Raises:
             requests.RequestException: On network / HTTP errors.
         """
+        payload: dict = {"query": query}
+        if conversation_id:
+            payload["conversation_id"] = conversation_id
+        if user_id:
+            payload["user_id"] = user_id
         resp = requests.post(
             f"{self.base_url}/tasks",
-            json={"query": query},
+            json=payload,
             timeout=REQUEST_TIMEOUT_SEC,
         )
         resp.raise_for_status()
@@ -72,3 +90,62 @@ class APIClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    # ------------------------------------------------------------------
+    # Conversations (memory layer)
+    # ------------------------------------------------------------------
+
+    def list_conversations(
+        self,
+        user_id: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict]:
+        """GET /conversations — sidebar list for a user.
+
+        Returns an empty list on network error so the sidebar never
+        crashes the whole page — the rest of the chat still works.
+        """
+        try:
+            resp = requests.get(
+                f"{self.base_url}/conversations",
+                params={"user_id": user_id, "limit": limit, "offset": offset},
+                timeout=REQUEST_TIMEOUT_SEC,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            logger.warning("list_conversations failed: %s", e)
+            return []
+
+    def get_messages(self, conversation_id: str, limit: int = 200) -> list[dict]:
+        """GET /conversations/{id}/messages — full transcript, ascending turn.
+
+        Returns ``[]`` if the conversation doesn't exist or the API is down.
+        """
+        try:
+            resp = requests.get(
+                f"{self.base_url}/conversations/{conversation_id}/messages",
+                params={"limit": limit},
+                timeout=REQUEST_TIMEOUT_SEC,
+            )
+            if resp.status_code == HTTPStatus.NOT_FOUND:
+                return []
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            logger.warning("get_messages(%s) failed: %s", conversation_id, e)
+            return []
+
+    def close_conversation(self, conversation_id: str) -> dict | None:
+        """POST /conversations/{id}/close — mark closed, schedule summary."""
+        try:
+            resp = requests.post(
+                f"{self.base_url}/conversations/{conversation_id}/close",
+                timeout=REQUEST_TIMEOUT_SEC,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            logger.warning("close_conversation(%s) failed: %s", conversation_id, e)
+            return None
