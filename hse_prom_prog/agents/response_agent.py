@@ -384,8 +384,12 @@ class ResponseAgent:
             logger.warning("[Response Agent] Validation note: %s", note)
             return {
                 "final_response": (
-                    f"Ошибка при выполнении запроса:\n\n{note}\n\n"
-                    "---\n*Попробуйте переформулировать запрос*"
+                    "К сожалению, в моей базе знаний нет ответа на этот вопрос.\n\n"
+                    "Я могу помочь с:\n"
+                    "• Agile-практиками (Sprint Goal, Velocity, Backlog Grooming)\n"
+                    "• Метриками команд (Done Total, Scope Drop, Cancel Rate)\n"
+                    "• Деталях о задачах Jira (текущий статус, описание)\n\n"
+                    "Попробуйте переформулировать запрос ближе к этим темам."
                 ),
             }
 
