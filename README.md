@@ -10,6 +10,9 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
   - [LLM Backend](#llm-backend)
   - [База данных](#база-данных)
   - [Векторное хранилище (Qdrant)](#векторное-хранилище-qdrant)
+- [Memory Layer](#memory-layer)
+  - [Контекст диалога](#контекст-диалога)
+  - [Профиль пользователя](#профиль-пользователя)
 - [Структура проекта](#структура-проекта)
 - [Быстрый старт с Docker Compose](#быстрый-старт-с-docker-compose)
   - [Настройка переменных окружения](#настройка-переменных-окружения)
@@ -77,25 +80,37 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 выполнением, пост-обработка ответа. Supervisor классифицирует запрос
 пользователя, определяет `intent`, `entities` и `query_type`, затем
 маршрутизирует по одному из пяти путей (включая `off_topic` — запрос не по теме,
-ответ выдаётся заготовленным текстом без вызова остальных агентов):
+ответ выдаётся заготовленным текстом без вызова остальных агентов). Между
+сообщениями память слоя [Memory Layer](#memory-layer) сохраняет историю диалога
+и профиль пользователя — Supervisor и Response Agent читают короткоживущий
+контекст + долгоживущий профиль из блока `MemoryManager`:
 
 ```
+  [Memory Layer: conversation history + user profile]
+    │  (ctx + profile)
+    ▼
   Input Guardrail (L1: regex, prompt injection)
     │
     ▼
   Supervisor ──► (conditional routing by query_type)
+    │    ▲
+    │    └── conversation_context + user_profile (anaphora + default_team)
     │
     ├─ off_topic ─► OFF_TOPIC_RESPONSE ──────────────────────────► END
     │
     ├─ sql       ─► SQL Agent ─────────────► Validator ─► Response Agent ─► Output Guardrail (L3) ─► END
-    │               (L2: SQLGuard в run_query)
-    │
+    │               (L2: SQLGuard в run_query)                  ▲
+    │                                                          ctx + profile
     ├─ rag       ─► RAG Agent ─────────────► Validator ─► Response Agent ─► Output Guardrail (L3) ─► END
     │
     ├─ hybrid    ─► SQL Agent ──┐
     │              RAG Agent ──┴► Validator ─► Response Agent ─► Output Guardrail (L3) ─► END
     │
     └─ simple    ─► Response Agent (прямой ответ) ─────────────► Output Guardrail (L3) ─► END
+                                                               │
+                                                               ▼
+                              [Memory Layer writes user + assistant turns,
+                               schedules async profile refresh + summarisation]
 ```
 
 ### Компоненты
@@ -210,6 +225,32 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 - Обрабатывает ошибки, пустые результаты («Задача AL-99999 не найдена») и
   таймауты LLM
 
+**6. Memory Layer** (short-term диалог + long-term профиль)
+
+- **MemoryManager** (`memory/manager.py`) — фасад над 4 репозиториями
+  (`ConversationRepository`, `ProfileRepository`, `SummaryRepository`) +
+  `ContextBuilder`. Единственная точка входа для workflow / Celery — шина
+  коммуникации с memory-модулем
+- **ContextBuilder** — sliding window по токен-бюджету (`HISTORY_TOKEN_BUDGET`,
+  1200 токенов по умолчанию): берёт последние полные ходы диалога, пока
+  укладываются в бюджет; всё, что выпало, покрывается rolling summary (строится
+  асинхронно Celery-таской `summarize_session`)
+- **ProfileExtractor** — правило-based анализ `metadata` всех сообщений
+  пользователя, считает частоты: `default_team` (команда с долей ≥ 60%),
+  `frequent_metrics` (top-3), `recent_sprints`, `dominant_query_types`.
+  Детерминированно и без LLM
+- **Анафорический carry-forward** в entity_sanitizer layer 6: при маркерах "эта
+  команда", "тот спринт", "у них" entities из предыдущего хода восстанавливаются
+  в текущем, если LLM их не извлёк
+- **Inactivity rotation** в workflow_task: диалог, неактивный дольше
+  `SESSION_TIMEOUT_MINUTES` (30 мин), автоматически закрывается и
+  переоткрывается — каждая рабочая сессия остаётся скоупом для short-term
+  контекста
+- **Persistence**: таблицы `conversations`, `messages`, `user_profiles`,
+  `conversation_summaries` (миграции Alembic 003–005). Content двойной —
+  `content` (полный) + `content_truncated` (150 токенов для быстрой реплейки в
+  промпт)
+
 ### LLM Backend
 
 Два раздельных vLLM-контейнера на одной GPU (совместный шаринг памяти):
@@ -258,6 +299,73 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
   metadata (заголовок документа + секция) → dense embedding + sparse embedding →
   загрузка обоих типов в Qdrant
 
+## Memory Layer
+
+Двухуровневая память: короткоживущий контекст диалога (sliding window + rolling
+summary) + долгоживущий профиль пользователя (default_team, frequent_metrics).
+Вся память живёт в PostgreSQL, дополнительных контейнеров не требует.
+
+Конфигурируется тремя env-переменными в `app-config` ConfigMap:
+
+| Переменная                | Значение по умолчанию | Что задаёт                                                 |
+| ------------------------- | --------------------- | ---------------------------------------------------------- |
+| `HISTORY_TOKEN_BUDGET`    | 1200                  | Бюджет токенов на блок `<conversation_history>` в промптах |
+| `SESSION_TIMEOUT_MINUTES` | 30                    | Через сколько минут idle диалог закрывается и ротируется   |
+| `MAX_CONVERSATION_TURNS`  | 50                    | Верхняя граница хранимых ходов на один диалог              |
+
+### Контекст диалога
+
+Short-term память: последние N ходов + rolling summary более старых.
+
+- **Sliding window по токенам**. `ContextBuilder` загружает все сообщения
+  диалога, идёт от свежих к старым и копит ходы, пока суммарная стоимость не
+  превышает `HISTORY_TOKEN_BUDGET`. Всегда оставляет хотя бы 1 ход.
+- **Двойной контент**. Сообщения хранятся в двух полях: `content` (полный ответ,
+  для пользователя) и `content_truncated` (~150 токенов, для replay в промпт).
+  Длинный ответ ассистента не съест бюджет на следующем ходе.
+- **Rolling summary**. Что не влезло в окно — покрывается `summary` диалога.
+  Пересчитывается асинхронно через Celery (`summarize_session`), никогда не
+  блокирует хот-путь.
+- **Inactivity rotation**. Если после предыдущего хода прошло больше
+  `SESSION_TIMEOUT_MINUTES`, workflow автоматически закрывает старый диалог,
+  запускает суммаризацию (для long-term rolling profile) и создаёт новый.
+- **Явная ротация**. Кнопка «Завершить диалог» в сайдбаре делает то же самое —
+  закрывает диалог, триггерит summary, возвращает UI в «новый чат».
+- **Анафорический carry-forward**. При маркерах «эта команда», «тот спринт», «у
+  них», «покажи ещё» entities (`team_name`, `sprint_name`, `cluster`,
+  `assignee`) из предыдущего хода восстанавливаются, если LLM не извлёк их из
+  текущего запроса. Реализовано как layer 6 в `entity_sanitizer`, чтобы
+  санитайзеры 1–5 сначала отбросили галлюцинации.
+
+**Multi-turn eval** (`eval/run_multiturn_eval.py`, 14 кейсов, 5 подкатегорий):
+carry-forward accuracy, false carry-forward rate, routing accuracy. Deploy gate:
+≥ 85% carry accuracy, 0% false carry. Dataset расширяет
+`eval/supervisor_golden_dataset.json` кейсами с массивом `turns`.
+
+### Профиль пользователя
+
+Long-term память, накапливается по сообщениям пользователя, дропается в промпты
+Supervisor и Response Agent.
+
+- **Идентификация**. В Streamlit стабильный UUID пинится в
+  `st.query_params["uid"]` (модуль `streamlit_app/auth.py`) — один и тот же таб
+  браузера попадает в одну и ту же строку `user_profiles`. Под SSO меняется
+  только этот модуль.
+- **Что сохраняется** (детерминированно, без LLM — `ProfileExtractor`):
+  - `default_team` — команда, которая упоминалась в ≥ 60% сообщений
+    пользователя; Supervisor подставляет её как team_name, когда запрос без
+    явной команды (защищено rule «query wins over profile»).
+  - `frequent_metrics` — top-3 метрики, о которых пользователь обычно
+    спрашивает.
+  - `recent_sprints`, `dominant_query_types` — для будущих подсказок.
+- **Context summary** — rolling roll-up 10 последних session summary'ев; меньше
+  3 — склеиваем, иначе LLM генерирует мета-саммари (max 200 токенов). Пишется в
+  `user_profiles.context_summary` и отображается в промпте как
+  `<user_profile>…</user_profile>`.
+- **Асинхронное обновление**. После каждого завершённого хода Celery таска
+  `update_profile_async` пересчитывает preferences + context_summary, чтобы не
+  удлинять путь ответа пользователю.
+
 ## Структура проекта
 
 ```
@@ -288,10 +396,12 @@ hse-prom-prog/
 │   │   ├── dependencies.py            # DI (DB, repo)
 │   │   ├── routers/
 │   │   │   ├── __init__.py
-│   │   │   └── tasks.py               # POST/GET /tasks endpoints
+│   │   │   ├── tasks.py               # POST/GET /tasks endpoints
+│   │   │   └── conversations.py       # GET /conversations, GET /conversations/{id}/messages, POST /conversations/{id}/close
 │   │   └── schemas/
 │   │       ├── __init__.py
-│   │       └── task.py                # Pydantic request/response
+│   │       ├── task.py                # Pydantic request/response (tasks)
+│   │       └── conversation.py        # Pydantic request/response (memory layer)
 │   ├── database/
 │   │   ├── __init__.py
 │   │   ├── connection.py              # PostgreSQL connection manager
@@ -303,9 +413,21 @@ hse-prom-prog/
 │   ├── llm/
 │   │   ├── __init__.py
 │   │   └── client.py                  # OpenAI client для vLLM
+│   ├── memory/                         # Memory Layer (short-term + long-term)
+│   │   ├── __init__.py
+│   │   ├── manager.py                  # Фасад: ConversationRepository + ProfileRepository + ContextBuilder
+│   │   ├── context_builder.py          # Sliding window по HISTORY_TOKEN_BUDGET + rolling summary
+│   │   ├── conversation_repo.py        # CRUD conversations + messages (raw SQL)
+│   │   ├── profile_repo.py             # CRUD user_profiles (raw SQL)
+│   │   ├── summary_repo.py             # CRUD conversation_summaries (raw SQL)
+│   │   ├── profile_extractor.py        # Rule-based: default_team, frequent_metrics (no LLM)
+│   │   ├── formatter.py                # <conversation_history> блок для промптов
+│   │   ├── truncator.py                # Обрезка длинных сообщений до 150 токенов
+│   │   └── token_estimator.py          # Деревянная оценка токенов без tiktoken
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── task.py                    # TaskStatus enum, Task model
+│   │   ├── task.py                    # TaskStatus enum, Task model
+│   │   └── memory.py                  # Conversation / Message / UserProfile / ConversationSummary / ConversationContext
 │   ├── rag/
 │   │   ├── __init__.py
 │   │   ├── bm25_index.py              # BM25 keyword index (rank-bm25)
@@ -318,7 +440,8 @@ hse-prom-prog/
 │   └── tasks/
 │       ├── __init__.py
 │       ├── celery_app.py              # Celery application factory
-│       └── workflow_task.py           # Celery task (wraps workflow)
+│       ├── workflow_task.py           # Celery task (wraps workflow + inactivity rotation)
+│       └── memory_tasks.py            # Celery: summarize_session, update_profile_async, _refresh_rolling_summary
 ├── knowledge_base/                    # Загружается из S3 (S3_KB_BUCKET)
 │   ├── agile/                         # Agile-практики, дашборды
 │   ├── metrics/                       # Описания метрик
@@ -328,18 +451,22 @@ hse-prom-prog/
 │   ├── script.py.mako
 │   └── versions/
 │       ├── 001_add_tasks_table.py
-│       └── 002_add_cleanup_function.py
+│       ├── 002_add_cleanup_function.py
+│       ├── 003_add_conversations.py       # conversations + messages (short-term memory)
+│       ├── 004_add_user_profiles.py       # user_profiles + conversation_summaries (long-term memory)
+│       └── 005_add_conversation_id_to_tasks.py
 ├── database/
 │   └── init.sql                       # PostgreSQL schema (данные загружаются из S3)
 ├── scripts/
 │   └── download_model.sh              # Download avibe-gptq-8bit from S3
 ├── streamlit_app/
 │   ├── app.py                         # Streamlit entrypoint (chat UI)
-│   ├── api_client.py                  # HTTP client for FastAPI
+│   ├── api_client.py                  # HTTP client for FastAPI (tasks + conversations)
+│   ├── auth.py                        # Stable uid via ?uid=… (будущий SSO)
 │   ├── config.py                      # Env-based settings
 │   └── components/
 │       ├── __init__.py
-│       ├── sidebar.py                 # Sidebar (status, controls)
+│       ├── sidebar.py                 # Sidebar (status, controls, история диалогов, «Завершить диалог»)
 │       └── result.py                  # Result/error rendering
 ├── nginx/
 │   ├── nginx.conf                     # Nginx reverse proxy config
@@ -354,12 +481,13 @@ hse-prom-prog/
 │   ├── __init__.py
 │   ├── golden_dataset.json                # 41 вопрос для оценки RAG
 │   ├── sql_golden_dataset.json            # 46 кейсов для SQL Agent
-│   ├── supervisor_golden_dataset.json     # 81 кейс для Supervisor (с off_topic)
+│   ├── supervisor_golden_dataset.json     # 81 single-turn + 14 multi-turn кейсов (95 всего)
 │   ├── response_golden_dataset.json       # 40 кейсов для Response Agent
 │   ├── metrics.py                         # RAGAS-метрики (GPT-5.2 as judge)
 │   ├── run_eval.py                        # CLI: оценка RAG-пайплайна
 │   ├── run_sql_eval.py                    # CLI: оценка SQL Agent
-│   ├── run_supervisor_eval.py             # CLI: оценка Supervisor (routing + entities)
+│   ├── run_supervisor_eval.py             # CLI: оценка Supervisor (routing + entities, single-turn)
+│   ├── run_multiturn_eval.py              # CLI: multi-turn eval (carry-forward + false carry)
 │   ├── run_response_eval.py               # CLI: оценка Response Agent (format + checks)
 │   ├── compare.py                         # CLI: сравнение RAG-экспериментов
 │   ├── analyze_tokens.py                  # Анализ prompt/completion токенов из логов
@@ -367,7 +495,9 @@ hse-prom-prog/
 │   └── results/                           # Результаты (gitignored)
 ├── tests/
 │   ├── __init__.py
-│   └── test_workflow.py               # 65 тестов (все агенты + workflow)
+│   ├── test_workflow.py               # 65 тестов (все агенты + workflow)
+│   ├── test_memory.py                 # Тесты MemoryManager / ContextBuilder / ProfileExtractor
+│   └── test_api_memory.py             # Тесты /conversations роутера + inactivity rotation
 ├── alembic.ini
 ├── docker-compose.yml
 ├── Dockerfile
@@ -947,7 +1077,29 @@ docker compose exec celery-worker \
 - Индикатор статуса API в сайдбаре (Online / Offline)
 - Обработка ошибок и таймаутов с понятными сообщениями
 - Детали выполнения (timestamps) в раскрывающемся блоке
-- Кнопка очистки чата
+
+### Сайдбар и память
+
+- **Стабильный `user_id`** пинится в URL как `?uid=...` (модуль
+  `streamlit_app/auth.py`) — рефреш страницы сохраняет личность юзера, и сайдбар
+  продолжает показывать его историю диалогов.
+- **История диалогов** — список последних 20 сессий с заголовком (первый запрос
+  пользователя, обрезанный до 50 символов) и относительным временем («5 мин»,
+  «вчера», «3 дн.»). Клик переключает чат на выбранный диалог и восстанавливает
+  транскрипт из API (`GET /conversations/{id}/messages`).
+- **Новый диалог** — первичная кнопка сайдбара. Сбрасывает local state и URL-пин
+  `conversation_id`; следующий запрос откроет свежую сессию.
+- **Завершить диалог** — появляется только при активной сессии. Вызывает
+  `POST /conversations/{id}/close`, который помечает сессию закрытой и ставит в
+  очередь `summarize_session` (long-term summary + rolling profile refresh).
+  После этого UI сбрасывается в «новый чат».
+- **URL как source of truth при refresh**. При загрузке страницы
+  `conversation_id` достаётся из `?cid=...` и транскрипт перезагружается через
+  API — не теряется при F5.
+- **Auto-rotation из worker'а**. Если Celery при обработке нашёл, что старая
+  сессия idle > `SESSION_TIMEOUT_MINUTES`, он ротирует её и возвращает новый
+  `conversation_id` в результате; Streamlit считывает его и переподпинывает URL
+  — UI остаётся в согласованном состоянии.
 
 ## Nginx + Production
 
@@ -2022,6 +2174,14 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | ----------------- | --------------------------- | -------------------------- |
 | `VSELLM_API_KEY`  | API ключ для vsellm (RAGAS) | —                          |
 | `VSELLM_BASE_URL` | URL vsellm API endpoint     | `https://api.vsellm.ru/v1` |
+
+### Memory Layer Configuration
+
+| Переменная                | Описание                                              | По умолчанию |
+| ------------------------- | ----------------------------------------------------- | ------------ |
+| `HISTORY_TOKEN_BUDGET`    | Бюджет токенов на `<conversation_history>` в промптах | `1200`       |
+| `SESSION_TIMEOUT_MINUTES` | Idle-таймаут для auto-rotation диалога                | `30`         |
+| `MAX_CONVERSATION_TURNS`  | Максимум хранимых ходов на один диалог                | `50`         |
 
 ### Other
 
