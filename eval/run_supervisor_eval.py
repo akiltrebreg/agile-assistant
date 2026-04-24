@@ -394,6 +394,10 @@ def main(argv: list[str] | None = None) -> None:
 
     with _GOLDEN.open() as f:
         dataset = json.load(f)
+    # Multi-turn cases (`turns` array instead of `query`) are exercised by
+    # run_multiturn_eval.py — skip them here so the single-turn runner
+    # keeps its flat shape.
+    dataset = [case for case in dataset if "query" in case]
     logger.info("Loaded %d Supervisor test cases", len(dataset))
 
     supervisor = _build_supervisor()

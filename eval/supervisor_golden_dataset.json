@@ -754,5 +754,349 @@
     },
     "category": "off_topic",
     "notes": "trickiest case: off-topic request (joke) dressed in Agile vocabulary. LLM must recognize intent (entertainment) over surface keywords (Scrum)"
+  },
+  {
+    "id": 82,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Second turn carries team_name via 'у них' anaphora; metric swaps.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А у них scope drop?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 83,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Second turn adds issue_type filter while carrying team.",
+    "turns": [
+      {
+        "query": "Покажи задачи команды lpop",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop" }
+        }
+      },
+      {
+        "query": "А баги у них?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop", "issue_type": "Bug" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 84,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Explicit 'этой команды' anaphora — team must carry, metric swaps.",
+    "turns": [
+      {
+        "query": "Done total у cthulhu?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "done_total" }
+        }
+      },
+      {
+        "query": "А velocity этой команды?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 85,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Team-only carry with no prior sprint — metric flips from scope_drop to velocity.",
+    "turns": [
+      {
+        "query": "Scope drop cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+        }
+      },
+      {
+        "query": "А у них velocity?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 86,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_sprint",
+    "notes": "Sprint name must carry via 'в этом спринте'.",
+    "turns": [
+      {
+        "query": "Покажи задачи спринта #1 Q1'26",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26" }
+        }
+      },
+      {
+        "query": "А баги в этом спринте?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26", "issue_type": "Bug" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 87,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_sprint",
+    "notes": "Sprint carries via 'в том же'; metric specified in turn 2.",
+    "turns": [
+      {
+        "query": "Метрики за спринт #1 Q1'26",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26" }
+        }
+      },
+      {
+        "query": "А в том же velocity?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 88,
+    "category": "multi_turn",
+    "subcategory": "context_switch",
+    "notes": "Turn 2 names a NEW team explicitly; must NOT carry cthulhu.",
+    "turns": [
+      {
+        "query": "Задачи cthulhu",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu" }
+        }
+      },
+      {
+        "query": "А у lpop?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 89,
+    "category": "multi_turn",
+    "subcategory": "context_switch",
+    "notes": "Team switches cthulhu → lpop in turn 2; metric is restated.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А какая velocity у lpop?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 90,
+    "category": "multi_turn",
+    "subcategory": "anaphora_intent_change",
+    "notes": "Team carries via 'у них'; intent flips metric → tasks_filter.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А какие задачи у них?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 91,
+    "category": "multi_turn",
+    "subcategory": "anaphora_intent_change",
+    "notes": "Previous task lookup; next is a rag definition — no carry.",
+    "turns": [
+      {
+        "query": "Задача AL-38787",
+        "expected": {
+          "intent": "task",
+          "query_type": "sql",
+          "entities": { "issue_key": "AL-38787" }
+        }
+      },
+      {
+        "query": "Что такое velocity?",
+        "expected": {
+          "intent": "general",
+          "query_type": "rag",
+          "entities": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": 92,
+    "category": "multi_turn",
+    "subcategory": "independent",
+    "notes": "Turn 2 is a pure rag definition — team must NOT carry.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "Что такое Definition of Done?",
+        "expected": {
+          "intent": "general",
+          "query_type": "rag",
+          "entities": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": 93,
+    "category": "multi_turn",
+    "subcategory": "independent",
+    "notes": "Turn 2 is a greeting — routes to simple, no carry-forward.",
+    "turns": [
+      {
+        "query": "Задачи cthulhu",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu" }
+        }
+      },
+      {
+        "query": "Привет!",
+        "expected": {
+          "intent": "general",
+          "query_type": "simple",
+          "entities": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": 94,
+    "category": "multi_turn",
+    "subcategory": "independent",
+    "notes": "Turn 2 is a fast-path task lookup — issue_key overrides everything.",
+    "turns": [
+      {
+        "query": "Метрики команды lpop",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop" }
+        }
+      },
+      {
+        "query": "Расскажи о задаче AL-38787",
+        "expected": {
+          "intent": "task",
+          "query_type": "sql",
+          "entities": { "issue_key": "AL-38787" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 95,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Three turns: team persists through two anaphora references.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А у них scope drop?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+        }
+      },
+      {
+        "query": "Какие у них баги?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "issue_type": "Bug" }
+        }
+      }
+    ]
   }
 ]
