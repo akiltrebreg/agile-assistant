@@ -735,3 +735,99 @@ class TestResponseAgentHistory:
         prefix = agent._history_prefix(_ctx(recent=long_turns), budget_tokens=50)
         # Budget too small for any turn → formatter drops them all → empty.
         assert prefix == "" or estimate_tokens(prefix) <= 50
+
+
+# ────────────────────────────────────────────────────────────────
+# SQL Agent — entities hint injection (the bug behind anaphoric
+# follow-ups landing on a wrong team via ORDER BY ... LIMIT 1)
+# ────────────────────────────────────────────────────────────────
+
+
+class TestSQLAgentEntitiesHint:
+    """``_format_entities_hint`` renders Supervisor entities for the SQL prompt.
+
+    Without this hint, Qwen3-8B reliably ignores anaphoric carry-forward —
+    even when prev_sql clearly filtered by team, the model regenerates
+    a global ORDER BY ... LIMIT 1 query.
+    """
+
+    def test_team_name_string(self) -> None:
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        hint = _format_entities_hint({"team_name": "cthulhu"})
+        assert "feature_teams ILIKE '%cthulhu%'" in hint
+        assert hint.startswith("\n\nИзвлечённые сущности")
+
+    def test_team_name_list(self) -> None:
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        hint = _format_entities_hint({"team_name": ["cthulhu", "lpop"]})
+        assert "'cthulhu'" in hint and "'lpop'" in hint
+        assert "ANY/IN или OR" in hint
+
+    def test_metric_points_at_column(self) -> None:
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        hint = _format_entities_hint({"metric_name": "scope_drop"})
+        assert "`scope_drop`" in hint
+        assert "report_agile_dashboard_metrics" in hint
+
+    def test_combined_team_and_metric(self) -> None:
+        """The exact scenario that fails today: cthulhu + scope_drop."""
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        hint = _format_entities_hint({"team_name": "cthulhu", "metric_name": "scope_drop"})
+        assert "feature_teams ILIKE '%cthulhu%'" in hint
+        assert "`scope_drop`" in hint
+
+    def test_enum_fields_use_exact_match(self) -> None:
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        hint = _format_entities_hint({"issue_type": "Bug", "status": "In Progress"})
+        assert "issue_type = 'Bug'" in hint
+        assert "issue_status_act = 'In Progress'" in hint
+
+    def test_empty_entities_returns_empty_string(self) -> None:
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        # No hint → prompt stays byte-identical to pre-memory behaviour.
+        assert _format_entities_hint({}) == ""
+        assert _format_entities_hint({"team_name": ""}) == ""
+        assert _format_entities_hint({"team_name": None}) == ""
+
+    def test_blank_string_dropped(self) -> None:
+        """Whitespace-only values must not produce broken filters."""
+        from hse_prom_prog.agents.sql_agent import _format_entities_hint
+
+        assert _format_entities_hint({"team_name": "   "}) == ""
+
+    def test_process_passes_entities_to_system_prompt(self) -> None:
+        """``SQLAgent.process()`` must inject the hint into the system prompt."""
+        from unittest.mock import patch
+
+        from hse_prom_prog.agents.sql_agent import SQLAgent
+
+        agent = SQLAgent.__new__(SQLAgent)  # bypass __init__ (avoid LangGraph build)
+        agent.db = MagicMock()
+        agent._graph = MagicMock()
+        agent._graph.invoke.return_value = {
+            "final_sql": "SELECT 1",
+            "final_result": [],
+            "final_error": "",
+        }
+
+        with (
+            patch("hse_prom_prog.agents.sql_agent.get_schema_compact", return_value="<schema>"),
+            patch("hse_prom_prog.agents.sql_agent.set_db"),
+        ):
+            agent.process(
+                {
+                    "original_query": "А у них scope drop?",
+                    "entities": {"team_name": "cthulhu", "metric_name": "scope_drop"},
+                }
+            )
+
+        invoke_args = agent._graph.invoke.call_args.args[0]
+        system_msg = invoke_args["messages"][0].content
+        assert "feature_teams ILIKE '%cthulhu%'" in system_msg
+        assert "`scope_drop`" in system_msg

@@ -630,6 +630,15 @@ class SQLAgent:
         schema_ddl = get_schema_compact(self.db.engine)
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(schema=schema_ddl)
 
+        # Inject Supervisor's structured entities BEFORE prev_sql. The model
+        # is much more reliable at honouring an explicit "team_name=cthulhu"
+        # hint than at inferring it from a textual SQL diff — without this,
+        # anaphoric follow-ups tend to land on ORDER BY <metric> LIMIT 1
+        # (no WHERE), even when prev_sql clearly filtered by the team.
+        entities_hint = _format_entities_hint(state.get("entities") or {})
+        if entities_hint:
+            system_prompt += entities_hint
+
         prev_sql = _extract_previous_sql(state.get("conversation_context"))
         if prev_sql:
             system_prompt += f"\n\nПредыдущий SQL-запрос пользователя:\n{prev_sql}"
@@ -680,6 +689,86 @@ class SQLAgent:
 
 
 # ── Utilities ────────────────────────────────────────────────
+
+
+# Free-text fields rendered as ILIKE filters in the entities hint.
+# Order is preserved in the prompt — keep most-discriminative first.
+_ILIKE_HINTS: tuple[tuple[str, str], ...] = (
+    ("sprint_name", "sprint_name"),
+    ("cluster", "cluster_name"),
+    ("assignee", "assignee_name"),
+    ("issue_key", "issue_key"),
+)
+
+# Enum/exact-match fields rendered with `=`.
+_EXACT_HINTS: tuple[tuple[str, str], ...] = (
+    ("issue_type", "issue_type"),
+    ("status", "issue_status_act"),
+)
+
+
+def _format_team_line(value: Any) -> str | None:
+    """Format ``team_name`` (string or list of strings) as a single hint line."""
+    if isinstance(value, list):
+        teams = [t.strip() for t in value if isinstance(t, str) and t.strip()]
+        if not teams:
+            return None
+        joined = ", ".join(repr(t) for t in teams)
+        return f"- feature_teams ILIKE одной из: {joined} (ANY/IN или OR)"
+    if isinstance(value, str) and value.strip():
+        return f"- feature_teams ILIKE '%{value.strip()}%'"
+    return None
+
+
+def _format_metric_line(value: Any) -> str | None:
+    """Format ``metric_name`` as a column-pointer line."""
+    if isinstance(value, str) and value.strip():
+        return (
+            f"- интересующая метрика — колонка `{value.strip()}` в report_agile_dashboard_metrics"
+        )
+    return None
+
+
+def _string_value(value: Any) -> str | None:
+    """Return ``value.strip()`` for non-empty strings, else ``None``."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _format_entities_hint(entities: dict[str, Any]) -> str:
+    """Render Supervisor's entities as a structured hint for the SQL prompt.
+
+    Returns ``""`` when there's nothing to hint about, so the prompt stays
+    byte-identical to the pre-memory behaviour for queries the Supervisor
+    couldn't extract structure from. The hint is appended to the system
+    prompt and tells the model which columns to filter on — much more
+    reliable than asking Qwen3-8B to re-derive the team from prev_sql.
+    """
+    lines: list[str] = []
+
+    if line := _format_team_line(entities.get("team_name")):
+        lines.append(line)
+
+    for ent_field, sql_column in _ILIKE_HINTS:
+        if v := _string_value(entities.get(ent_field)):
+            lines.append(f"- {sql_column} ILIKE '%{v}%'")
+
+    for ent_field, sql_column in _EXACT_HINTS:
+        if v := _string_value(entities.get(ent_field)):
+            lines.append(f"- {sql_column} = '{v}'")
+
+    if line := _format_metric_line(entities.get("metric_name")):
+        lines.append(line)
+
+    if not lines:
+        return ""
+
+    body = "\n".join(lines)
+    return (
+        "\n\nИзвлечённые сущности из запроса (ОБЯЗАТЕЛЬНО используй их в "
+        "WHERE / SELECT — не игнорируй):\n" + body
+    )
 
 
 def _extract_previous_sql(ctx: ConversationContext | None) -> str | None:
