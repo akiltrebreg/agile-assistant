@@ -126,7 +126,6 @@ render_sidebar(
 
 # ── Chat title ───────────────────────────────────────────────
 st.title("Agile AI Assistant")
-st.caption("Задайте вопрос о Jira-задаче — например, «Расскажи о задаче AL-38787»")
 
 # ── Render chat history ──────────────────────────────────────
 for msg in st.session_state.messages:
