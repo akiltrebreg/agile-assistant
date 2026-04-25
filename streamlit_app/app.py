@@ -76,8 +76,24 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
+def _close_current_if_any() -> None:
+    """Quietly close the active conversation before leaving it.
+
+    Triggered both by "Новый диалог" and by switching to another
+    conversation in the sidebar — every UI exit-from-current-chat is
+    treated as the end of that session, scheduling summarisation +
+    profile refresh on the backend. We skip the call when the chat
+    has no messages: nothing worth summarising, and the rotation logic
+    in the worker has the same guard.
+    """
+    cid = st.session_state.get("conversation_id")
+    if cid and st.session_state.get("messages"):
+        client.close_conversation(cid)
+
+
 def _start_new_chat() -> None:
-    """Clear local + URL state and force a rerun."""
+    """Close the previous chat (if any), then clear local + URL state."""
+    _close_current_if_any()
     st.session_state.conversation_id = None
     st.session_state.messages = []
     pin_conversation_id(None)
@@ -85,7 +101,14 @@ def _start_new_chat() -> None:
 
 
 def _switch_to_conversation(conversation_id: str) -> None:
-    """Switch the chat to another conversation (sidebar click)."""
+    """Switch the chat to another conversation (sidebar click).
+
+    A click on the *currently active* item is a no-op — nothing to
+    close, nothing to reload.
+    """
+    if conversation_id == st.session_state.get("conversation_id"):
+        return
+    _close_current_if_any()
     st.session_state.conversation_id = conversation_id
     st.session_state.messages = _load_messages_from_api(conversation_id)
     pin_conversation_id(conversation_id)

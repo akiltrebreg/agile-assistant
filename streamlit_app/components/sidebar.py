@@ -22,11 +22,11 @@ def render_sidebar(
     """Render the sidebar.
 
     Backwards-compatible: when the memory-layer kwargs are omitted the
-    sidebar still shows the logo + health + "Clear chat" and nothing else
-    — useful for tests or a stripped-down anonymous mode.
+    sidebar still shows the logo + "Clear chat" and nothing else — useful
+    for tests or a stripped-down anonymous mode.
     """
     with st.sidebar:
-        _render_header(client)
+        _render_header()
         st.divider()
 
         if user_id:
@@ -45,7 +45,7 @@ def render_sidebar(
             st.rerun()
 
 
-def _render_header(client: APIClient) -> None:
+def _render_header() -> None:
     st.markdown(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50"'
         ' style="width:100%;max-width:200px;">'
@@ -56,14 +56,6 @@ def _render_header(client: APIClient) -> None:
         "</svg>",
         unsafe_allow_html=True,
     )
-    st.caption("LangGraph + vLLM + PostgreSQL")
-
-    st.divider()
-
-    if client.health():
-        st.success("API: Online", icon="✅")
-    else:
-        st.error("API: Offline", icon="❌")
 
 
 def _render_conversation_controls(
@@ -74,6 +66,10 @@ def _render_conversation_controls(
     on_new_chat: Callable[[], None] | None,
     on_select: Callable[[str], None] | None,
 ) -> None:
+    # "Новый диалог" is the only chat-control button — same mental model
+    # as ChatGPT / Claude / Gemini. Closing the previous conversation
+    # (so the worker schedules summarisation + profile refresh) happens
+    # inside the on_new_chat callback rather than as a separate button.
     if st.button(
         "➕ Новый диалог",
         use_container_width=True,
@@ -83,21 +79,6 @@ def _render_conversation_controls(
             on_new_chat()
         else:
             # Fallback: clear local state, leave URL alone.
-            st.session_state.messages = []
-            st.session_state.conversation_id = None
-            st.rerun()
-
-    # "Завершить диалог" — only meaningful when there IS an active one.
-    # Explicit close triggers summarisation; after that we reuse the
-    # same on_new_chat callback to reset local + URL state.
-    if current_conversation_id and st.button(
-        "Завершить диалог",
-        use_container_width=True,
-    ):
-        client.close_conversation(current_conversation_id)
-        if on_new_chat is not None:
-            on_new_chat()
-        else:
             st.session_state.messages = []
             st.session_state.conversation_id = None
             st.rerun()
