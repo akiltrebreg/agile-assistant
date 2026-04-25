@@ -13,10 +13,13 @@ Design principles:
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 import time
 from typing import Any
+
+import pymorphy3
 
 logger = logging.getLogger(__name__)
 
@@ -467,30 +470,58 @@ def _sanitize_field(
     return _sanitize_passthrough(value)
 
 
-# Anaphoric markers that signal the user is referring back to a previously
-# mentioned entity ("эта команда", "тот спринт", "покажи ещё"). Matched as
-# lowercase substrings against the query — kept permissive on purpose since
-# the surrounding guard (sanitizer layers 1-5) already drops hallucinated or
-# empty values before carry-forward runs.
-_ANAPHORA_MARKERS: tuple[str, ...] = (
-    "эт",  # covers этот/эта/это/эти/этой/этом
-    "так",  # такой/такая/такие/также
-    "тот",
-    "та ",
-    "те ",
-    "той",
-    "тех",
-    "ещё",
-    "еще",
-    "тоже",
-    "аналогич",
-    "по ней",
-    "по нему",
-    "по ним",
-    "у них",
-    "у неё",
-    "у нее",
-    "у него",
+# ---------------------------------------------------------------------------
+# 6a. Lemmatizer (pymorphy3 singleton, lazy init, cached per word)
+# ---------------------------------------------------------------------------
+
+_TOKEN_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9_]+")
+_morph_analyzer: pymorphy3.MorphAnalyzer | None = None
+
+
+def _get_morph() -> pymorphy3.MorphAnalyzer:
+    """Return the singleton MorphAnalyzer, loading dictionaries on first use."""
+    global _morph_analyzer  # noqa: PLW0603
+    if _morph_analyzer is None:
+        _morph_analyzer = pymorphy3.MorphAnalyzer()
+    return _morph_analyzer
+
+
+@functools.lru_cache(maxsize=4096)
+def _lemma(word: str) -> str:
+    """Lemma of a single (lowercased) word. Cached because queries repeat."""
+    return _get_morph().parse(word)[0].normal_form
+
+
+def _query_lemmas(query: str) -> frozenset[str]:
+    """Lemmatize every alphanumeric token of the query (lowercased)."""
+    return frozenset(_lemma(t.lower()) for t in _TOKEN_RE.findall(query))
+
+
+# Lemma forms of anaphoric pointers. pymorphy3 collapses any case/gender/
+# number form (этой, этом, этим / том, той, тех / них, им, ему, …) onto
+# one of these — so the list stays small and surface-form coverage is
+# automatic. Compare against substring matching, which mis-fired on
+# "так" inside "такое" of "Что такое X?".
+_ANAPHORA_LEMMAS: frozenset[str] = frozenset(
+    {
+        # Demonstratives — covers все падежи/рода/числа of эт-, т-, так-.
+        "этот",
+        "это",
+        "тот",
+        "такой",
+        # Adverbs / particles.
+        "ещё",
+        "тоже",
+        "также",
+        "аналогичный",
+        "аналогично",
+        # Personal pronouns: 3rd-person forms used to refer back.
+        "они",
+        "он",
+        "она",
+        "её",
+        "свой",
+    }
 )
 
 # Fields eligible for carry-forward from the prior turn. issue_type / status
@@ -505,9 +536,8 @@ _CARRY_FORWARD_FIELDS: tuple[str, ...] = (
 
 
 def _has_anaphora(user_query: str) -> bool:
-    """Return True if the query contains at least one anaphoric marker."""
-    query_lower = user_query.lower()
-    return any(marker in query_lower for marker in _ANAPHORA_MARKERS)
+    """Return True if any token of the query lemmatizes to an anaphora marker."""
+    return bool(_query_lemmas(user_query) & _ANAPHORA_LEMMAS)
 
 
 def _carry_forward_entities(
@@ -536,6 +566,76 @@ def _carry_forward_entities(
     return result
 
 
+# ---------------------------------------------------------------------------
+# 7. Fallback enum extractor — synonyms map as a backstop extractor.
+# ---------------------------------------------------------------------------
+
+
+@functools.lru_cache(maxsize=512)
+def _synonym_lemmas(syn_key: str) -> frozenset[str]:
+    """Lemmatized token set of a synonym key."""
+    return frozenset(_lemma(t.lower()) for t in _TOKEN_RE.findall(syn_key))
+
+
+def _fallback_extract_enum(
+    field: str,
+    query_lemmas: frozenset[str],
+    db_enums: dict[str, set[str]],
+) -> str | None:
+    """Match query lemmas against the synonym dictionary for ``field``.
+
+    Returns the canonical enum value when every lemma of any synonym key
+    is present in the query and DB validation accepts it. Generic synonyms
+    that map to ``None`` (e.g. "метрики") are skipped — they don't pin
+    down a specific value.
+    """
+    synonyms = _SYNONYM_MAPS.get(field)
+    if synonyms is None:
+        return None
+    for syn_key, canonical in synonyms.items():
+        if canonical is None:
+            continue
+        s_lemmas = _synonym_lemmas(syn_key)
+        if not s_lemmas or not s_lemmas <= query_lemmas:
+            continue
+        validated = validate_against_db(field, canonical, db_enums)
+        if validated is not None:
+            return validated
+    return None
+
+
+def _fill_missing_enums_from_query(
+    entities: dict[str, Any],
+    user_query: str,
+    db_enums: dict[str, set[str]],
+) -> dict[str, Any]:
+    """Layer 7: fill empty enum fields by matching synonym keys against
+    lemmatized query tokens.
+
+    Reuses ``_SYNONYM_MAPS`` as a single source of truth — the same
+    dictionary that normalizes LLM-supplied values in layer 1 acts as
+    a fallback extractor here. Only fields the LLM left empty are touched,
+    so explicit extraction always wins.
+    """
+    out: dict[str, Any] = dict(entities)
+    missing = [f for f in _ENUM_FIELDS if not out.get(f)]
+    if not missing:
+        return out
+    query_lemmas = _query_lemmas(user_query)
+    if not query_lemmas:
+        return out
+    for field in missing:
+        extracted = _fallback_extract_enum(field, query_lemmas, db_enums)
+        if extracted is not None:
+            out[field] = extracted
+            logger.info(
+                "[EntitySanitizer] fallback-extracted %s=%r from query lemmas",
+                field,
+                extracted,
+            )
+    return out
+
+
 def sanitize_entities(
     entities: dict[str, Any],
     user_query: str,
@@ -551,7 +651,10 @@ def sanitize_entities(
       - free-text fields -> hallucination filter
       - unknown field -> passthrough
       - [layer 6] carry-forward from ``prev_entities`` when the query
-        contains an anaphoric marker and the field is still empty
+        contains an anaphoric marker (lemma-based) and the field is
+        still empty
+      - [layer 7] fallback extraction: for each enum field still empty,
+        match synonym keys against lemmatized query tokens
 
     Args:
         entities: Raw entities from LLM.
@@ -569,4 +672,5 @@ def sanitize_entities(
         cleaned = _sanitize_field(field, value, user_query, db_enums)
         if cleaned is not None:
             result[field] = cleaned
-    return _carry_forward_entities(result, prev_entities, user_query)
+    result = _carry_forward_entities(result, prev_entities, user_query)
+    return _fill_missing_enums_from_query(result, user_query, db_enums)

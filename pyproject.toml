@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 packages = [{include = "hse_prom_prog"}]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "gitpython>=3.1.45",
     "numpy>=2.3.5",
@@ -50,6 +50,10 @@ dependencies = [
     # RAGAS evaluation framework
     "ragas>=0.2.0",
     "datasets>=3.0.0",
+    # Russian morphological analyzer (lemmatization for anaphora and
+    # fallback enum extraction in the entity sanitizer)
+    "pymorphy3>=2.0.6",
+    "pymorphy3-dicts-ru>=2.4.417150.4580142",
 ]
 
 [dependency-groups]
