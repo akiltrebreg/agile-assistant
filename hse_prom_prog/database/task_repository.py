@@ -189,6 +189,41 @@ class TaskRepository:
             logger.error(f"[TaskRepository] Failed to update task {task_id}: {e}")
             raise
 
+    def update_conversation_id(self, task_id: UUID, conversation_id: UUID) -> None:
+        """Repoint a task at a different conversation.
+
+        Used when the worker rotates a stale conversation mid-flight: the
+        request was originally accepted against the old conversation, but
+        actually executed in the context of a freshly created one. Without
+        this the audit row in ``tasks`` keeps pointing at the closed
+        conversation, which makes debugging "which session ran this query"
+        misleading.
+        """
+        sql = "UPDATE tasks SET conversation_id = :conversation_id WHERE task_id = :task_id"
+        try:
+            with self.db.get_session() as session:
+                session.execute(
+                    text(sql),
+                    {
+                        "task_id": str(task_id),
+                        "conversation_id": str(conversation_id),
+                    },
+                )
+                session.commit()
+                logger.info(
+                    "[TaskRepository] Repointed task %s to conversation %s",
+                    task_id,
+                    conversation_id,
+                )
+        except SQLAlchemyError as e:
+            logger.error(
+                "[TaskRepository] Failed to repoint task %s to conversation %s: %s",
+                task_id,
+                conversation_id,
+                e,
+            )
+            raise
+
     def _row_to_task(self, row: Any) -> Task:
         """Convert database row to Task instance.
 

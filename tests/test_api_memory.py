@@ -343,6 +343,71 @@ class TestMaybeRotateStaleConversation:
         assert result is stale
         memory.conversation_repo.close.assert_not_called()
 
+    def test_rotation_repoints_task_audit_row(self) -> None:
+        """After rotation, ``tasks.conversation_id`` must point at the new conv.
+
+        Without this, the audit trail keeps blaming the closed conversation
+        for a request that actually executed in the freshly created one.
+        """
+        user_id = uuid4()
+        task_uuid = uuid4()
+        stale = _stale_conv(user_id=user_id, idle=INACTIVITY_THRESHOLD + timedelta(minutes=1))
+        fresh = _stale_conv(user_id=user_id, idle=timedelta(seconds=0))
+
+        memory = MagicMock()
+        memory.conversation_repo.count_messages.return_value = 4
+        memory.conversation_repo.create.return_value = fresh
+        task_repo = MagicMock()
+
+        result = _maybe_rotate_stale_conversation(
+            memory,
+            stale,
+            user_id,
+            task_uuid=task_uuid,
+            task_repo=task_repo,
+        )
+
+        assert result.id == fresh.id
+        task_repo.update_conversation_id.assert_called_once_with(task_uuid, fresh.id)
+
+    def test_audit_repoint_failure_does_not_block_response(self) -> None:
+        """A DB hiccup on the audit update must not surface as a user-facing error."""
+        user_id = uuid4()
+        task_uuid = uuid4()
+        stale = _stale_conv(user_id=user_id, idle=INACTIVITY_THRESHOLD + timedelta(minutes=1))
+        fresh = _stale_conv(user_id=user_id, idle=timedelta(seconds=0))
+
+        memory = MagicMock()
+        memory.conversation_repo.count_messages.return_value = 4
+        memory.conversation_repo.create.return_value = fresh
+        task_repo = MagicMock()
+        task_repo.update_conversation_id.side_effect = RuntimeError("db gone")
+
+        result = _maybe_rotate_stale_conversation(
+            memory,
+            stale,
+            user_id,
+            task_uuid=task_uuid,
+            task_repo=task_repo,
+        )
+
+        assert result.id == fresh.id
+        task_repo.update_conversation_id.assert_called_once_with(task_uuid, fresh.id)
+
+    def test_no_repoint_when_task_context_missing(self) -> None:
+        """Legacy callers without task_uuid/repo still rotate cleanly."""
+        user_id = uuid4()
+        stale = _stale_conv(user_id=user_id, idle=INACTIVITY_THRESHOLD + timedelta(minutes=1))
+        fresh = _stale_conv(user_id=user_id, idle=timedelta(seconds=0))
+
+        memory = MagicMock()
+        memory.conversation_repo.count_messages.return_value = 4
+        memory.conversation_repo.create.return_value = fresh
+
+        result = _maybe_rotate_stale_conversation(memory, stale, user_id)
+
+        assert result.id == fresh.id
+
 
 # ────────────────────────────────────────────────────────────────
 # GET /conversations/{id}/messages — round-trip

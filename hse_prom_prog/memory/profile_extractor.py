@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TEAM_SHARE_THRESHOLD = 0.6
 FREQUENT_METRICS_TOP_N = 3
+# Below this many entity-bearing messages we don't have enough signal
+# to commit to a default_team or detail-level preference — the first
+# few queries are noisy (e.g. one team + one greeting → 100% share).
+MIN_MESSAGES_FOR_PROFILE = 5
 
 
 @dataclass
@@ -27,13 +31,26 @@ class _Tally:
 class ProfileExtractor:
     """Computes a ``preferences`` dict from message metadata."""
 
-    def extract(self, messages_metadata: list[dict[str, Any]]) -> dict[str, Any]:
+    def extract(
+        self,
+        messages_metadata: list[dict[str, Any]],
+        min_messages: int = MIN_MESSAGES_FOR_PROFILE,
+    ) -> dict[str, Any]:
         """Derive preferences from a flat list of message metadata dicts.
 
         Expected per-message keys (all optional): ``entities`` (dict with
         ``team_name`` / ``metric_name`` / ``sprint_name``) and ``query_type``.
         Missing or malformed entries are silently skipped.
+
+        Returns an empty ``preferences`` dict when fewer than
+        ``min_messages`` messages carry a non-empty ``entities`` payload —
+        a guard against premature commitment (e.g. user's first two
+        queries happen to mention the same team, leading the supervisor
+        to inject ``default_team`` thereafter on shaky evidence).
         """
+        if self._entity_message_count(messages_metadata) < min_messages:
+            return {}
+
         tally = self._tally(messages_metadata)
 
         preferences: dict[str, Any] = {}
@@ -46,6 +63,18 @@ class ProfileExtractor:
         if detail := self._detail_level(tally.query_types):
             preferences["preferred_detail_level"] = detail
         return preferences
+
+    @staticmethod
+    def _entity_message_count(messages_metadata: list[dict[str, Any]]) -> int:
+        """Count messages whose ``entities`` payload is a non-empty dict."""
+        count = 0
+        for meta in messages_metadata:
+            if not isinstance(meta, dict):
+                continue
+            entities = meta.get("entities")
+            if isinstance(entities, dict) and entities:
+                count += 1
+        return count
 
     @staticmethod
     def _tally(messages_metadata: list[dict[str, Any]]) -> _Tally:

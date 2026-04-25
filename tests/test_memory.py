@@ -233,7 +233,11 @@ class TestProfileExtractor:
 
     def test_even_split_leaves_no_default_team(self) -> None:
         extractor = ProfileExtractor()
+        # 6 messages so the min_messages gate (5) is cleared and we
+        # genuinely exercise the share-threshold logic, not the gate.
         metadata = [
+            {"entities": {"team_name": "a"}},
+            {"entities": {"team_name": "b"}},
             {"entities": {"team_name": "a"}},
             {"entities": {"team_name": "b"}},
             {"entities": {"team_name": "a"}},
@@ -253,11 +257,13 @@ class TestProfileExtractor:
 
     def test_detail_level_brief_when_sql_dominates(self) -> None:
         extractor = ProfileExtractor()
+        # min_messages=0 — focused unit test on the detail-level rule,
+        # the entity-count gate is exercised separately below.
         metadata = [{"query_type": "sql"} for _ in range(5)] + [
             {"query_type": "rag"},
         ]
 
-        prefs = extractor.extract(metadata)
+        prefs = extractor.extract(metadata, min_messages=0)
 
         assert prefs["preferred_detail_level"] == "brief"
 
@@ -270,9 +276,24 @@ class TestProfileExtractor:
             {"query_type": "sql"},
         ]
 
-        prefs = extractor.extract(metadata)
+        prefs = extractor.extract(metadata, min_messages=0)
 
         assert prefs["preferred_detail_level"] == "detailed"
+
+    def test_min_messages_gate_blocks_premature_default_team(self) -> None:
+        """Three same-team messages must NOT yet produce a default_team.
+
+        Without the gate, the first 2-3 queries about the same team would
+        lock in default_team at 100% share — the supervisor would then
+        inject it into every subsequent unrelated query. The gate keeps
+        preferences empty until enough signal accumulates.
+        """
+        extractor = ProfileExtractor()
+        below = [{"entities": {"team_name": "cthulhu"}} for _ in range(3)]
+        above = [{"entities": {"team_name": "cthulhu"}} for _ in range(6)]
+
+        assert extractor.extract(below) == {}
+        assert extractor.extract(above)["default_team"] == "cthulhu"
 
 
 # ────────────────────────────────────────────────────────────────

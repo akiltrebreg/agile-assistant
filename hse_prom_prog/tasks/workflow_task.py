@@ -100,7 +100,13 @@ def execute_workflow(  # noqa: PLR0913
         _mark_processing_if_first(self, repo, task_uuid, task_id)
 
         memory = MemoryManager(db)
-        conv_uuid, internal_user_uuid = _resolve_memory_ids(memory, conversation_id, external_id)
+        conv_uuid, internal_user_uuid = _resolve_memory_ids(
+            memory,
+            conversation_id,
+            external_id,
+            task_uuid=task_uuid,
+            task_repo=repo,
+        )
         ctx, user_profile = _load_memory_payloads(memory, conv_uuid, internal_user_uuid)
 
         llm_client = get_llm_client()
@@ -183,6 +189,9 @@ def _resolve_memory_ids(
     memory: MemoryManager,
     conversation_id: str | None,
     external_id: str | None,
+    *,
+    task_uuid: UUID | None = None,
+    task_repo: TaskRepository | None = None,
 ) -> tuple[UUID | None, UUID | None]:
     """Resolve request identifiers to internal UUIDs for the memory layer.
 
@@ -190,6 +199,10 @@ def _resolve_memory_ids(
     ``None`` (anonymous session / no conversation). Also rotates
     conversations idle for more than :data:`INACTIVITY_THRESHOLD` so
     long breaks start a fresh session with a summarised predecessor.
+
+    ``task_uuid`` + ``task_repo`` are optional: when both are present
+    and a rotation happens, the audit row in ``tasks`` is repointed at
+    the freshly created conversation so debugging stays honest.
     """
     internal_user_uuid: UUID | None = None
     if external_id:
@@ -198,7 +211,13 @@ def _resolve_memory_ids(
     conv_uuid: UUID | None = None
     if conversation_id:
         conv = memory.get_or_create_conversation(UUID(conversation_id), internal_user_uuid)
-        conv = _maybe_rotate_stale_conversation(memory, conv, internal_user_uuid)
+        conv = _maybe_rotate_stale_conversation(
+            memory,
+            conv,
+            internal_user_uuid,
+            task_uuid=task_uuid,
+            task_repo=task_repo,
+        )
         conv_uuid = conv.id
     return conv_uuid, internal_user_uuid
 
@@ -207,6 +226,9 @@ def _maybe_rotate_stale_conversation(
     memory: MemoryManager,
     conv: Conversation,
     user_uuid: UUID | None,
+    *,
+    task_uuid: UUID | None = None,
+    task_repo: TaskRepository | None = None,
 ) -> Conversation:
     """Close an idle conversation and hand back a fresh one.
 
@@ -220,6 +242,10 @@ def _maybe_rotate_stale_conversation(
     The stale conversation is closed and submitted for summarisation;
     failures at either step degrade gracefully — the new conversation
     is still returned so the user's current request is never blocked.
+
+    When ``task_uuid`` and ``task_repo`` are provided, ``tasks.conversation_id``
+    is updated to the new conversation so the audit trail reflects where
+    the request was actually processed.
     """
     if user_uuid is None or not conv.is_active or conv.updated_at is None:
         return conv
@@ -248,7 +274,21 @@ def _maybe_rotate_stale_conversation(
     except Exception as e:
         logger.warning("[WorkflowTask] Failed to enqueue summarisation: %s", e)
 
-    return memory.conversation_repo.create(user_id=user_uuid)
+    new_conv = memory.conversation_repo.create(user_id=user_uuid)
+
+    if task_uuid is not None and task_repo is not None:
+        try:
+            task_repo.update_conversation_id(task_uuid, new_conv.id)
+        except Exception as e:
+            # Audit-only update — never block the user's response on it.
+            logger.warning(
+                "[WorkflowTask] Failed to repoint task %s to conv %s: %s",
+                task_uuid,
+                new_conv.id,
+                e,
+            )
+
+    return new_conv
 
 
 def _load_memory_payloads(
