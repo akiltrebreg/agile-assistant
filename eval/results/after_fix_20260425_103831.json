@@ -1,0 +1,1137 @@
+{
+  "experiment": "after_fix",
+  "timestamp": "20260425_103831",
+  "aggregate": {
+    "cases": 14,
+    "turns": 29,
+    "routing_accuracy": 0.931,
+    "entities_accuracy": 0.862,
+    "carry_forward_opportunities": 9,
+    "carry_forward_hits": 8,
+    "carry_forward_accuracy": 0.889,
+    "false_carry_opportunities": 5,
+    "false_carry_events": 1,
+    "false_carry_rate": 0.2,
+    "per_subcategory": {
+      "carry_forward_team": {
+        "cases": 5,
+        "turns": 11,
+        "routing_ok": 10,
+        "carry_opportunities": 6,
+        "carry_hits": 6,
+        "false_opportunities": 0,
+        "false_events": 0
+      },
+      "carry_forward_sprint": {
+        "cases": 2,
+        "turns": 4,
+        "routing_ok": 3,
+        "carry_opportunities": 2,
+        "carry_hits": 1,
+        "false_opportunities": 0,
+        "false_events": 0
+      },
+      "context_switch": {
+        "cases": 2,
+        "turns": 4,
+        "routing_ok": 4,
+        "carry_opportunities": 0,
+        "carry_hits": 0,
+        "false_opportunities": 2,
+        "false_events": 0
+      },
+      "anaphora_intent_change": {
+        "cases": 2,
+        "turns": 4,
+        "routing_ok": 4,
+        "carry_opportunities": 1,
+        "carry_hits": 1,
+        "false_opportunities": 0,
+        "false_events": 0
+      },
+      "independent": {
+        "cases": 3,
+        "turns": 6,
+        "routing_ok": 6,
+        "carry_opportunities": 0,
+        "carry_hits": 0,
+        "false_opportunities": 3,
+        "false_events": 1
+      }
+    }
+  },
+  "results": [
+    {
+      "id": 82,
+      "subcategory": "carry_forward_team",
+      "notes": "Second turn carries team_name via 'у них' anaphora; metric swaps.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Velocity cthulhu?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 1.03,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А у них scope drop?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "scope_drop"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "metric_name": "scope_drop",
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "cthulhu"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.569,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "subcategory": "carry_forward_team",
+      "notes": "Second turn adds issue_type filter while carrying team.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Покажи задачи команды lpop",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop"
+            }
+          },
+          "actual": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.416,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А баги у них?",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop",
+              "issue_type": "Bug"
+            }
+          },
+          "actual": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "issue_type": "Bug",
+              "team_name": "lpop"
+            }
+          },
+          "routing_match": true,
+          "intent_match": false,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "lpop"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.495,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "subcategory": "carry_forward_team",
+      "notes": "Explicit 'этой команды' anaphora — team must carry, metric swaps.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Done total у cthulhu?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "done_total"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "done_total"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.533,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А velocity этой команды?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "metric_name": "velocity",
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "cthulhu"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.516,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "subcategory": "carry_forward_team",
+      "notes": "Team-only carry with no prior sprint — metric flips from scope_drop to velocity.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Scope drop cthulhu",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "scope_drop"
+            }
+          },
+          "actual": {
+            "intent": "general",
+            "query_type": "rag",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": false,
+          "intent_match": false,
+          "entities_match": false,
+          "entity_mismatches": [
+            "metric_name: missing, want 'scope_drop'"
+          ],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.395,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А у них velocity?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "metric_name": "velocity",
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "cthulhu"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.52,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "subcategory": "carry_forward_sprint",
+      "notes": "Sprint name must carry via 'в этом спринте'.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Покажи задачи спринта #1 Q1'26",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "sprint_name": "#1 Q1'26"
+            }
+          },
+          "actual": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "sprint_name": "#1 Q1'26"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.54,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А баги в этом спринте?",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "sprint_name": "#1 Q1'26",
+              "issue_type": "Bug"
+            }
+          },
+          "actual": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "sprint_name": "#1 Q1'26"
+            }
+          },
+          "routing_match": true,
+          "intent_match": false,
+          "entities_match": false,
+          "entity_mismatches": [
+            "issue_type: missing, want 'Bug'"
+          ],
+          "carry_forward": {
+            "should_carry": {
+              "sprint_name": "#1 Q1'26"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "sprint_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.633,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "subcategory": "carry_forward_sprint",
+      "notes": "Sprint carries via 'в том же'; metric specified in turn 2.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Метрики за спринт #1 Q1'26",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "sprint_name": "#1 Q1'26"
+            }
+          },
+          "actual": {
+            "intent": "general",
+            "query_type": "rag",
+            "entities": {
+              "sprint_name": "#1 Q1'26"
+            }
+          },
+          "routing_match": false,
+          "intent_match": false,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.506,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А в том же velocity?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "sprint_name": "#1 Q1'26",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": false,
+          "entity_mismatches": [
+            "sprint_name: missing, want \"#1 Q1'26\""
+          ],
+          "carry_forward": {
+            "should_carry": {
+              "sprint_name": "#1 Q1'26"
+            },
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [
+              "sprint_name"
+            ],
+            "false_carries": []
+          },
+          "latency_s": 0.382,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "subcategory": "context_switch",
+      "notes": "Turn 2 names a NEW team explicitly; must NOT carry cthulhu.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Задачи cthulhu",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "actual": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.548,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А у lpop?",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop"
+            }
+          },
+          "actual": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {
+              "team_name": "cthulhu"
+            },
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.427,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "subcategory": "context_switch",
+      "notes": "Team switches cthulhu → lpop in turn 2; metric is restated.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Velocity cthulhu",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.496,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А какая velocity у lpop?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop",
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {
+              "team_name": "cthulhu"
+            },
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.497,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "subcategory": "anaphora_intent_change",
+      "notes": "Team carries via 'у них'; intent flips metric → tasks_filter.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Velocity cthulhu",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.492,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А какие задачи у них?",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "actual": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": false,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "cthulhu"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.393,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "subcategory": "anaphora_intent_change",
+      "notes": "Previous task lookup; next is a rag definition — no carry.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Задача AL-38787",
+          "expected": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "issue_key": "AL-38787"
+            }
+          },
+          "actual": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "issue_key": "AL-38787"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.0,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "Что такое velocity?",
+          "expected": {
+            "intent": "general",
+            "query_type": "rag",
+            "entities": {}
+          },
+          "actual": {
+            "intent": "general",
+            "query_type": "rag",
+            "entities": {}
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.316,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "subcategory": "independent",
+      "notes": "Turn 2 is a pure rag definition — team must NOT carry.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Velocity cthulhu",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.488,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "Что такое Definition of Done?",
+          "expected": {
+            "intent": "general",
+            "query_type": "rag",
+            "entities": {}
+          },
+          "actual": {
+            "intent": "general",
+            "query_type": "rag",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": false,
+          "entity_mismatches": [
+            "team_name: +'cthulhu' (unexpected)"
+          ],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {
+              "team_name": "cthulhu"
+            },
+            "hits": [],
+            "misses": [],
+            "false_carries": [
+              "team_name"
+            ]
+          },
+          "latency_s": 0.292,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "subcategory": "independent",
+      "notes": "Turn 2 is a greeting — routes to simple, no carry-forward.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Задачи cthulhu",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "actual": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.526,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "Привет!",
+          "expected": {
+            "intent": "general",
+            "query_type": "simple",
+            "entities": {}
+          },
+          "actual": {
+            "intent": "general",
+            "query_type": "simple",
+            "entities": {}
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {
+              "team_name": "cthulhu"
+            },
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.372,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "subcategory": "independent",
+      "notes": "Turn 2 is a fast-path task lookup — issue_key overrides everything.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Метрики команды lpop",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "lpop"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.391,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "Расскажи о задаче AL-38787",
+          "expected": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "issue_key": "AL-38787"
+            }
+          },
+          "actual": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "issue_key": "AL-38787"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {
+              "team_name": "lpop"
+            },
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.0,
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "subcategory": "carry_forward_team",
+      "notes": "Three turns: team persists through two anaphora references.",
+      "turns": [
+        {
+          "turn_index": 0,
+          "query": "Velocity cthulhu?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "velocity"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {},
+            "should_not_carry": {},
+            "hits": [],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.489,
+          "error": null
+        },
+        {
+          "turn_index": 1,
+          "query": "А у них scope drop?",
+          "expected": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "metric_name": "scope_drop"
+            }
+          },
+          "actual": {
+            "intent": "metric",
+            "query_type": "sql",
+            "entities": {
+              "metric_name": "scope_drop",
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": true,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "cthulhu"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.525,
+          "error": null
+        },
+        {
+          "turn_index": 2,
+          "query": "Какие у них баги?",
+          "expected": {
+            "intent": "tasks_filter",
+            "query_type": "sql",
+            "entities": {
+              "team_name": "cthulhu",
+              "issue_type": "Bug"
+            }
+          },
+          "actual": {
+            "intent": "task",
+            "query_type": "sql",
+            "entities": {
+              "issue_type": "Bug",
+              "team_name": "cthulhu"
+            }
+          },
+          "routing_match": true,
+          "intent_match": false,
+          "entities_match": true,
+          "entity_mismatches": [],
+          "carry_forward": {
+            "should_carry": {
+              "team_name": "cthulhu"
+            },
+            "should_not_carry": {},
+            "hits": [
+              "team_name"
+            ],
+            "misses": [],
+            "false_carries": []
+          },
+          "latency_s": 0.518,
+          "error": null
+        }
+      ]
+    }
+  ]
+}
