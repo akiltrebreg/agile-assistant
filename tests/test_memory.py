@@ -629,6 +629,152 @@ class TestSupervisorWithContext:
         assert result["query_type"] == "hybrid"
         assert result["intent"] == "metric"
 
+    def test_metric_plus_team_misrouted_to_rag_is_upgraded(self) -> None:
+        """Rule 5: "Scope drop cthulhu" wrongly routed to rag → sql/metric.
+
+        Reproduces eval Case 85: the LLM occasionally drops a terse
+        "<metric> <team>" form into the rag bucket, despite the prompt's
+        Шаг 4 forbidding rag when concrete identifiers are present.
+        """
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"general","query_type":"rag","entities":{"team_name":"cthulhu"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("Scope drop cthulhu")
+
+        assert result["query_type"] == "sql"
+        assert result["intent"] == "metric"
+        assert result["entities"]["team_name"] == "cthulhu"
+        # metric_name was missing in LLM output — Rule 5 fills it in.
+        assert result["entities"]["metric_name"] == "scope_drop"
+
+    def test_generic_metric_word_plus_sprint_is_upgraded(self) -> None:
+        """Rule 5: "Метрики за спринт X" → sql/metric, sprint preserved."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"general","query_type":"rag","entities":{"sprint_name":"#1 Q1\'26"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("Метрики за спринт #1 Q1'26")
+
+        assert result["query_type"] == "sql"
+        assert result["intent"] == "metric"
+        assert result["entities"]["sprint_name"] == "#1 Q1'26"
+        # Generic "метрик" word — no specific metric_name to fill in.
+        assert "metric_name" not in result["entities"]
+
+    def test_metric_with_rag_marker_stays_rag(self) -> None:
+        """Rule 5 must NOT fire when a rag-marker is present.
+
+        A "что такое <metric> в команде <team>" form is a theoretical
+        question even with team context — Rule 5 skips it (and Rule 7
+        strips the team).
+        """
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"general","query_type":"rag","entities":{"team_name":"cthulhu"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("Что такое scope drop у cthulhu?")
+
+        assert result["query_type"] == "rag"
+        assert result["intent"] == "general"
+        # Rule 7 cleans up stale entities on rag/general.
+        assert result["entities"] == {}
+
+    def test_plural_noun_demotes_task_to_tasks_filter(self) -> None:
+        """Rule 6: plural-noun anaphoric follow-up → tasks_filter, not task.
+
+        Reproduces eval Cases 83/86/90/95: anaphoric plural follow-ups
+        like "<a> bugs of theirs?" get tagged as intent=task even though
+        no issue_key is present. Team name reaches the result through
+        carry-forward — that detail isn't what's under test here, but is
+        needed to mirror the real scenario.
+        """
+        mock_llm = MagicMock()
+        # LLM returns intent=task (the bug we're fixing). team_name from
+        # the prompt context is omitted by the LLM — anaphora carry-forward
+        # fills it back from prev_entities.
+        mock_llm.invoke.return_value = (
+            '{"intent":"task","query_type":"sql","entities":{"issue_type":"Bug"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        ctx = _ctx(
+            recent=[
+                {
+                    "role": "user",
+                    "content": "Покажи задачи команды lpop",
+                    "metadata": {"entities": {"team_name": "lpop"}},
+                }
+            ]
+        )
+        result = agent.process("А баги у них?", conversation_context=ctx)
+
+        assert result["intent"] == "tasks_filter"
+        assert result["query_type"] == "sql"
+        assert result["entities"]["team_name"] == "lpop"
+        assert result["entities"]["issue_type"] == "Bug"
+
+    def test_plural_noun_with_issue_key_stays_task(self) -> None:
+        """Rule 6 must NOT fire when an issue_key survives sanitization.
+
+        A regex fast-path issue_key short-circuits the slow path entirely,
+        so the rule never runs in that scenario — verified here by
+        observing that a query like "задачи AL-12345" lands on intent=task
+        with the regex-extracted key.
+        """
+        mock_llm = MagicMock()
+        # The mock will not be invoked because the regex fast path triggers.
+        mock_llm.invoke.return_value = "{}"
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("задачи AL-12345 покажи")
+
+        assert result["intent"] == "task"
+        assert result["entities"]["issue_key"] == "AL-12345"
+        mock_llm.invoke.assert_not_called()
+
+    def test_rag_general_drops_stale_entities(self) -> None:
+        """Rule 7: rag/general carries no entities.
+
+        Reproduces eval Case 92: after "Velocity cthulhu", the next turn
+        "Что такое Definition of Done?" gets team_name=cthulhu carried
+        forward by the substring-based anaphora detector ("так" matches
+        "такое"). Rule 7 cleans that up unconditionally.
+        """
+        mock_llm = MagicMock()
+        # The LLM may correctly route to rag but still emit a team_name
+        # because the conversation history mentioned it; OR carry-forward
+        # may inject it. Either way, post-processing strips it.
+        mock_llm.invoke.return_value = (
+            '{"intent":"general","query_type":"rag","entities":{"team_name":"cthulhu"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("Что такое Definition of Done?")
+
+        assert result["query_type"] == "rag"
+        assert result["intent"] == "general"
+        assert result["entities"] == {}
+
+    def test_simple_general_drops_stale_entities(self) -> None:
+        """Rule 7 also fires for query_type=simple (greetings)."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"general","query_type":"simple","entities":{"team_name":"cthulhu"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("Привет!")
+
+        assert result["query_type"] == "simple"
+        assert result["entities"] == {}
+
 
 # ────────────────────────────────────────────────────────────────
 # Supervisor + user_profile (long-term memory)

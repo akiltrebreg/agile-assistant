@@ -66,6 +66,66 @@ _DANGEROUS_PREFIXES = (
     "update ",
 )
 
+# Concrete metric tokens — substring-matched against the lowered query.
+# Mapped to canonical metric_name values. Order matters only insofar as
+# longer compound tokens come first (they're more specific).
+_KNOWN_METRIC_TOKENS: tuple[tuple[str, str], ...] = (
+    ("initial_commitment_sp", "initial_commitment_sp"),
+    ("initial commitment", "initial_commitment_sp"),
+    ("final_commitment_sp", "final_commitment_sp"),
+    ("final commitment", "final_commitment_sp"),
+    ("added_work_sp", "added_work_sp"),
+    ("added work", "added_work_sp"),
+    ("complete_sp", "complete_sp"),
+    ("complete sp", "complete_sp"),
+    ("done_total", "done_total"),
+    ("done total", "done_total"),
+    ("scope_drop", "scope_drop"),
+    ("scope drop", "scope_drop"),
+    ("sprint_goal", "sprint_goal"),
+    ("sprint goal", "sprint_goal"),
+    ("cancel_rate", "cancel_rate"),
+    ("cancel rate", "cancel_rate"),
+    ("velocity", "velocity"),
+    ("скорость", "velocity"),
+)
+
+# Generic metric mention — signals "the user is asking about metric data"
+# but doesn't pin down which one. "метрик" matches метрика/метрики/метрику
+# /метрик (genitive plural) via plain substring.
+_GENERIC_METRIC_TOKENS: tuple[str, ...] = ("метрик",)
+
+# Plural task-noun forms. When the LLM tags a query as intent=task without
+# an issue_key but one of these is present, the user really means a
+# filtered list — intent=tasks_filter.
+_PLURAL_TASK_NOUNS: tuple[str, ...] = (
+    "задачи",
+    "задач",
+    "баги",
+    "багов",
+    "сторис",
+    "эпики",
+    "эпиков",
+    "сабтаски",
+    "сабтасок",
+    "тикеты",
+    "тикетов",
+)
+
+
+def _detect_metric_mention(query_lower: str) -> tuple[bool, str | None]:
+    """Return ``(mentioned, canonical_name)`` for metric tokens in the query.
+
+    ``canonical_name`` is ``None`` when only a generic word ("метрик") is
+    present — the metric was mentioned but not specified.
+    """
+    for token, canonical in _KNOWN_METRIC_TOKENS:
+        if token in query_lower:
+            return True, canonical
+    if any(t in query_lower for t in _GENERIC_METRIC_TOKENS):
+        return True, None
+    return False, None
+
 
 # JSON schema for structured output — vLLM enforces this via guided decoding.
 # Entity fields are OPTIONAL (no "required" list) so the model can OMIT
@@ -494,7 +554,11 @@ class SupervisorAgent:
 
         return {"intent": intent, "entities": entities, "query_type": query_type}
 
-    def _post_process_classification(self, query: str, result: dict[str, Any]) -> dict[str, Any]:
+    def _post_process_classification(  # noqa: C901
+        self,
+        query: str,
+        result: dict[str, Any],
+    ) -> dict[str, Any]:
         """Deterministic corrections applied after LLM classification.
 
         Fixes residual misclassifications that the LLM keeps making despite
@@ -508,6 +572,19 @@ class SupervisorAgent:
              branch and is the main trigger for vLLM degenerate-loops on
              this model. The advice intent is signalled by the WORDING of
              the query — if no marker is present, the upgrade is spurious.
+          5. metric mention + team/sprint context but routed to rag/simple
+             -> upgrade to sql/metric. The classifier prompt forbids rag
+             when concrete identifiers are present, but the LLM still slips
+             on terse forms like "Scope drop cthulhu" / "Метрики за спринт".
+             We re-fill metric_name when a known metric token is detected.
+          6. intent=task without an issue_key but with a plural task noun
+             ("баги", "задачи") -> intent=tasks_filter. The SQL Agent's
+             single-task branch expects an issue_key; plural follow-ups
+             belong on the filtered-list branch.
+          7. rag/simple/off_topic + intent=general -> drop entities. Those
+             routes don't use entity filters, and stale carry-forward (e.g.
+             team_name leaking into "Что такое DoD?") is a known false
+             positive of the substring-based anaphora detector.
         """
         query_lower = query.lower()
 
@@ -526,9 +603,10 @@ class SupervisorAgent:
         has_sprint = bool(entities.get("sprint_name"))
         has_ctx = has_team or has_sprint
         has_hybrid_marker = any(m in query_lower for m in _HYBRID_MARKERS)
+        has_rag_marker = any(m in query_lower for m in _RAG_MARKERS)
 
         # Rule 2: rag-marker without team/sprint -> rag
-        if qt == "sql" and not has_ctx and any(m in query_lower for m in _RAG_MARKERS):
+        if qt == "sql" and not has_ctx and has_rag_marker:
             logger.info("[Supervisor] Post-process: rag-marker, no team -> rag")
             result = dict(result)
             result["query_type"] = "rag"
@@ -546,15 +624,54 @@ class SupervisorAgent:
             return result
 
         # Rule 4: hybrid without ANY hybrid-marker -> sql.
-        # Hybrid means data + advice; the advice signal lives in the query
-        # wording. If the LLM returned hybrid but no marker is present,
-        # demote to sql/metric to skip the (expensive, loop-prone) hybrid
-        # generation path.
         if qt == "hybrid" and not has_hybrid_marker:
             logger.info("[Supervisor] Post-process: hybrid without marker -> sql")
             result = dict(result)
             result["query_type"] = "sql"
-            return result
+            qt = "sql"
+
+        # Rule 5: metric mention + ctx but routed to rag/simple -> sql/metric.
+        # Skip when a rag-marker is present — those queries are theoretical
+        # (e.g. "what is scope drop") and Rule 3 / Rule 7 handle them.
+        if qt in ("rag", "simple") and has_ctx and not has_rag_marker:
+            mentioned, canonical = _detect_metric_mention(query_lower)
+            if mentioned:
+                logger.info(
+                    "[Supervisor] Post-process: metric+ctx wrongly routed to %s -> sql/metric",
+                    qt,
+                )
+                result = dict(result)
+                result["query_type"] = "sql"
+                result["intent"] = "metric"
+                new_entities = dict(result.get("entities") or {})
+                if canonical and not new_entities.get("metric_name"):
+                    new_entities["metric_name"] = canonical
+                result["entities"] = new_entities
+                qt = "sql"
+
+        # Rule 6: intent=task + no issue_key + plural noun -> tasks_filter.
+        if (
+            result.get("intent") == "task"
+            and not (result.get("entities") or {}).get("issue_key")
+            and any(n in query_lower for n in _PLURAL_TASK_NOUNS)
+        ):
+            logger.info("[Supervisor] Post-process: plural noun without issue_key -> tasks_filter")
+            result = dict(result)
+            result["intent"] = "tasks_filter"
+
+        # Rule 7: rag/simple/off_topic + general -> drop stale entities.
+        if (
+            result.get("query_type") in ("rag", "simple", "off_topic")
+            and result.get("intent") == "general"
+            and result.get("entities")
+        ):
+            logger.info(
+                "[Supervisor] Post-process: %s/general -> drop %d stale entities",
+                result["query_type"],
+                len(result["entities"]),
+            )
+            result = dict(result)
+            result["entities"] = {}
 
         return result
 

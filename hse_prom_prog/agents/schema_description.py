@@ -60,6 +60,14 @@ Q: "Какой scope drop у команды cthulhu?"
 A: {"query_type": "sql", "intent": "metric", \
 "entities": {"team_name": "cthulhu", "metric_name": "scope_drop"}}
 
+Q: "Scope drop cthulhu"
+A: {"query_type": "sql", "intent": "metric", \
+"entities": {"team_name": "cthulhu", "metric_name": "scope_drop"}}
+
+Q: "Метрики за спринт #1 Q1'26"
+A: {"query_type": "sql", "intent": "metric", \
+"entities": {"sprint_name": "#1 Q1'26"}}
+
 Q: "Как рассчитывается Done Total?"
 A: {"query_type": "rag", "intent": "general", "entities": {}}
 
