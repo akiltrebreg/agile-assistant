@@ -502,6 +502,12 @@ class SupervisorAgent:
           1. Dangerous SQL prefix (DROP/DELETE/…) -> simple/general (safety).
           2. rag-marker words without team/sprint -> rag/general.
           3. hybrid-marker words WITH team/sprint -> hybrid (keep intent).
+          4. hybrid claimed without ANY hybrid-marker -> downgrade to sql.
+             The LLM tends to "upgrade" simple follow-ups into hybrid after
+             a few turns, which routes through the analysis-heavy hybrid
+             branch and is the main trigger for vLLM degenerate-loops on
+             this model. The advice intent is signalled by the WORDING of
+             the query — if no marker is present, the upgrade is spurious.
         """
         query_lower = query.lower()
 
@@ -519,6 +525,7 @@ class SupervisorAgent:
         has_team = bool(entities.get("team_name"))
         has_sprint = bool(entities.get("sprint_name"))
         has_ctx = has_team or has_sprint
+        has_hybrid_marker = any(m in query_lower for m in _HYBRID_MARKERS)
 
         # Rule 2: rag-marker without team/sprint -> rag
         if qt == "sql" and not has_ctx and any(m in query_lower for m in _RAG_MARKERS):
@@ -530,12 +537,23 @@ class SupervisorAgent:
             return result
 
         # Rule 3: hybrid-marker + team/sprint -> hybrid
-        if qt in ("sql", "rag") and has_ctx and any(m in query_lower for m in _HYBRID_MARKERS):
+        if qt in ("sql", "rag") and has_ctx and has_hybrid_marker:
             logger.info("[Supervisor] Post-process: hybrid-marker + team -> hybrid")
             result = dict(result)
             result["query_type"] = "hybrid"
             if not result.get("intent") or result["intent"] == "general":
                 result["intent"] = "metric"
+            return result
+
+        # Rule 4: hybrid without ANY hybrid-marker -> sql.
+        # Hybrid means data + advice; the advice signal lives in the query
+        # wording. If the LLM returned hybrid but no marker is present,
+        # demote to sql/metric to skip the (expensive, loop-prone) hybrid
+        # generation path.
+        if qt == "hybrid" and not has_hybrid_marker:
+            logger.info("[Supervisor] Post-process: hybrid without marker -> sql")
+            result = dict(result)
+            result["query_type"] = "sql"
             return result
 
         return result

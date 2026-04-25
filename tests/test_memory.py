@@ -585,6 +585,50 @@ class TestSupervisorWithContext:
         assert "<conversation_history>" not in prompt
         assert "Используй историю" not in prompt
 
+    def test_hybrid_without_marker_is_downgraded_to_sql(self) -> None:
+        """Spurious LLM upgrade to hybrid → post-processing demotes it.
+
+        Reproduces a real production failure: after a few turns the LLM
+        starts returning ``query_type=hybrid`` for plain follow-ups (e.g.
+        "scope drop?" with anaphora), which routes through the analysis
+        branch of Response Agent and triggers a degenerate-loop on the
+        avibe-gptq-8bit model. The advice signal lives in the wording —
+        if no hybrid marker is present, the upgrade is spurious.
+        """
+        mock_llm = MagicMock()
+        # LLM "upgrades" a plain follow-up to hybrid even though the
+        # query has no hybrid markers ("улучшить", "снизить", "дай совет", …).
+        # The team name is in the query so the sanitizer keeps it — that
+        # lets us focus the assertion on the rule under test.
+        mock_llm.invoke.return_value = (
+            '{"intent":"metric","query_type":"hybrid",'
+            '"entities":{"team_name":"cthulhu","metric_name":"scope_drop"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        result = agent.process("scope drop cthulhu")
+
+        # Post-processing demotes hybrid → sql; intent + entities preserved.
+        assert result["query_type"] == "sql"
+        assert result["intent"] == "metric"
+        assert result["entities"]["team_name"] == "cthulhu"
+        assert result["entities"]["metric_name"] == "scope_drop"
+
+    def test_hybrid_with_marker_stays_hybrid(self) -> None:
+        """A genuine hybrid request with an advice marker is left alone."""
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = (
+            '{"intent":"metric","query_type":"hybrid",'
+            '"entities":{"team_name":"cthulhu","metric_name":"scope_drop"}}'
+        )
+        agent = SupervisorAgent(mock_llm)
+
+        # "как улучшить" is in _HYBRID_MARKERS — genuine advice request.
+        result = agent.process("scope drop cthulhu — как улучшить?")
+
+        assert result["query_type"] == "hybrid"
+        assert result["intent"] == "metric"
+
 
 # ────────────────────────────────────────────────────────────────
 # Supervisor + user_profile (long-term memory)
