@@ -56,6 +56,9 @@ scrape_configs:
     scrape_interval: 30s
 
   # 8. Prometheus self-monitoring
+  # route-prefix=/prometheus/ shifts /metrics under /prometheus/metrics —
+  # the default metrics_path of /metrics now 404s.
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
+    metrics_path: /prometheus/metrics

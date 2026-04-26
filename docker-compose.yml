@@ -13,10 +13,23 @@ services:
         condition: service_healthy
       static:
         condition: service_started
+      # Monitoring upstreams: nginx config references prometheus and
+      # grafana hostnames; if either container is missing at startup
+      # nginx fails the resolver. service_started is enough — gzip
+      # + first-request DNS lookup handle the rest.
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount the directory (not a single file): bind-mounting a single
+      # file pins to its inode, so atomic rewrites by `git pull` or an
+      # editor leave the container holding the stale version. Mounting
+      # the parent dir makes new content visible immediately, so a
+      # plain `nginx -s reload` is enough — no --force-recreate.
+      - ./nginx:/etc/nginx/conf.d:ro
       - static_files:/var/www/static:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
@@ -465,8 +478,11 @@ services:
       # (no prefix stripping). Splitting them causes redirect loops.
       - "--web.external-url=http://195.209.218.21/prometheus/"
       - "--web.route-prefix=/prometheus/"
-    ports:
-      - "9090:9090"
+    # Internal-only — public access goes through nginx /prometheus/
+    # with gzip. Removing the host port mapping shrinks the public
+    # attack surface and forces all traffic through one entrypoint.
+    expose:
+      - "9090"
     depends_on:
       - api
     networks:
@@ -482,8 +498,14 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
       GF_USERS_ALLOW_SIGN_UP: "false"
-    ports:
-      - "3000:3000"
+      # Subpath behind nginx: SERVE_FROM_SUB_PATH makes Grafana emit
+      # absolute links and asset paths under /grafana/. nginx forwards
+      # the path as-is (proxy_pass without trailing slash).
+      GF_SERVER_ROOT_URL: "http://195.209.218.21/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    # Internal-only — public access via nginx /grafana/ with gzip.
+    expose:
+      - "3000"
     depends_on:
       - prometheus
     networks:
