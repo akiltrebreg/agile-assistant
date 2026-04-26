@@ -460,6 +460,12 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
+      # External access goes through nginx /prometheus/ with gzip; the
+      # external-url is what the React UI bakes into absolute links.
+      # route-prefix stays at / so nginx strips the prefix via the
+      # trailing slash on its proxy_pass.
+      - "--web.external-url=http://195.209.218.21/prometheus/"
+      - "--web.route-prefix=/"
     ports:
       - "9090:9090"
     depends_on:
