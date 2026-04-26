@@ -58,6 +58,12 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
   - [L2 — SQLGuard (tool-level)](#l2--sqlguard-tool-level)
   - [L3 — ResponseGuard (output)](#l3--responseguard-output)
   - [Тестирование guards](#тестирование-guards)
+- [Observability — Prometheus, Grafana, Langfuse](#observability--prometheus-grafana-langfuse)
+  - [Метрики Prometheus](#метрики-prometheus)
+  - [Дашборды Grafana](#дашборды-grafana)
+  - [Алерты Prometheus](#алерты-prometheus)
+  - [Трейсинг Langfuse](#трейсинг-langfuse)
+  - [Запуск observability-стека](#запуск-observability-стека)
 - [Оценка агентов](#оценка-агентов)
   - [RAG-пайплайн (RAGAS)](#rag-пайплайн-ragas)
   - [SQL Agent](#sql-agent)
@@ -83,7 +89,10 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 ответ выдаётся заготовленным текстом без вызова остальных агентов). Между
 сообщениями память слоя [Memory Layer](#memory-layer) сохраняет историю диалога
 и профиль пользователя — Supervisor и Response Agent читают короткоживущий
-контекст + долгоживущий профиль из блока `MemoryManager`:
+контекст + долгоживущий профиль из блока `MemoryManager`. Поверх этого работает
+[observability-стек](#observability--prometheus-grafana-langfuse): Prometheus +
+Grafana собирают метрики latency / throughput / error rate / очередей, а
+Langfuse получает трейсы каждого запроса с полными промптами и токенами:
 
 ```
   [Memory Layer: conversation history + user profile]
@@ -111,6 +120,10 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
                                                                ▼
                               [Memory Layer writes user + assistant turns,
                                schedules async profile refresh + summarisation]
+
+  Параллельно для каждого узла:
+    • Prometheus метрики (latency, count, in_progress) — scrape из api:8080/metrics, celery-worker:9100/metrics
+    • Langfuse trace + nested spans (полные промпты + usage) — buffered, flush в конце задачи
 ```
 
 ### Компоненты
@@ -258,6 +271,39 @@ PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
   `content` (полный) + `content_truncated` (150 токенов для быстрой реплейки в
   промпт)
 
+**7. Observability** (Prometheus + Grafana + Langfuse)
+
+- **Prometheus метрики** (`hse_prom_prog/metrics.py`) — единый реестр из ~45
+  кастомных метрик в неймспейсе `agile_assistant_*`. Покрывают весь pipeline:
+  end-to-end latency и queue wait, Celery task lifecycle, per-agent durations,
+  guardrails L1/L2/L3 results, entity sanitizer corrections by layer, RAG
+  retrieval/reranker, memory context tokens, session rotations
+- **Эндпоинты `/metrics`**: FastAPI экспонирует метрики через
+  `prometheus-fastapi-instrumentator`, Celery worker — через side-car
+  `start_http_server(9100)`. Prometheus скрейпит 8 целей: api, celery-worker,
+  vllm, vllm-sql, postgresql (через pg-exporter), redis (через redis-exporter),
+  qdrant, prometheus self
+- **Grafana дашборды** (`monitoring/grafana/dashboards/`) — четыре дашборда в
+  папке "Agile Assistant": Overview (e2e latency, throughput, error rate),
+  Infrastructure (PostgreSQL / Redis / Qdrant / vLLM), Agents Deep Dive
+  (per-agent latency, SQL retries, RAG fallbacks, response branches), Guardrails
+  & Safety (L1/L2/L3 blocks, sanitizer corrections, memory rotations)
+- **Алерты Prometheus** (`monitoring/prometheus/alerts.yml`) — 9 правил: high
+  e2e latency, high error rate, Celery queue backlog, vLLM queue overflow,
+  KV-cache exhaustion, PostgreSQL replication lag, Qdrant down
+- **Langfuse трейсинг** (`hse_prom_prog/tracing.py`) — singleton-клиент с
+  graceful degradation. На каждый Celery-таск создаётся root trace (`user_id`,
+  `session_id`, `input` / `output`), внутри — вложенные spans для каждого агента
+  (`@observe(name="...")`) и generations для LLM-вызовов
+  (`@observe(as_type="generation")` с `model`, `input/output`, `usage`).
+  Контекст распространяется через Python `contextvars` — параллелизма в hybrid
+  нет (SQL+RAG последовательно), сиротских spans не возникает
+- **Kill-switch**: `LANGFUSE_ENABLED=false` отключает SDK полностью — `@observe`
+  становится no-op, приложение работает идентично без трейсов. Аналогично,
+  отсутствие `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` не ломает запуск,
+  только не отправляет данные. Подробности — в разделе
+  [Observability](#observability--prometheus-grafana-langfuse)
+
 ### LLM Backend
 
 Два раздельных vLLM-контейнера на одной GPU (совместный шаринг памяти):
@@ -393,6 +439,8 @@ hse-prom-prog/
 │   ├── __init__.py
 │   ├── config.py                      # Pydantic settings
 │   ├── main.py                        # CLI entry point
+│   ├── metrics.py                     # Prometheus реестр (~45 метрик в неймспейсе agile_assistant_*)
+│   ├── tracing.py                     # Langfuse singleton + @observe реэкспорт + graceful degradation
 │   ├── agents/
 │   │   ├── __init__.py
 │   │   ├── supervisor.py              # Supervisor (intent + entities + query_type)
@@ -475,7 +523,15 @@ hse-prom-prog/
 │       ├── 004_add_user_profiles.py       # user_profiles + conversation_summaries (long-term memory)
 │       └── 005_add_conversation_id_to_tasks.py
 ├── database/
-│   └── init.sql                       # PostgreSQL schema (данные загружаются из S3)
+│   ├── init.sql                       # PostgreSQL schema (данные загружаются из S3)
+│   └── init-langfuse.sql              # Создаёт langfuse_db рядом с основной БД
+├── monitoring/
+│   ├── prometheus/
+│   │   ├── prometheus.yml             # 8 scrape targets (api, celery, vllm, vllm-sql, pg, redis, qdrant, self)
+│   │   └── alerts.yml                 # 9 правил (latency, error rate, queue backlog, KV-cache, replication lag)
+│   └── grafana/
+│       ├── provisioning/              # Datasource (Prometheus) + dashboard provider
+│       └── dashboards/                # 4 JSON-дашборда: overview, infrastructure, agents, guardrails
 ├── scripts/
 │   └── download_model.sh              # Download avibe-gptq-8bit from S3
 ├── streamlit_app/
@@ -1120,8 +1176,12 @@ docker compose exec celery-worker \
 
 ## Nginx + Production
 
-Nginx выступает единой точкой входа (порт 80). FastAPI и Streamlit не имеют
-внешних портов и доступны только через reverse proxy.
+Nginx выступает единой точкой входа (порт 80). FastAPI, Streamlit, Prometheus и
+Grafana не имеют внешних портов и доступны только через reverse proxy.
+Внутренние upstream-ы (`fastapi`, `streamlit`, `prometheus`, `grafana`,
+`langfuse`) объявлены в [nginx/nginx.conf](nginx/nginx.conf). Для тяжёлых JS
+бандлов Grafana настроены увеличенные `proxy_buffers` и gzip — без них первая
+загрузка дашбордов уходила в 30-60 секунд из-за дисковой буферизации.
 
 ### Архитектура контейнеров
 
@@ -1145,22 +1205,31 @@ Nginx выступает единой точкой входа (порт 80). Fas
                           └─────────────────────────────────────┘
 ```
 
-| Контейнер  | Образ                 | Роль                                            |
-| ---------- | --------------------- | ----------------------------------------------- |
-| **nginx**  | `nginx:1.27-alpine`   | Reverse proxy, единственный открытый порт (80)  |
-| **api**    | Dockerfile + gunicorn | FastAPI в production (gunicorn + UvicornWorker) |
-| **static** | `busybox` + volume    | Хранит статические файлы, шарит volume с nginx  |
-| **qdrant** | `qdrant:v1.13.2`      | Векторное хранилище для RAG Agent               |
+| Контейнер          | Образ                                   | Роль                                                                  |
+| ------------------ | --------------------------------------- | --------------------------------------------------------------------- |
+| **nginx**          | `nginx:1.27-alpine`                     | Reverse proxy, единственный открытый порт (80)                        |
+| **api**            | Dockerfile + gunicorn                   | FastAPI в production (gunicorn + UvicornWorker), экспонирует /metrics |
+| **celery-worker**  | Dockerfile + celery threads             | Workflow-исполнитель, side-car `start_http_server(9100)` для метрик   |
+| **static**         | `busybox` + volume                      | Хранит статические файлы, шарит volume с nginx                        |
+| **qdrant**         | `qdrant:v1.13.2`                        | Векторное хранилище для RAG Agent                                     |
+| **prometheus**     | `prom/prometheus:v2.53.0`               | Time-series для метрик; subpath `/prometheus/` за nginx               |
+| **grafana**        | `grafana/grafana:11.1.0`                | Дашборды поверх Prometheus; subpath `/grafana/` за nginx              |
+| **pg-exporter**    | `prometheuscommunity/postgres-exporter` | Side-car для PostgreSQL метрик                                        |
+| **redis-exporter** | `oliver006/redis_exporter`              | Side-car для Redis метрик                                             |
+| **langfuse**       | `langfuse/langfuse:2`                   | LLM-tracing UI + API; пишет в `langfuse_db` (тот же PostgreSQL)       |
 
 ### Маршруты nginx
 
-| Путь              | Куда проксирует  | Особенности                                        |
-| ----------------- | ---------------- | -------------------------------------------------- |
-| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (`/api/tasks` -> `/tasks`) |
-| `/static/*`       | Диск / Streamlit | Сначала volume, затем fallback на Streamlit        |
-| `/docs`, `/redoc` | `api:8080`       | Swagger UI                                         |
-| `/_stcore/stream` | `streamlit:8501` | WebSocket (Upgrade + Connection headers)           |
-| `/` (default)     | `streamlit:8501` | Streamlit UI с WebSocket-поддержкой                |
+| Путь              | Куда проксирует   | Особенности                                                                                   |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------------- |
+| `/api/*`          | `api:8080`        | Prefix `/api` удаляется (`/api/tasks` -> `/tasks`); `/api/metrics` отдаёт 404 (internal-only) |
+| `/static/*`       | Диск / Streamlit  | Сначала volume, затем fallback на Streamlit                                                   |
+| `/docs`, `/redoc` | `api:8080`        | Swagger UI                                                                                    |
+| `/_stcore/stream` | `streamlit:8501`  | WebSocket (Upgrade + Connection headers)                                                      |
+| `/prometheus/`    | `prometheus:9090` | Prometheus UI (gzip, large proxy_buffers для JS-бандлов)                                      |
+| `/grafana/`       | `grafana:3000`    | Grafana UI (gzip, WebSocket для Live, large proxy_buffers)                                    |
+| `/langfuse/`      | `langfuse:3000`   | Langfuse UI (опционально; основной доступ — `localhost:3001`)                                 |
+| `/` (default)     | `streamlit:8501`  | Streamlit UI с WebSocket-поддержкой                                                           |
 
 ### Запуск production-стека
 
@@ -1714,6 +1783,296 @@ docker compose run --rm --no-deps app \
     python -m hse_prom_prog.main 'Расскажи о задаче AL-38787'
 ```
 
+## Observability — Prometheus, Grafana, Langfuse
+
+Две плоскости наблюдаемости поверх workflow:
+
+- **Prometheus + Grafana** — операционные метрики (latency, throughput, error
+  rate, очереди, размер контекстов). Отвечают на «сколько / как быстро / где
+  узкое место»
+- **Langfuse** — трейсинг каждого запроса от FastAPI до финального ответа.
+  Полный prompt каждого агента, цепочка вызовов, входные/выходные токены, model
+  parameters. Отвечает на «почему ответ деградировал»
+
+Метрики и трейсы — два уровня детализации одного и того же события. Grafana
+показывает сводный сигнал по тысячам запросов; Langfuse — конкретный trace по
+`trace_id` для отладки одного запроса. Прометей — про SLO, Langfuse — про root
+cause.
+
+Все компоненты разворачиваются в `docker compose` рядом с основным стеком и не
+требуют отдельной инфраструктуры:
+
+| Сервис         | Образ                                   | Порт (host)                       | Где живут данные                        |
+| -------------- | --------------------------------------- | --------------------------------- | --------------------------------------- |
+| prometheus     | `prom/prometheus:v2.53.0`               | внутр. (через nginx /prometheus/) | volume `prometheus_data`, retention 15d |
+| grafana        | `grafana/grafana:11.1.0`                | внутр. (через nginx /grafana/)    | volume `grafana_data`                   |
+| langfuse       | `langfuse/langfuse:2`                   | `localhost:3001`                  | PostgreSQL `langfuse_db`                |
+| pg-exporter    | `prometheuscommunity/postgres-exporter` | внутренний                        | —                                       |
+| redis-exporter | `oliver006/redis_exporter`              | внутренний                        | —                                       |
+
+> Prometheus и Grafana проксируются через nginx с gzip-сжатием. Прямые порты
+> `9090` / `3000` намеренно закрыты от внешнего мира — публичная точка одна
+> (порт 80). Langfuse временно открыт на `:3001`, потому что его OAuth-эндпоинт
+> требует совпадения `NEXTAUTH_URL` с тем, что вводит пользователь в браузере.
+
+### Метрики Prometheus
+
+Реестр метрик собран в [hse_prom_prog/metrics.py](hse_prom_prog/metrics.py). Все
+имена живут в неймспейсе `agile_assistant_*`. Метрики разделены на 8 секций.
+
+**Pipeline (workflow_task)**:
+
+| Метрика                       | Тип       | Лейблы       | Что показывает                                     |
+| ----------------------------- | --------- | ------------ | -------------------------------------------------- |
+| `pipeline_duration_seconds`   | Histogram | `query_type` | E2E latency Celery-задачи от старта до записи в DB |
+| `pipeline_queue_wait_seconds` | Histogram | —            | Время ожидания в Redis-очереди (только attempt 0)  |
+| `tasks_total`                 | Counter   | `status`     | Терминальные исходы: COMPLETED / FAILED            |
+| `tasks_in_progress`           | Gauge     | —            | Сколько задач сейчас в работе                      |
+
+**Celery worker** (через сигналы `task_prerun` / `task_postrun` / `task_failure`
+/ `task_retry`):
+
+| Метрика                        | Тип       | Лейблы             | Что показывает                                        |
+| ------------------------------ | --------- | ------------------ | ----------------------------------------------------- |
+| `celery_task_duration_seconds` | Histogram | `task_name`        | Длительность Celery-задачи (включая memory_tasks)     |
+| `celery_tasks_total`           | Counter   | `task_name, state` | success / failure / retry per task                    |
+| `celery_active_tasks`          | Gauge     | —                  | Активные задачи воркера                               |
+| `celery_queue_length`          | Gauge     | —                  | LLEN `celery` в Redis (custom collector с lazy-Redis) |
+
+**Per-agent durations**:
+
+| Метрика                            | Тип       | Лейблы               | Что показывает                                               |
+| ---------------------------------- | --------- | -------------------- | ------------------------------------------------------------ |
+| `supervisor_duration_seconds`      | Histogram | `path`               | fast / slow path — даёт понять долю LLM-вызовов              |
+| `supervisor_classifications_total` | Counter   | `intent, query_type` | confusion-матрица для роутинга                               |
+| `supervisor_fast_path_total`       | Counter   | —                    | сколько запросов поймал regex до LLM                         |
+| `supervisor_llm_calls_total`       | Counter   | —                    | slow-path вызовы                                             |
+| `supervisor_parse_errors_total`    | Counter   | —                    | LLM вернул невалидный JSON                                   |
+| `sql_agent_duration_seconds`       | Histogram | `intent`             | E2E LangGraph SQL-цикл                                       |
+| `sql_query_duration_seconds`       | Histogram | —                    | Время одного `db.execute_query`                              |
+| `sql_queries_total`                | Counter   | `status`             | success / error / blocked (через L2 SQLGuard)                |
+| `sql_result_rows`                  | Histogram | —                    | Распределение размера результата                             |
+| `sql_retries_total`                | Counter   | —                    | retries из-за SQL error или semantic mismatch                |
+| `sql_empty_results_total`          | Counter   | `intent`             | row_count = 0 без error — индикатор плохого фильтра          |
+| `rag_agent_duration_seconds`       | Histogram | —                    | E2E RAG (retrieve → rerank → LLM)                            |
+| `rag_retrieval_duration_seconds`   | Histogram | `search_type`        | Только Qdrant query                                          |
+| `rag_chunks_retrieved`             | Histogram | `search_type`        | Сколько кандидатов вернул retriever                          |
+| `rag_top_score`                    | Histogram | `search_type`        | Score лучшего чанка — proxy на качество retrieval            |
+| `rag_chunks_after_reranker`        | Histogram | —                    | Сколько чанков выжило после фильтра по threshold             |
+| `rag_reranker_duration_seconds`    | Histogram | —                    | Время cross-encoder reranking                                |
+| `rag_requests_total`               | Counter   | `search_type`        | dense / sparse / hybrid                                      |
+| `rag_fallbacks_total`              | Counter   | `from_mode, to_mode` | hybrid → dense fallback при отсутствии sparse vectors        |
+| `validator_results_total`          | Counter   | `use_sql, use_rag`   | Куда уходит payload в Response Agent                         |
+| `validator_data_missing_total`     | Counter   | `source`             | sql / rag / both — какой источник пустой                     |
+| `response_duration_seconds`        | Histogram | `branch`             | error/simple/sql_task/sql_tasks_filter/sql_metric/rag/hybrid |
+| `response_length_tokens`           | Histogram | `branch`             | Размер финального ответа в токенах                           |
+| `response_truncated_total`         | Counter   | —                    | Список задач обрезан (>20 строк)                             |
+| `response_llm_timeouts_total`      | Counter   | —                    | Таймауты LLM в любой ветке Response Agent                    |
+
+**Guardrails L1/L2/L3**:
+
+| Метрика                            | Тип     | Лейблы            | Что показывает                                           |
+| ---------------------------------- | ------- | ----------------- | -------------------------------------------------------- |
+| `guardrail_l1_results_total`       | Counter | `reason`          | injection_blocked / whitelist_fast_path / pass           |
+| `guardrail_l2_results_total`       | Counter | `allowed, layer`  | Какой слой SQLGuard сработал (limits / regex / ast / ok) |
+| `guardrail_l3_results_total`       | Counter | `passed, blocked` | Прошёл / заблокирован / санитизирован                    |
+| `guardrail_l3_checks_failed_total` | Counter | `check_name`      | sql_leak / traceback / hallucinated_urls / internal_leak |
+
+**Entity sanitizer**:
+
+| Метрика                                | Тип     | Лейблы        | Что показывает                                              |
+| -------------------------------------- | ------- | ------------- | ----------------------------------------------------------- |
+| `sanitizer_corrections_total`          | Counter | `layer`       | Какой слой 1-7 что-то исправил                              |
+| `sanitizer_anaphora_carries_total`     | Counter | `entity_type` | Какие поля карри-форвардятся чаще (team/sprint/cluster/...) |
+| `sanitizer_fallback_extractions_total` | Counter | `field`       | Какое enum-поле LLM пропускает (layer 7 ловит)              |
+
+**Memory layer**:
+
+| Метрика                          | Тип       | Лейблы   | Что показывает                                            |
+| -------------------------------- | --------- | -------- | --------------------------------------------------------- |
+| `memory_context_tokens`          | Histogram | —        | Сколько токенов история + summary внесли в промпт         |
+| `memory_context_turns`           | Histogram | —        | Сколько ходов вошло в окно (после sliding window)         |
+| `memory_session_rotations_total` | Counter   | `reason` | inactivity / explicit_close — частота auto/manual ротации |
+| `memory_summarizations_total`    | Counter   | —        | Запуски Celery-таски `summarize_session`                  |
+| `memory_profile_updates_total`   | Counter   | —        | Запуски Celery-таски `update_profile_async`               |
+
+**FastAPI HTTP** (через `prometheus-fastapi-instrumentator`): автоматические
+метрики `http_requests_total`, `http_request_duration_seconds` с лейблами
+`method`, `handler`, `status`. `/metrics` исключён из инструментирования, чтобы
+Prometheus сам себя не считал.
+
+### Дашборды Grafana
+
+Четыре JSON-дашборда в
+[monitoring/grafana/dashboards/](monitoring/grafana/dashboards/), автоматически
+провижионятся при запуске Grafana через `provisioning/dashboards/` (см.
+[monitoring/grafana/provisioning/](monitoring/grafana/provisioning/)).
+
+| Дашборд                        | UID                | Что показывает                                                                                              |
+| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| **Agile Assistant — Overview** | `agile-overview`   | E2E latency p50/p95/p99, throughput RPS, error rate, queue wait, in-progress, query_type breakdown          |
+| **Infrastructure**             | `agile-infra`      | PostgreSQL connections / TPS / replication lag, Redis ops/sec, Qdrant healthcheck, vLLM KV-cache, GPU       |
+| **Agents Deep Dive**           | `agile-agents`     | Per-agent latency, SQL retries / empty results, RAG retrieval / reranker / fallbacks, response branches     |
+| **Guardrails & Safety**        | `agile-guardrails` | L1 injection blocks, L2 layer breakdown, L3 failed checks, sanitizer corrections by layer, memory rotations |
+
+Все дашборды настроены на datasource `prometheus`. Разворачиваются автоматически
+после `docker compose up -d grafana` — провижионинг провалидирует dashboards и
+зальёт их в папку «Agile Assistant».
+
+### Алерты Prometheus
+
+Все правила в
+[monitoring/prometheus/alerts.yml](monitoring/prometheus/alerts.yml). Группа
+`agile_assistant`. Правил 9 (severity: warning / critical):
+
+| Alert                      | Условие                                                    | Severity |
+| -------------------------- | ---------------------------------------------------------- | -------- |
+| `HighE2ELatency`           | p95 `pipeline_duration_seconds` > 30s 5 минут подряд       | warning  |
+| `HighErrorRate`            | rate FAILED tasks > 5% от общего за 5 минут                | critical |
+| `CeleryQueueBacklog`       | `celery_queue_length` > 50 5 минут подряд                  | warning  |
+| `VLLMMainQueueOverflow`    | vLLM main: `vllm:num_requests_waiting` > 10 5 минут подряд | warning  |
+| `VLLMSQLQueueOverflow`     | vLLM SQL: `vllm:num_requests_waiting` > 5 5 минут подряд   | warning  |
+| `VLLMKVCacheExhausted`     | KV-cache utilization > 90% 5 минут                         | critical |
+| `PostgreSQLReplicationLag` | Replication lag > 30s (для k8s HA-кластера)                | warning  |
+| `QdrantDown`               | Qdrant healthcheck падает > 2 минут                        | critical |
+| `HighGuardrailBlockRate`   | Доля L1/L2/L3 блоков > 20% от трафика 10 минут             | warning  |
+
+Алерты не отправляются в Alertmanager — он не входит в Phase 1 деплой.
+Срабатывания видны на странице `/prometheus/alerts` и могут быть экспортированы
+в Slack/Telegram при подключении Alertmanager.
+
+### Трейсинг Langfuse
+
+Реализация — [hse_prom_prog/tracing.py](hse_prom_prog/tracing.py). Один
+singleton-клиент инициализируется при импорте, остальные модули используют
+реэкспорт `observe` / `langfuse_context` оттуда. Если SDK не установлен или
+выключен через `LANGFUSE_ENABLED=false` — `observe` становится no-op
+декоратором, `langfuse_context` — заглушкой с пустыми методами; код агентов
+работает идентично.
+
+**Корневой trace** создаётся в `tasks/workflow_task.py` императивно (не через
+`@observe`), потому что нужно явно установить `user_id`, `session_id`,
+`input/output` и сделать `flush()` в `finally` блоке:
+
+```
+trace = langfuse_client.trace(
+    name="workflow",
+    user_id=external_id,
+    session_id=conversation_id,
+    input={"query": query},
+    metadata={"task_id": task_id, "celery_retry": self.request.retries},
+)
+langfuse_context.update_current_trace(trace_id=trace.id)
+```
+
+После этого все `@observe(...)` в агентах автоматически становятся child-spans
+через Python `contextvars`. Celery worker запущен с `--pool=threads` — каждая
+задача в своём потоке, контексты не смешиваются.
+
+**Покрытие spans / generations**:
+
+| Точка                             | Тип        | Что захватывается                                                |
+| --------------------------------- | ---------- | ---------------------------------------------------------------- |
+| `workflow` (root)                 | trace      | user_id, session_id, input query, output final_response          |
+| `guardrail_l1`                    | span       | input query, output reason (pass/whitelist/injection_blocked)    |
+| `memory_context_build`            | span       | conversation_id, token_budget → tokens_used, turns_included      |
+| `supervisor`                      | span       | input query, has_history, has_profile → intent, query_type, path |
+| `entity_sanitizer`                | span       | raw_entities → sanitized_entities                                |
+| `sql_agent`                       | span       | query, intent, entities → sql, rows_count, error                 |
+| `sql_llm_call` (внутри sql_agent) | generation | model=Qwen3-8B-AWQ, tools, prompt → tool_calls + usage           |
+| `run_query` (внутри sql_agent)    | span       | sql → status (success/error/blocked), rows_count, duration_ms    |
+| `guardrail_l2` (внутри run_query) | span       | sql → allowed, layer, reason                                     |
+| `rag_agent`                       | span       | query → sources, response_length                                 |
+| `retrieval` (внутри rag_agent)    | span       | query, search_type, k → chunks_count, preview_sources            |
+| `reranker` (внутри rag_agent)     | span       | chunks_count, threshold → chunks_after, scores                   |
+| `validator`                       | span       | query_type, sql_ok, rag_ok → use_sql, use_rag, note              |
+| `response_agent`                  | span       | branch, intent → response_preview (500 chars), response_length   |
+| `llm_call` (LLMClient.invoke)     | generation | model=avibe-gptq-8bit, prompt, params → output + usage           |
+| `guardrail_l3`                    | span       | response_length → passed, blocked, failed_checks                 |
+
+LLM-вызовы помечены как `as_type="generation"` — Langfuse выделяет их в
+отдельную сущность с usage tokens, model parameters и поддержкой LLM-as-a-judge
+scoring (это будет использоваться в Phase 4).
+
+**Что не пишется в Langfuse**:
+
+- Полный текст RAG-чанков и SQL-результатов — только id / source / row_count.
+  Иначе storage раздувается на длинных диалогах
+- `final_response` дублируется только preview (500 символов) на span'е Response
+  Agent — полный текст уже на root trace
+- Async memory tasks (`summarize_session`, `update_profile_async`) — они
+  выполняются после ответа пользователю и не являются частью основного trace.
+  Если понадобится их трейсить отдельно — нужно создавать новый trace
+- HTTP-вызовы FastAPI — за это отвечает Prometheus (HTTP middleware), Langfuse
+  на этом уровне переплюс
+
+### Запуск observability-стека
+
+Phase 1+2 (Prometheus + Grafana) запускаются вместе с основным стеком
+автоматически:
+
+```bash
+docker compose up -d prometheus grafana pg-exporter redis-exporter
+```
+
+После этого:
+
+- Prometheus UI: `http://localhost/prometheus/` (через nginx, gzip)
+- Grafana UI: `http://localhost/grafana/` (логин: `admin`, пароль из
+  `GRAFANA_PASSWORD`)
+- Метрики FastAPI: `http://localhost/api/metrics` — заблокировано nginx'ом
+  (404), Prometheus скрейпит напрямую через docker network
+- Метрики Celery worker: `celery-worker:9100/metrics` — internal-only
+
+**Phase 3 (Langfuse)** — отдельный шаг, потому что нужны API-ключи из UI:
+
+```bash
+# 1. Если postgres_data уже создан — создать БД для Langfuse вручную
+docker compose exec postgres \
+    psql -U hse_user -c "CREATE DATABASE langfuse_db;"
+
+# 2. Запустить Langfuse
+docker compose up -d langfuse
+docker compose ps langfuse  # ждём healthy (60-90 сек)
+
+# 3. Открыть http://localhost:3001 → зарегистрировать admin аккаунт
+#    (первый пользователь автоматически админ)
+
+# 4. Settings → Projects → New Project → "Agile Assistant"
+
+# 5. Settings → API Keys → Create New Key
+#    Скопировать pk-lf-... и sk-lf-... в .env:
+#      LANGFUSE_PUBLIC_KEY=pk-lf-...
+#      LANGFUSE_SECRET_KEY=sk-lf-...
+
+# 6. Перезапустить api и celery-worker, чтобы tracing.py подхватил ключи
+docker compose restart api celery-worker
+
+# 7. Отправить тестовый запрос
+curl -s -X POST http://localhost/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Расскажи о задаче AL-38787"}'
+
+# 8. В Langfuse UI → Traces должен появиться trace с деревом spans
+```
+
+> При первом запуске volume `postgres_data` ещё пуст — `init-langfuse.sql` в
+> `database/init-langfuse.sql` выполнится автоматически и создаст `langfuse_db`.
+> Шаг 1 нужен только если volume уже существовал до Phase 3.
+
+**Отключение Langfuse без удаления кода**:
+
+```bash
+# В .env:
+LANGFUSE_ENABLED=false
+
+docker compose restart api celery-worker
+```
+
+Все `@observe`-декораторы становятся no-op, метрики Prometheus продолжают
+писаться. Полезно при отладке проблем с Langfuse-сервером или при локальной
+разработке без отдельного контейнера.
+
 ## Оценка агентов
 
 Модуль `eval/` содержит четыре независимых eval-пайплайна — по одному для
@@ -2195,6 +2554,23 @@ poetry run pytest tests/ --cov=hse_prom_prog
 | `HISTORY_TOKEN_BUDGET`    | Бюджет токенов на `<conversation_history>` в промптах | `1200`       |
 | `SESSION_TIMEOUT_MINUTES` | Idle-таймаут для auto-rotation диалога                | `30`         |
 | `MAX_CONVERSATION_TURNS`  | Максимум хранимых ходов на один диалог                | `50`         |
+
+### Monitoring (Phase 1)
+
+| Переменная         | Описание                                             | По умолчанию |
+| ------------------ | ---------------------------------------------------- | ------------ |
+| `GRAFANA_PASSWORD` | Пароль admin-пользователя в Grafana (логин: `admin`) | `admin`      |
+
+### Langfuse Tracing (Phase 3)
+
+| Переменная                 | Описание                                                                   | По умолчанию             |
+| -------------------------- | -------------------------------------------------------------------------- | ------------------------ |
+| `LANGFUSE_PUBLIC_KEY`      | Public key проекта Langfuse (`pk-lf-...`). Пусто = не отправлять spans     | —                        |
+| `LANGFUSE_SECRET_KEY`      | Secret key проекта Langfuse (`sk-lf-...`)                                  | —                        |
+| `LANGFUSE_HOST`            | URL Langfuse-сервера (внутри docker-network)                               | `http://langfuse:3000`   |
+| `LANGFUSE_ENABLED`         | Master kill-switch для SDK. `false` → `@observe` становится no-op          | `true`                   |
+| `LANGFUSE_NEXTAUTH_SECRET` | Секрет NextAuth для UI Langfuse-сервера (для prod: `openssl rand -hex 32`) | `changeme-in-production` |
+| `LANGFUSE_SALT`            | Salt для шифрования API-ключей в БД Langfuse                               | `changeme-in-production` |
 
 ### Other
 
