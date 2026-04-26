@@ -460,12 +460,11 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
-      # External access goes through nginx /prometheus/ with gzip; the
-      # external-url is what the React UI bakes into absolute links.
-      # route-prefix stays at / so nginx strips the prefix via the
-      # trailing slash on its proxy_pass.
+      # Prometheus owns the /prometheus/ subpath end-to-end: route-prefix
+      # matches the external-url path, so nginx forwards requests as-is
+      # (no prefix stripping). Splitting them causes redirect loops.
       - "--web.external-url=http://195.209.218.21/prometheus/"
-      - "--web.route-prefix=/"
+      - "--web.route-prefix=/prometheus/"
     ports:
       - "9090:9090"
     depends_on:
