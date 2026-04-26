@@ -371,6 +371,10 @@ services:
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+    # Prometheus side-car port (metrics exporter started by celery_app.py).
+    # Internal-only — Prometheus scrapes celery-worker:9100 over the docker network.
+    expose:
+      - "9100"
     # --pool=threads: I/O-bound tasks (waiting for vLLM HTTP), not CPU-bound
     command:
       celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
@@ -442,6 +446,66 @@ services:
     networks:
       - hse-network
 
+  # ──────────────────────────────────────────────────────────────
+  # Monitoring stack: Prometheus + Grafana + exporters (Phase 1)
+  # ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: hse-prom-prog-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+    networks:
+      - hse-network
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: hse-prom-prog-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - hse-network
+
+  pg-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: hse-prom-prog-pg-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-hse_user}:${POSTGRES_PASSWORD:-hse_password}@postgres:5432/${POSTGRES_DB:-hse_jira_db}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hse-network
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: hse-prom-prog-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - hse-network
+
   # One-shot job: download CSVs from S3 and load into PostgreSQL
   load-data:
     build:
@@ -475,6 +539,8 @@ volumes:
   redis_data:
   static_files:
   qdrant_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   hse-network:

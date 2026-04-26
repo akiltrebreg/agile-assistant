@@ -54,6 +54,9 @@ dependencies = [
     # fallback enum extraction in the entity sanitizer)
     "pymorphy3>=2.0.6",
     "pymorphy3-dicts-ru>=2.4.417150.4580142",
+    # Prometheus monitoring (Phase 1 — custom metrics + FastAPI instrumentation)
+    "prometheus-client>=0.21.0,<0.22",
+    "prometheus-fastapi-instrumentator>=7.0.0,<8",
 ]
 
 [dependency-groups]

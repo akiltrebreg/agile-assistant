@@ -6,6 +6,7 @@ Includes retry logic with exponential backoff for transient failures.
 """
 
 import logging
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -18,6 +19,12 @@ from hse_prom_prog.database.task_repository import TaskRepository
 from hse_prom_prog.graph.workflow import AgileWorkflow
 from hse_prom_prog.llm.client import get_llm_client
 from hse_prom_prog.memory.manager import MemoryManager
+from hse_prom_prog.metrics import (
+    PIPELINE_DURATION,
+    PIPELINE_QUEUE_WAIT,
+    TASKS_IN_PROGRESS,
+    TASKS_TOTAL,
+)
 from hse_prom_prog.models.memory import Conversation, ConversationContext
 from hse_prom_prog.models.task import TaskStatus
 from hse_prom_prog.rag.retriever import get_retriever
@@ -64,13 +71,14 @@ class WorkflowTask(CeleryTask):
     retry_jitter=True,  # Add randomness to prevent thundering herd
     max_retries=3,  # Up to 3 retries for transient failures
 )
-def execute_workflow(  # noqa: PLR0913
+def execute_workflow(  # noqa: PLR0913, PLR0915
     self,
     task_id: str,
     query: str,
     conversation_id: str | None = None,
     user_external_id: str | None = None,
     user_id: str | None = None,
+    created_at_ts: float | None = None,
 ) -> None:
     """Execute AgileWorkflow for a given task.
 
@@ -89,10 +97,28 @@ def execute_workflow(  # noqa: PLR0913
         user_external_id: External (cookie / SSO) user id.
         user_id: Deprecated alias for ``user_external_id`` — accepted so
             older Celery messages in the queue don't crash after deploy.
+        created_at_ts: POSIX timestamp when the API enqueued this task,
+            used to record queue wait. Optional so old in-flight messages
+            from before this deploy don't crash.
     """
     task_uuid = UUID(task_id)
     db: DatabaseConnection | None = None
     external_id = user_external_id or user_id
+
+    # Queue wait: record once on first attempt only — retries spend
+    # time in the worker, not the queue, and would inflate p95 wait.
+    if created_at_ts is not None and self.request.retries == 0:
+        wait = max(0.0, time.time() - created_at_ts)
+        PIPELINE_QUEUE_WAIT.observe(wait)
+
+    pipeline_start = time.time()
+    query_type = "error"
+    # ``terminal_status`` stays None for transient retries (Celery will
+    # re-queue the task; counting it as FAILED here would double-count
+    # once the eventual retry settles). It flips to COMPLETED/FAILED
+    # only on a terminal outcome.
+    terminal_status: str | None = None
+    TASKS_IN_PROGRESS.inc()
 
     try:
         db = get_database()
@@ -141,12 +167,14 @@ def execute_workflow(  # noqa: PLR0913
             },
             workflow_state=result,
         )
+        terminal_status = "COMPLETED"
 
     except SoftTimeLimitExceeded:
         # Hard timeout -- no retries, fail immediately
         error_msg = "Task exceeded soft time limit"
         logger.error(f"[WorkflowTask {task_id}] {error_msg}")
         _update_task_failed(db, task_uuid, task_id, error_msg)
+        terminal_status = "FAILED"
         raise
 
     except (ConnectionError, OSError, TimeoutError):
@@ -155,6 +183,7 @@ def execute_workflow(  # noqa: PLR0913
         if self.request.retries >= self.max_retries:
             error_msg = f"Failed after {self.max_retries} retries (transient error)"
             _update_task_failed(db, task_uuid, task_id, error_msg)
+            terminal_status = "FAILED"
         raise
 
     except Exception as e:
@@ -162,9 +191,14 @@ def execute_workflow(  # noqa: PLR0913
         error_msg = f"{type(e).__name__}: {e!s}"
         logger.error(f"[WorkflowTask {task_id}] Workflow failed: {error_msg}", exc_info=True)
         _update_task_failed(db, task_uuid, task_id, error_msg)
+        terminal_status = "FAILED"
         raise
 
     finally:
+        TASKS_IN_PROGRESS.dec()
+        PIPELINE_DURATION.labels(query_type=query_type).observe(time.time() - pipeline_start)
+        if terminal_status is not None:
+            TASKS_TOTAL.labels(status=terminal_status).inc()
         if db is not None:
             db.close()
 

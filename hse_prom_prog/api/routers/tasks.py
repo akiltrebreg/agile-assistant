@@ -80,6 +80,10 @@ def create_task(
             kwargs={
                 "conversation_id": str(conv.id),
                 "user_external_id": request.user_id,
+                # Wallclock at enqueue: the worker subtracts this from
+                # its own clock to record queue wait time. UTC-aware so
+                # the math survives across container timezones.
+                "created_at_ts": task.created_at.timestamp() if task.created_at else None,
             },
             task_id=None,
         )

@@ -1,0 +1,89 @@
+groups:
+  - name: agile_assistant_pipeline
+    rules:
+      # E2E latency SLO: p95 < 30s for hybrid (slowest path).
+      - alert: HighE2ELatency
+        expr:
+          histogram_quantile(0.95,
+          sum(rate(agile_assistant_pipeline_duration_seconds_bucket[5m])) by
+          (le)) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pipeline p95 latency exceeds 30s"
+          description:
+            "p95 latency is {{ $value | humanizeDuration }}. Check vLLM load and
+            Celery queue."
+
+      # Error rate > 10% — fail-fast threshold for noisy regressions.
+      - alert: HighErrorRate
+        expr: >
+          (
+            sum(rate(agile_assistant_tasks_total{status="FAILED"}[5m]))
+            /
+            sum(rate(agile_assistant_tasks_total[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Task error rate exceeds 10%"
+          description: "{{ $value | humanizePercentage }} of tasks are failing."
+
+      # Backlog growing faster than workers drain it.
+      - alert: CeleryQueueBacklog
+        expr: agile_assistant_celery_queue_length > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery queue has {{ $value }} pending tasks"
+          description:
+            "Consider scaling workers: docker compose up -d --scale
+            celery-worker=N"
+
+  - name: infrastructure
+    rules:
+      - alert: VLLMMainQueueOverflow
+        expr: vllm:num_requests_waiting{job="vllm-main"} > 5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "vLLM main has {{ $value }} requests waiting"
+
+      - alert: VLLMSQLQueueOverflow
+        expr: vllm:num_requests_waiting{job="vllm-sql"} > 3
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "vLLM SQL has {{ $value }} requests waiting"
+
+      - alert: VLLMKVCacheExhausted
+        expr: vllm:gpu_cache_usage_perc > 0.95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary:
+            "vLLM GPU KV-cache usage at {{ $value | humanizePercentage }}"
+
+      # Only meaningful in CloudNativePG (k8s) — standalone PG never
+      # exposes pg_replication_lag_seconds, so this stays silent.
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag_seconds > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL replication lag is {{ $value }}s"
+
+      - alert: QdrantDown
+        expr: up{job="qdrant"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Qdrant is unreachable"
