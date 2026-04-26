@@ -425,6 +425,70 @@ services:
     networks:
       - hse-network
 
+  # ──────────────────────────────────────────────────────────────
+  # Celery worker — judge queue (Phase 4: LLM-as-a-Judge)
+  # Same image as celery-worker, separate process listening only on
+  # the ``judge`` queue. Isolation matters because a slow GPT-5.2 call
+  # must never block user-facing workflow tasks. concurrency=2 covers
+  # the realistic enqueue rate (one judge per workflow) without
+  # piling up parallel calls against vsellm rate limits.
+  # ──────────────────────────────────────────────────────────────
+  celery-judge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      # vsellm credentials (judge LLM endpoint).
+      - VSELLM_API_KEY=${VSELLM_API_KEY:-}
+      - VSELLM_BASE_URL=${VSELLM_BASE_URL:-https://api.vsellm.ru/v1}
+      - JUDGE_ENABLED=${JUDGE_ENABLED:-true}
+      # Langfuse — judge writes scores back to the originating trace.
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
+      # Different port than celery-worker (9100) so the two workers can
+      # share a network namespace without colliding on bind. Prometheus
+      # scrape target ``celery-judge:9101`` is wired in prometheus.yml.
+      - PROMETHEUS_PORT=9101
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    expose:
+      - "9101"
+    # --queues=judge isolates the worker from the default queue so a
+    # stuck judge LLM call does not steal capacity from workflow_task.
+    command:
+      celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
+      --pool=threads --concurrency=2 --queues=judge --hostname=judge@%h
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 10",
+        ]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+    networks:
+      - hse-network
+
   # Streamlit frontend (thin client, talks only to FastAPI)
   streamlit:
     build:

@@ -21,6 +21,16 @@ scrape_configs:
     metrics_path: /metrics
     scrape_interval: 15s
 
+  # 2b. Celery judge worker — Phase 4. Same code path, separate process
+  #     and port so JUDGE_* metrics are scraped from the worker that
+  #     actually owns them. Port is set via PROMETHEUS_PORT=9101 in the
+  #     celery-judge service env.
+  - job_name: "celery-judge"
+    static_configs:
+      - targets: ["celery-judge:9101"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+
   # 3. vLLM main (avibe-gptq-8bit, port 8000 inside the docker network)
   - job_name: "vllm-main"
     static_configs:

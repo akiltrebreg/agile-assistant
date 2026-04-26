@@ -342,3 +342,33 @@ MEMORY_SUMMARIZATIONS = Counter(
     "Session summarization events",
     namespace=_NAMESPACE,
 )
+
+# ── LLM-as-a-Judge ────────────────────────────────────────────
+# Phase 4: each completed workflow ships query+response to GPT-5.2
+# (vsellm) for asynchronous quality scoring on six binary criteria
+# (practicality, language_quality, text_cleanliness, agile_correctness,
+# completeness, politeness). Lives in a dedicated celery queue so a
+# slow judge LLM call can never block the user-facing pipeline.
+#
+# Gauge — not Histogram — because scores are absolute 0/1, not draws
+# from a distribution. PromQL avg_over_time() gives the rolling "share
+# of 1s" we want for the dashboard, equivalent to a mean of binary
+# observations. The .set() race between concurrent judge runs is
+# acceptable: scrape every 15s + 1h rolling window swallows it.
+JUDGE_CRITERION_SCORES = Gauge(
+    "judge_criterion_score",
+    "LLM-as-a-Judge score per criterion (0 or 1), last evaluation",
+    labelnames=("criterion",),
+    namespace=_NAMESPACE,
+)
+JUDGE_WEIGHTED_TOTAL = Gauge(
+    "judge_weighted_total",
+    "Weighted total score from LLM-as-a-Judge (0.0-1.0)",
+    namespace=_NAMESPACE,
+)
+JUDGE_EVALUATIONS_TOTAL = Counter(
+    "judge_evaluations_total",
+    "Total judge evaluations by outcome",
+    labelnames=("status",),
+    namespace=_NAMESPACE,
+)

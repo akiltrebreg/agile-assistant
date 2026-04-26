@@ -330,6 +330,25 @@ class Settings(BaseSettings):
         ),
     )
 
+    # LLM-as-a-Judge (Phase 4) — async response evaluation via GPT-5.2.
+    # vsellm credentials are reused from the existing RAGAS eval setup.
+    vsellm_api_key: str = Field(
+        default="",
+        description="API key for vsellm (GPT-5.2 endpoint). Empty = judge disabled.",
+    )
+    vsellm_base_url: str = Field(
+        default="https://api.vsellm.ru/v1",
+        description="vsellm OpenAI-compatible base URL (judge LLM endpoint).",
+    )
+    judge_enabled: bool = Field(
+        default=True,
+        description=(
+            "Master kill-switch for LLM-as-a-Judge. When False, "
+            "evaluate_response_async returns 'skipped' without calling GPT-5.2. "
+            "Independent of LANGFUSE_ENABLED — tracing and judging toggle separately."
+        ),
+    )
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins into a list.

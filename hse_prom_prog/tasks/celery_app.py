@@ -4,6 +4,7 @@ This module creates and configures the Celery application for async task process
 """
 
 import logging
+import os
 import time
 
 from celery import Celery
@@ -29,8 +30,10 @@ logger = logging.getLogger(__name__)
 # Port the worker exposes for Prometheus scraping. The Celery worker
 # has no HTTP server of its own, so we spin up a tiny one alongside
 # task processing — same registry as celery signals + workflow_task,
-# so pipeline metrics land here.
-_METRICS_PORT = 9100
+# so pipeline metrics land here. Configurable via PROMETHEUS_PORT so
+# multiple workers (default queue + judge) can co-exist on the same
+# docker network: celery-worker uses 9100, celery-judge uses 9101.
+_METRICS_PORT = int(os.environ.get("PROMETHEUS_PORT", "9100"))
 
 # Per-task start time keyed by Celery task UUID. Threadsafe-enough for
 # the threads pool (CPython dict assignment is atomic) and small —
@@ -69,6 +72,11 @@ def create_celery_app() -> Celery:
         include=[
             "hse_prom_prog.tasks.workflow_task",
             "hse_prom_prog.tasks.memory_tasks",
+            # Phase 4: LLM-as-a-Judge. Listed explicitly (rather than
+            # relying on autodiscover) because evaluate_response_async
+            # ships in its own queue and we want the import to fail
+            # loudly at worker boot if the file is missing.
+            "hse_prom_prog.tasks.judge_task",
         ],
     )
 
@@ -93,6 +101,14 @@ def create_celery_app() -> Celery:
         # Result backend disabled
         result_backend=None,
         task_ignore_result=True,
+        # Phase 4 routing: judge tasks must land on the dedicated
+        # ``judge`` queue, served by the celery-judge worker. Without
+        # this entry an enqueue with queue="judge" would still work
+        # (we pass the queue at apply_async-time), but the route makes
+        # the topology explicit and resilient to a missing kwarg.
+        task_routes={
+            "evaluate_response": {"queue": "judge"},
+        },
     )
 
     logger.info(

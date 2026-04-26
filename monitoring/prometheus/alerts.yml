@@ -87,3 +87,69 @@ groups:
           severity: critical
         annotations:
           summary: "Qdrant is unreachable"
+
+  # Phase 4: LLM-as-a-Judge quality alerts. ``avg_over_time`` of a
+  # 0/1 gauge over 1h gives the share-of-1s — equivalent to the mean
+  # of binary observations. ``for: 15m`` filters out single-point
+  # noise so we only page on sustained degradation.
+  - name: agile_assistant_quality
+    rules:
+      - alert: JudgeQualityDrop
+        expr: avg_over_time(agile_assistant_judge_weighted_total[1h]) < 0.7
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM-as-a-Judge quality score dropped below 0.7"
+          description: >
+            Weighted average quality score over the last hour is {{ $value |
+            printf "%.2f" }}. Threshold: 0.7. Check the Quality dashboard for
+            per-criterion breakdown. Common causes: degraded LLM, changed
+            prompts, Qdrant issues (RAG path).
+
+      - alert: JudgePracticalityDrop
+        expr:
+          avg_over_time(agile_assistant_judge_criterion_score{criterion="practicality"}[1h])
+          < 0.6
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Practicality score (weight 0.30) dropped below 0.6"
+          description: >
+            Practicality is the highest-weighted criterion. Current 1h average:
+            {{ $value | printf "%.2f" }}. Responses are losing actionable detail
+            — review Response Agent prompts and the data fetched by SQL/RAG
+            paths.
+
+      - alert: JudgeTextCleanlinessDrop
+        expr:
+          avg_over_time(agile_assistant_judge_criterion_score{criterion="text_cleanliness"}[1h])
+          < 0.6
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Text cleanliness score (weight 0.20) dropped below 0.6"
+          description: >
+            Generation artifacts (raw SQL, markdown, traceback, internal
+            identifiers) are leaking through. Current 1h average: {{ $value |
+            printf "%.2f" }}. Inspect L3 ResponseGuard and Response Agent output
+            formatting.
+
+      - alert: JudgeUnavailable
+        expr: >
+          (
+            sum(rate(agile_assistant_judge_evaluations_total{status="api_error"}[30m]))
+            /
+            clamp_min(sum(rate(agile_assistant_judge_evaluations_total[30m])),
+          1e-9) ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM-as-a-Judge API error rate exceeds 50%"
+          description: >
+            More than half of judge evaluations are failing due to upstream API
+            errors. Verify VSELLM_API_KEY validity and api.vsellm.ru
+            availability.

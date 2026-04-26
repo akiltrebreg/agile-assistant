@@ -14,6 +14,7 @@ from uuid import UUID
 from celery import Task as CeleryTask
 from celery.exceptions import SoftTimeLimitExceeded
 
+from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
 from hse_prom_prog.database.task_repository import TaskRepository
 from hse_prom_prog.graph.workflow import AgileWorkflow
@@ -252,6 +253,38 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
                 langfuse_client.flush()
             except Exception as exc:
                 logger.warning("[WorkflowTask %s] Langfuse flush failed: %s", task_id, exc)
+
+        # LLM-as-a-Judge (Phase 4) — fire-and-forget. Runs only on
+        # successful completions with a real, evaluable response.
+        # off_topic / error responses are scripted; rating them tells us
+        # nothing about model quality and just burns vsellm tokens.
+        if (
+            settings.judge_enabled
+            and terminal_status == "COMPLETED"
+            and final_response
+            and query_type not in ("off_topic", "error")
+        ):
+            judge_trace_id = trace.id if trace is not None else ""
+            try:
+                # Lazy import keeps the workflow_task <-> judge_task
+                # import graph acyclic and lets the workflow worker
+                # start even if the judge module fails to load
+                # (e.g. openai SDK missing in the celery-worker image).
+                from hse_prom_prog.tasks.judge_task import (  # noqa: PLC0415
+                    evaluate_response_async,
+                )
+
+                evaluate_response_async.apply_async(
+                    kwargs={
+                        "trace_id": judge_trace_id,
+                        "query": query,
+                        "response": final_response,
+                        "query_type": query_type,
+                    },
+                    queue="judge",
+                )
+            except Exception as exc:
+                logger.warning("[WorkflowTask %s] Failed to enqueue judge task: %s", task_id, exc)
 
 
 def _mark_processing_if_first(
