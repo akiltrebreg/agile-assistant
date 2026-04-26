@@ -14,6 +14,7 @@ from sentence_transformers import CrossEncoder
 
 from hse_prom_prog.config import settings
 from hse_prom_prog.metrics import RAG_CHUNKS_AFTER_RERANKER, RAG_RERANKER_DURATION
+from hse_prom_prog.tracing import langfuse_context, observe
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
@@ -52,6 +53,7 @@ class Reranker:
             top_n,
         )
 
+    @observe(name="reranker")
     def rerank(
         self,
         query: str,
@@ -72,7 +74,11 @@ class Reranker:
         Returns:
             Reranked, filtered, and reordered list of documents.
         """
+        langfuse_context.update_current_observation(
+            input={"chunks_count": len(documents), "threshold": self._threshold},
+        )
         if not documents:
+            langfuse_context.update_current_observation(output={"chunks_after": 0, "scores": []})
             return []
 
         start = time.time()
@@ -89,6 +95,9 @@ class Reranker:
             logger.info("[Reranker] All documents below threshold %.2f", self._threshold)
             RAG_RERANKER_DURATION.observe(time.time() - start)
             RAG_CHUNKS_AFTER_RERANKER.observe(0)
+            langfuse_context.update_current_observation(
+                output={"chunks_after": 0, "scores": [], "reason": "below_threshold"},
+            )
             return []
 
         # Step 3: Sort by score descending, take top_n
@@ -104,6 +113,12 @@ class Reranker:
 
         RAG_RERANKER_DURATION.observe(time.time() - start)
         RAG_CHUNKS_AFTER_RERANKER.observe(len(scored_docs))
+        langfuse_context.update_current_observation(
+            output={
+                "chunks_after": len(scored_docs),
+                "scores": [round(float(s), 4) for s, _ in scored_docs],
+            },
+        )
 
         # Step 4: "Lost in the Middle" reordering
         return self._lost_in_the_middle_reorder(scored_docs)

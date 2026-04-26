@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 from hse_prom_prog.metrics import GUARDRAIL_L3_CHECKS_FAILED, GUARDRAIL_L3_RESULTS
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ class ResponseGuard:
     # Public API
     # ------------------------------------------------------------------
 
+    @observe(name="guardrail_l3")
     def check(
         self,
         response: str,
@@ -125,6 +127,9 @@ class ResponseGuard:
         context_urls: list[str] | None = None,
     ) -> OutputGuardResult:
         """Run all output checks and produce a single aggregated result."""
+        langfuse_context.update_current_observation(
+            input={"response_length": len(response), "query_type": query_type},
+        )
         checks: list[OutputCheckResult] = []
         sanitized = response
 
@@ -154,6 +159,13 @@ class ResponseGuard:
         for failed_check in failed:
             GUARDRAIL_L3_CHECKS_FAILED.labels(check_name=failed_check.name).inc()
 
+        langfuse_context.update_current_observation(
+            output={
+                "passed": passed,
+                "blocked": blocked,
+                "failed_checks": [c.name for c in failed],
+            },
+        )
         return OutputGuardResult(
             passed=passed,
             checks=checks,

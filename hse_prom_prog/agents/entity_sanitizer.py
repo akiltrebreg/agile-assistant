@@ -26,6 +26,7 @@ from hse_prom_prog.metrics import (
     SANITIZER_CORRECTIONS,
     SANITIZER_FALLBACK_EXTRACTIONS,
 )
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -657,6 +658,7 @@ def _fill_missing_enums_from_query(
     return out
 
 
+@observe(name="entity_sanitizer")
 def sanitize_entities(
     entities: dict[str, Any],
     user_query: str,
@@ -694,4 +696,10 @@ def sanitize_entities(
         if cleaned is not None:
             result[field] = cleaned
     result = _carry_forward_entities(result, prev_entities, user_query)
-    return _fill_missing_enums_from_query(result, user_query, db_enums)
+    result = _fill_missing_enums_from_query(result, user_query, db_enums)
+
+    langfuse_context.update_current_observation(
+        input={"raw_entities": entities, "has_prev_entities": bool(prev_entities)},
+        output={"sanitized_entities": result},
+    )
+    return result

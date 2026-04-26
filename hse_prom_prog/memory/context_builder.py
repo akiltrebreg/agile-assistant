@@ -12,6 +12,7 @@ from hse_prom_prog.memory.conversation_repo import ConversationRepository
 from hse_prom_prog.memory.token_estimator import estimate_tokens
 from hse_prom_prog.metrics import MEMORY_CONTEXT_TOKENS, MEMORY_CONTEXT_TURNS
 from hse_prom_prog.models.memory import ConversationContext, Message
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class ContextBuilder:
     def __init__(self, repo: ConversationRepository) -> None:
         self.repo = repo
 
+    @observe(name="memory_context_build")
     def build(self, conversation_id: UUID, token_budget: int) -> ConversationContext:
         """Return the context that fits within ``token_budget`` tokens.
 
@@ -35,8 +37,22 @@ class ContextBuilder:
              existing summary, flag ``needs_summarization=True`` — the
              summariser runs as a separate async job.
         """
+        langfuse_context.update_current_observation(
+            input={
+                "conversation_id": str(conversation_id),
+                "token_budget": token_budget,
+            },
+        )
         conversation = self.repo.get(conversation_id)
         if conversation is None:
+            langfuse_context.update_current_observation(
+                output={
+                    "tokens_used": 0,
+                    "turns_included": 0,
+                    "has_summary": False,
+                    "reason": "no_conversation",
+                },
+            )
             return ConversationContext(
                 summary="",
                 recent_turns=[],
@@ -46,6 +62,14 @@ class ContextBuilder:
 
         messages = self.repo.get_messages(conversation_id)
         if not messages:
+            langfuse_context.update_current_observation(
+                output={
+                    "tokens_used": 0,
+                    "turns_included": 0,
+                    "has_summary": bool(conversation.summary),
+                    "reason": "no_messages",
+                },
+            )
             return ConversationContext(
                 summary=conversation.summary or "",
                 recent_turns=[],
@@ -84,6 +108,14 @@ class ContextBuilder:
         MEMORY_CONTEXT_TOKENS.observe(history_tokens)
         MEMORY_CONTEXT_TURNS.observe(len(kept))
 
+        langfuse_context.update_current_observation(
+            output={
+                "tokens_used": history_tokens,
+                "turns_included": len(kept),
+                "has_summary": bool(existing_summary),
+                "needs_summarization": needs_summarization,
+            },
+        )
         return ConversationContext(
             summary=existing_summary,
             recent_turns=[self._message_to_turn(m) for m in kept],

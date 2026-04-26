@@ -14,6 +14,7 @@ from hse_prom_prog.config import settings
 from hse_prom_prog.llm.client import LLMClient
 from hse_prom_prog.metrics import RAG_AGENT_DURATION
 from hse_prom_prog.rag.reranker import get_reranker
+from hse_prom_prog.tracing import langfuse_context, observe
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
@@ -47,15 +48,20 @@ class RAGAgent:
     # Public interface
     # ------------------------------------------------------------------
 
+    @observe(name="rag_agent")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Retrieve context and generate RAG-based answer."""
         original_query = state.get("original_query", "")
         logger.info("[RAG Agent] Processing query: %s", original_query[:80])
+        langfuse_context.update_current_observation(input={"query": original_query})
 
         start = time.time()
         try:
             docs = self._retrieve_and_rerank(original_query)
             if not docs:
+                langfuse_context.update_current_observation(
+                    output={"sources": [], "rag_response": None, "reason": "no_docs"},
+                )
                 return {**_EMPTY}
 
             context, sources = self._build_context(docs)
@@ -64,9 +70,17 @@ class RAGAgent:
                 answer = self._generate_answer(original_query, context)
             except Exception as e:
                 logger.error("[RAG Agent] LLM generation failed: %s", e)
+                langfuse_context.update_current_observation(
+                    output={"sources": sources, "error": str(e)},
+                    level="ERROR",
+                    status_message=f"{type(e).__name__}: {e}",
+                )
                 return {**_EMPTY, "rag_sources": sources, "error": str(e)}
 
             logger.info("[RAG Agent] Generated answer with %d sources", len(sources))
+            langfuse_context.update_current_observation(
+                output={"sources": sources, "response_length": len(answer)},
+            )
             return {"rag_response": answer, "rag_sources": sources}
         finally:
             RAG_AGENT_DURATION.observe(time.time() - start)

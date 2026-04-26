@@ -10,8 +10,34 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 
 from hse_prom_prog.config import settings
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_usage(response: Any) -> dict[str, int] | None:
+    """Pull token counts off a LangChain message in either supported format.
+
+    Newer LangChain exposes ``usage_metadata`` (input/output/total) directly
+    on the message; older versions stash an OpenAI-shape ``token_usage``
+    dict under ``response_metadata``. We accept either and normalise to
+    the Langfuse usage shape.
+    """
+    um = getattr(response, "usage_metadata", None)
+    if um:
+        return {
+            "input": um.get("input_tokens", 0),
+            "output": um.get("output_tokens", 0),
+            "total": um.get("total_tokens", 0),
+        }
+    legacy = (getattr(response, "response_metadata", None) or {}).get("token_usage") or {}
+    if legacy:
+        return {
+            "input": legacy.get("prompt_tokens", 0),
+            "output": legacy.get("completion_tokens", 0),
+            "total": legacy.get("total_tokens", 0),
+        }
+    return None
 
 
 class LLMClient:
@@ -60,6 +86,7 @@ class LLMClient:
             },
         )
 
+    @observe(as_type="generation", name="llm_call")
     def invoke(
         self,
         prompt: str,
@@ -83,6 +110,19 @@ class LLMClient:
         Raises:
             Exception: If there's an error communicating with the LLM API.
         """
+        effective_max_tokens = max_tokens if max_tokens is not None else self.max_tokens
+        # Best-effort tracing: build the generation metadata up front so a
+        # crash before .invoke() still leaves a useful Langfuse record.
+        langfuse_context.update_current_observation(
+            model=self.model,
+            input=prompt,
+            model_parameters={
+                "temperature": self.temperature,
+                "max_tokens": effective_max_tokens,
+                "response_format": "json_schema" if response_format else None,
+            },
+        )
+
         try:
             logger.debug(f"Invoking LLM with prompt: {prompt[:100]}...")
             bind_kwargs: dict[str, Any] = {}
@@ -94,9 +134,19 @@ class LLMClient:
             response = client.invoke(prompt)
             result = response.content if hasattr(response, "content") else str(response)
             logger.debug(f"LLM response: {result[:100]}...")
+
+            usage = _extract_usage(response)
+            update: dict[str, Any] = {"output": result}
+            if usage is not None:
+                update["usage"] = usage
+            langfuse_context.update_current_observation(**update)
             return result
         except Exception as e:
             logger.error(f"Error invoking LLM: {e}")
+            langfuse_context.update_current_observation(
+                level="ERROR",
+                status_message=f"{type(e).__name__}: {e}",
+            )
             raise
 
 

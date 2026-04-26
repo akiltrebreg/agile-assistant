@@ -43,6 +43,7 @@ from hse_prom_prog.metrics import (
     SQL_RETRIES,
 )
 from hse_prom_prog.models.memory import ConversationContext
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -283,6 +284,7 @@ def _has_query_result(messages: list) -> bool:
     return all(not isinstance(msg, HumanMessage) for msg in messages[last_ok_idx + 1 :])
 
 
+@observe(as_type="generation", name="sql_llm_call")
 def _call_model(state: AgentState) -> dict:
     """Call the LLM with current messages.
 
@@ -302,6 +304,18 @@ def _call_model(state: AgentState) -> dict:
         prompt_chars,
         len(messages),
         mode,
+    )
+
+    # Capture pre-call metadata so the generation has model info even if
+    # llm.invoke crashes — Langfuse keeps the partial record.
+    langfuse_context.update_current_observation(
+        model=settings.sql_vllm_model,
+        input=get_buffer_string(messages),
+        model_parameters={
+            "temperature": 0.0,
+            "max_tokens": 512,
+            "tool_choice": "any" if mode == "forced" else "auto",
+        },
     )
 
     response = llm.invoke(messages)
@@ -333,6 +347,24 @@ def _call_model(state: AgentState) -> dict:
         len(tool_calls),
         content_preview,
     )
+
+    # Build a Langfuse-friendly representation of the response. Tool
+    # calls are surfaced as a separate field because their structure is
+    # what matters most for SQL Agent debugging.
+    output_payload: dict[str, Any] = {"content": str(response.content)}
+    if tool_calls:
+        output_payload["tool_calls"] = [
+            {"name": tc.get("name"), "args": tc.get("args")} for tc in tool_calls
+        ]
+    obs_update: dict[str, Any] = {"output": output_payload}
+    if total_tokens or prompt_tokens:
+        obs_update["usage"] = {
+            "input": prompt_tokens,
+            "output": completion_tokens,
+            "total": total_tokens,
+        }
+    langfuse_context.update_current_observation(**obs_update)
+
     return {"messages": [response]}
 
 
@@ -620,6 +652,7 @@ class SQLAgent:
         if not self.db:
             self.db = get_database()
 
+    @observe(name="sql_agent")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Process a user query through the LangGraph SQL agent.
 
@@ -632,6 +665,13 @@ class SQLAgent:
         original_query = state.get("original_query", "")
         intent = state.get("intent") or "unknown"
         logger.info("[SQL Agent] Processing: %s", original_query[:80])
+        langfuse_context.update_current_observation(
+            input={
+                "query": original_query,
+                "intent": intent,
+                "entities": state.get("entities") or {},
+            },
+        )
 
         self._ensure_db()
         set_db(self.db)
@@ -671,6 +711,11 @@ class SQLAgent:
                 )
             except Exception as e:
                 logger.error("[SQL Agent] Graph execution failed: %s", e)
+                langfuse_context.update_current_observation(
+                    output={"sql": None, "rows_count": 0, "error": str(e)},
+                    level="ERROR",
+                    status_message=f"{type(e).__name__}: {e}",
+                )
                 return {
                     "original_query": original_query,
                     "sql_query": None,
@@ -691,6 +736,13 @@ class SQLAgent:
             if row_count == 0 and not error:
                 SQL_EMPTY_RESULTS.labels(intent=intent).inc()
 
+            langfuse_context.update_current_observation(
+                output={
+                    "sql": sql or None,
+                    "rows_count": row_count,
+                    "error": error or None,
+                },
+            )
             return {
                 "original_query": original_query,
                 "sql_query": sql or None,

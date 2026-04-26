@@ -32,6 +32,7 @@ from hse_prom_prog.metrics import (
     SUPERVISOR_PARSE_ERRORS,
 )
 from hse_prom_prog.models.memory import ConversationContext
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -685,6 +686,7 @@ class SupervisorAgent:
 
         return result
 
+    @observe(name="supervisor")
     def process(
         self,
         user_query: str,
@@ -711,6 +713,18 @@ class SupervisorAgent:
         logger.info("[Supervisor] Processing query: %s", user_query)
         start = time.time()
 
+        # Whatever path we take below (fast/slow/error), we want the
+        # Langfuse span to show the user query and any prior context
+        # the classifier got to see — set it once up front.
+        has_history = bool((conversation_context or {}).get("recent_turns"))
+        langfuse_context.update_current_observation(
+            input={
+                "query": user_query,
+                "has_history": has_history,
+                "has_profile": bool(user_profile),
+            },
+        )
+
         # Fast path: regex finds an issue key
         issue_key = self._extract_issue_key_regex(user_query)
 
@@ -719,6 +733,14 @@ class SupervisorAgent:
             SUPERVISOR_FAST_PATH.inc()
             SUPERVISOR_CLASSIFICATIONS.labels(intent="task", query_type="sql").inc()
             SUPERVISOR_DURATION.labels(path="fast").observe(time.time() - start)
+            langfuse_context.update_current_observation(
+                output={
+                    "intent": "task",
+                    "query_type": "sql",
+                    "entities": {"issue_key": issue_key},
+                    "path": "fast",
+                },
+            )
             return {
                 "original_query": user_query,
                 "intent": "task",
@@ -739,6 +761,15 @@ class SupervisorAgent:
             logger.error("[Supervisor] LLM classification failed: %s", e)
             SUPERVISOR_CLASSIFICATIONS.labels(intent="error", query_type="error").inc()
             SUPERVISOR_DURATION.labels(path="slow").observe(time.time() - start)
+            langfuse_context.update_current_observation(
+                output={
+                    "intent": "error",
+                    "query_type": "error",
+                    "path": "slow",
+                },
+                level="ERROR",
+                status_message=f"{type(e).__name__}: {e}",
+            )
             return {
                 "original_query": user_query,
                 "intent": "error",
@@ -792,6 +823,15 @@ class SupervisorAgent:
         SUPERVISOR_CLASSIFICATIONS.labels(intent=intent, query_type=query_type).inc()
         SUPERVISOR_DURATION.labels(path="slow").observe(time.time() - start)
 
+        langfuse_context.update_current_observation(
+            output={
+                "intent": intent,
+                "query_type": query_type,
+                "entities": entities,
+                "path": "slow",
+                "route": route,
+            },
+        )
         return {
             "original_query": user_query,
             "intent": intent,

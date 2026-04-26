@@ -57,6 +57,8 @@ dependencies = [
     # Prometheus monitoring (Phase 1 — custom metrics + FastAPI instrumentation)
     "prometheus-client>=0.21.0,<0.22",
     "prometheus-fastapi-instrumentator>=7.0.0,<8",
+    # Langfuse — LLM tracing (Phase 3)
+    "langfuse>=2.50,<3",
 ]
 
 [dependency-groups]

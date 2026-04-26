@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from hse_prom_prog.metrics import VALIDATOR_DATA_MISSING, VALIDATOR_RESULTS
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class ValidatorAgent:
     results are usable and passes them to the Response Agent.
     """
 
+    @observe(name="validator")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Validate agent outputs and produce a validation_result.
 
@@ -57,29 +59,38 @@ class ValidatorAgent:
             rag_ok,
         )
 
+        langfuse_context.update_current_observation(
+            input={
+                "query_type": query_type,
+                "has_sql_result": bool(sql_result),
+                "has_rag_response": rag_ok,
+                "sql_error": bool(sql_error),
+            },
+        )
+
         if query_type == "sql":
             _record(sql_ok, False)
             if not sql_ok:
                 VALIDATOR_DATA_MISSING.labels(source="sql").inc()
-            return {
-                "validation_result": {
-                    "use_sql": sql_ok,
-                    "use_rag": False,
-                    "note": None if sql_ok else (sql_error or "No SQL data"),
-                },
+            payload = {
+                "use_sql": sql_ok,
+                "use_rag": False,
+                "note": None if sql_ok else (sql_error or "No SQL data"),
             }
+            langfuse_context.update_current_observation(output=payload)
+            return {"validation_result": payload}
 
         if query_type == "rag":
             _record(False, rag_ok)
             if not rag_ok:
                 VALIDATOR_DATA_MISSING.labels(source="rag").inc()
-            return {
-                "validation_result": {
-                    "use_sql": False,
-                    "use_rag": rag_ok,
-                    "note": None if rag_ok else "No relevant documents found",
-                },
+            payload = {
+                "use_sql": False,
+                "use_rag": rag_ok,
+                "note": None if rag_ok else "No relevant documents found",
             }
+            langfuse_context.update_current_observation(output=payload)
+            return {"validation_result": payload}
 
         # hybrid — use whatever is available
         if not sql_ok and not rag_ok:
@@ -87,13 +98,9 @@ class ValidatorAgent:
             logger.warning("[Validator] Both agents returned nothing: %s", note)
             _record(False, False)
             VALIDATOR_DATA_MISSING.labels(source="both").inc()
-            return {
-                "validation_result": {
-                    "use_sql": False,
-                    "use_rag": False,
-                    "note": note,
-                },
-            }
+            payload = {"use_sql": False, "use_rag": False, "note": note}
+            langfuse_context.update_current_observation(output=payload)
+            return {"validation_result": payload}
 
         logger.info(
             "[Validator] Hybrid — sql=%s, rag=%s, sources=%d",
@@ -107,10 +114,6 @@ class ValidatorAgent:
             VALIDATOR_DATA_MISSING.labels(source="sql").inc()
         if not rag_ok:
             VALIDATOR_DATA_MISSING.labels(source="rag").inc()
-        return {
-            "validation_result": {
-                "use_sql": sql_ok,
-                "use_rag": rag_ok,
-                "note": None,
-            },
-        }
+        payload = {"use_sql": sql_ok, "use_rag": rag_ok, "note": None}
+        langfuse_context.update_current_observation(output=payload)
+        return {"validation_result": payload}

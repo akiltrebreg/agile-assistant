@@ -32,6 +32,7 @@ from hse_prom_prog.metrics import (
 from hse_prom_prog.rag.embeddings import get_embeddings, get_target_dim, truncate_vector
 from hse_prom_prog.rag.ingest import DENSE_VECTOR_NAME, SPARSE_VECTOR_NAME
 from hse_prom_prog.rag.sparse import embed_sparse
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -108,15 +109,29 @@ class MultiModeRetriever:
         self._full_dim = len(test_vec)
         self._target_dim = get_target_dim(self._full_dim)
 
+    @observe(name="retrieval")
     def invoke(self, query: str, **_kwargs: Any) -> list[Document]:
+        langfuse_context.update_current_observation(
+            input={"query": query, "search_type": self.search_type, "k": self.k},
+        )
         if self.search_type == "dense":
-            return self._dense_search(query)
-        if self.search_type == "sparse":
-            return self._sparse_search(query)
-        if self.search_type == "hybrid":
-            return self._hybrid_search(query)
-        msg = f"Unknown search_type: {self.search_type}"
-        raise ValueError(msg)
+            docs = self._dense_search(query)
+        elif self.search_type == "sparse":
+            docs = self._sparse_search(query)
+        elif self.search_type == "hybrid":
+            docs = self._hybrid_search(query)
+        else:
+            msg = f"Unknown search_type: {self.search_type}"
+            raise ValueError(msg)
+
+        # Top-score is the most useful debugging signal alongside count;
+        # full chunk text would blow up Langfuse storage so we surface
+        # only the source/category metadata.
+        sources = [d.metadata.get("source") for d in docs[:5] if d.metadata]
+        langfuse_context.update_current_observation(
+            output={"chunks_count": len(docs), "preview_sources": sources},
+        )
+        return docs
 
     # ── dense ────────────────────────────────────────────────
 

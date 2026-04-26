@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass
 
 from hse_prom_prog.metrics import GUARDRAIL_L2_RESULTS
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -179,14 +180,22 @@ class SQLGuardResult:
 
 
 def _record_l2(result: SQLGuardResult) -> SQLGuardResult:
-    """Forward the result through Prometheus before returning to caller."""
+    """Forward the result through Prometheus + Langfuse before returning."""
     GUARDRAIL_L2_RESULTS.labels(
         allowed=str(result.allowed).lower(),
         layer=result.layer,
     ).inc()
+    langfuse_context.update_current_observation(
+        output={
+            "allowed": result.allowed,
+            "layer": result.layer,
+            "reason": result.reason,
+        },
+    )
     return result
 
 
+@observe(name="guardrail_l2")
 def check_sql(sql: str) -> SQLGuardResult:
     """Three-layer SQL validation. Called from ``run_query`` before execution.
 
@@ -195,6 +204,7 @@ def check_sql(sql: str) -> SQLGuardResult:
         otherwise (False, reason, layer) where `layer` tells which check blocked.
     """
     sql_stripped = sql.strip()
+    langfuse_context.update_current_observation(input={"sql": sql_stripped})
 
     if not sql_stripped:
         return _record_l2(SQLGuardResult(False, "empty_query", "limits"))

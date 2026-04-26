@@ -23,6 +23,7 @@ from hse_prom_prog.metrics import (
     SQL_QUERY_DURATION,
     SQL_RESULT_ROWS,
 )
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def _get_db() -> DatabaseConnection:
 
 
 @tool
+@observe(name="run_query")
 def run_query(query: str) -> str:
     """Execute a SQL SELECT query against the PostgreSQL database.
 
@@ -54,14 +56,27 @@ def run_query(query: str) -> str:
         Query results as text, or an error message if the query fails.
         Use the error message to fix the query and retry.
     """
+    # ``@observe`` is the *inner* decorator so it wraps the plain
+    # function before LangChain's ``@tool`` turns it into a
+    # StructuredTool. When the tool is invoked from langgraph the
+    # observed function still runs and contextvars propagate, so the
+    # span attaches to the current sql_agent trace.
     db = _get_db()
     sql = query.strip()
+    langfuse_context.update_current_observation(input={"sql": sql})
 
     # Level 2 SQL Guardrail: regex + AST + table whitelist + limits
     guard = check_sql(sql)
     if not guard.allowed:
         logger.warning("[SQL Tools] Blocked by SQLGuard (%s): %s", guard.layer, guard.reason)
         SQL_QUERIES_TOTAL.labels(status="blocked").inc()
+        langfuse_context.update_current_observation(
+            output={
+                "status": "blocked",
+                "layer": guard.layer,
+                "reason": guard.reason,
+            },
+        )
         return (
             f"ERROR: Query blocked by security policy "
             f"(layer={guard.layer}, reason={guard.reason}). "
@@ -75,14 +90,31 @@ def run_query(query: str) -> str:
     try:
         results = db.execute_query(sql)
     except SQLAlchemyError as e:
-        SQL_QUERY_DURATION.observe(time.time() - sql_start)
+        duration = time.time() - sql_start
+        SQL_QUERY_DURATION.observe(duration)
         SQL_QUERIES_TOTAL.labels(status="error").inc()
         error_msg = f"SQL Error: {e!s}"
         logger.warning("[SQL Tools] %s", error_msg)
+        langfuse_context.update_current_observation(
+            output={
+                "status": "error",
+                "error": str(e),
+                "duration_ms": round(duration * 1000, 2),
+            },
+            level="ERROR",
+        )
         return error_msg
-    SQL_QUERY_DURATION.observe(time.time() - sql_start)
+    duration = time.time() - sql_start
+    SQL_QUERY_DURATION.observe(duration)
     SQL_QUERIES_TOTAL.labels(status="success").inc()
     SQL_RESULT_ROWS.observe(len(results))
+    langfuse_context.update_current_observation(
+        output={
+            "status": "success",
+            "rows_count": len(results),
+            "duration_ms": round(duration * 1000, 2),
+        },
+    )
 
     if not results:
         return json.dumps({"row_count": 0, "rows": []})

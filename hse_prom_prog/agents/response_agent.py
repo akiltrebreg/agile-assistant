@@ -24,6 +24,7 @@ from hse_prom_prog.metrics import (
     RESPONSE_TRUNCATED,
 )
 from hse_prom_prog.models.memory import ConversationContext
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -495,11 +496,21 @@ class ResponseAgent:
     # Main entry point
     # ------------------------------------------------------------------
 
+    @observe(name="response_agent")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Generate natural language response. Thin wrapper that records
         latency and length per branch — the routing logic itself lives in
         ``_process_impl`` so the metrics here stay declarative."""
         branch = _resolve_branch(state)
+        langfuse_context.update_current_observation(
+            input={
+                "branch": branch,
+                "query_type": state.get("query_type"),
+                "intent": state.get("intent"),
+                "has_sql_data": bool(state.get("sql_result")),
+                "has_rag_data": bool(state.get("rag_response")),
+            },
+        )
         start = time.time()
         try:
             update = self._process_impl(state)
@@ -508,6 +519,15 @@ class ResponseAgent:
         final = (update or {}).get("final_response") or ""
         if final:
             RESPONSE_LENGTH_TOKENS.labels(branch=branch).observe(estimate_tokens(final))
+        # Preview only — full final_response is on the parent trace; we
+        # don't want to duplicate it and bloat Langfuse storage.
+        langfuse_context.update_current_observation(
+            output={
+                "branch": branch,
+                "response_length": len(final),
+                "response_preview": final[:500],
+            },
+        )
         return update
 
     def _process_impl(self, state: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915, C901

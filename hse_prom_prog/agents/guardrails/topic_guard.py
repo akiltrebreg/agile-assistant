@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass
 
 from hse_prom_prog.metrics import GUARDRAIL_L1_RESULTS
+from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ class TopicGuard:
     Supervisor agent, which is an LLM call anyway.
     """
 
+    @observe(name="guardrail_l1")
     def check(self, query: str) -> GuardResult:
         """Classify the query via two regex stages.
 
@@ -84,20 +86,31 @@ class TopicGuard:
           2. Whitelist → pass with reason='whitelist'
           3. Default   → pass with reason='pass' (Supervisor will classify)
         """
+        langfuse_context.update_current_observation(input={"query": query})
         for pattern in _HARD_DENY_PATTERNS:
             if pattern.search(query):
                 logger.warning("[TopicGuard] HARD DENY: %r", query[:100])
                 GUARDRAIL_L1_RESULTS.labels(
                     reason=_L1_REASON_LABELS["blocked:prompt_injection"]
                 ).inc()
+                langfuse_context.update_current_observation(
+                    output={"passed": False, "reason": "blocked:prompt_injection"},
+                    level="WARNING",
+                )
                 return GuardResult(passed=False, reason="blocked:prompt_injection")
 
         for pattern in _ALWAYS_PASS_PATTERNS:
             if pattern.search(query):
                 GUARDRAIL_L1_RESULTS.labels(reason=_L1_REASON_LABELS["whitelist"]).inc()
+                langfuse_context.update_current_observation(
+                    output={"passed": True, "reason": "whitelist"},
+                )
                 return GuardResult(passed=True, reason="whitelist")
 
         GUARDRAIL_L1_RESULTS.labels(reason=_L1_REASON_LABELS["pass"]).inc()
+        langfuse_context.update_current_observation(
+            output={"passed": True, "reason": "pass"},
+        )
         return GuardResult(passed=True, reason="pass")
 
 

@@ -21,6 +21,8 @@ services:
         condition: service_started
       grafana:
         condition: service_started
+      langfuse:
+        condition: service_started
     ports:
       - "80:80"
     volumes:
@@ -84,6 +86,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Second init script: creates the langfuse_db sidecar database.
+      # Init scripts run only on first volume init — for an existing
+      # postgres_data volume, create the DB manually via psql.
+      - ./database/init-langfuse.sql:/docker-entrypoint-initdb.d/init-langfuse.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hse_user}"]
       interval: 10s
@@ -326,6 +332,13 @@ services:
       - REDIS_DB=0
       - FASTAPI_HOST=0.0.0.0
       - FASTAPI_PORT=8080
+      # Langfuse tracing (Phase 3) — keys come from .env, host is the
+      # in-network DNS name. ENABLED=false disables the SDK entirely so
+      # the service still runs without a Langfuse container.
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
     # No external ports — nginx is the single public entrypoint
     expose:
       - "8080"
@@ -381,6 +394,13 @@ services:
       - QDRANT_COLLECTION_NAME=business_docs
       - CELERY_TASK_TIME_LIMIT=600
       - CELERY_TASK_SOFT_TIME_LIMIT=300
+      # Langfuse tracing (Phase 3). The Celery worker is where most
+      # spans actually originate (workflow runs here), so the env vars
+      # must mirror the api service.
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
@@ -530,6 +550,47 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - hse-network
+
+  # ──────────────────────────────────────────────────────────────
+  # Langfuse — LLM tracing (Phase 3)
+  # Self-hosted Next.js app, shares the existing PostgreSQL but uses
+  # its own database (langfuse_db, created by init-langfuse.sql).
+  # ──────────────────────────────────────────────────────────────
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: hse-prom-prog-langfuse
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-hse_user}:${POSTGRES_PASSWORD:-hse_password}@postgres:5432/langfuse_db"
+      NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET:-changeme-in-production}"
+      # NEXTAUTH_URL must match the URL the user types in the browser;
+      # localhost:3001 is the host-side mapping below.
+      NEXTAUTH_URL: "http://localhost:3001"
+      SALT: "${LANGFUSE_SALT:-changeme-in-production}"
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+    # 3001 on the host because Grafana already owns 3000. Inside the
+    # docker network Langfuse listens on 3000 (LANGFUSE_HOST default).
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/public/health",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - hse-network
 

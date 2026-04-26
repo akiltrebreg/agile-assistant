@@ -30,6 +30,7 @@ from hse_prom_prog.models.memory import Conversation, ConversationContext
 from hse_prom_prog.models.task import TaskStatus
 from hse_prom_prog.rag.retriever import get_retriever
 from hse_prom_prog.tasks.celery_app import celery_app
+from hse_prom_prog.tracing import langfuse_client, langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class WorkflowTask(CeleryTask):
     retry_jitter=True,  # Add randomness to prevent thundering herd
     max_retries=3,  # Up to 3 retries for transient failures
 )
-def execute_workflow(  # noqa: PLR0913, PLR0915
+def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
     self,
     task_id: str,
     query: str,
@@ -121,6 +122,29 @@ def execute_workflow(  # noqa: PLR0913, PLR0915
     terminal_status: str | None = None
     TASKS_IN_PROGRESS.inc()
 
+    # Langfuse root trace — created up front so every nested @observe in
+    # the workflow attaches to it via contextvars. ``langfuse_client`` is
+    # None when the SDK is disabled / missing (graceful degradation).
+    trace = None
+    if langfuse_client is not None:
+        try:
+            trace = langfuse_client.trace(
+                name="workflow",
+                user_id=external_id,
+                session_id=conversation_id,
+                input={"query": query},
+                metadata={
+                    "task_id": task_id,
+                    "celery_retry": self.request.retries,
+                },
+            )
+            langfuse_context.update_current_trace(trace_id=trace.id)
+        except Exception as exc:
+            logger.warning("[WorkflowTask %s] Langfuse trace init failed: %s", task_id, exc)
+            trace = None
+
+    final_response = ""
+
     try:
         db = get_database()
         repo = TaskRepository(db)
@@ -156,12 +180,13 @@ def execute_workflow(  # noqa: PLR0913, PLR0915
 
         entities = result.get("entities") or {}
         query_type = result.get("query_type", "sql")
+        final_response = result.get("final_response", "No response generated")
         logger.info(f"[WorkflowTask {task_id}] Workflow completed (query_type={query_type})")
         repo.update_task_status(
             task_uuid,
             TaskStatus.COMPLETED,
             result={
-                "final_response": result.get("final_response", "No response generated"),
+                "final_response": final_response,
                 "issue_key": entities.get("issue_key"),
                 "query_type": query_type,
                 "conversation_id": str(conv_uuid) if conv_uuid else None,
@@ -197,11 +222,36 @@ def execute_workflow(  # noqa: PLR0913, PLR0915
 
     finally:
         TASKS_IN_PROGRESS.dec()
-        PIPELINE_DURATION.labels(query_type=query_type).observe(time.time() - pipeline_start)
+        duration = time.time() - pipeline_start
+        PIPELINE_DURATION.labels(query_type=query_type).observe(duration)
         if terminal_status is not None:
             TASKS_TOTAL.labels(status=terminal_status).inc()
         if db is not None:
             db.close()
+
+        # Finalise Langfuse trace before the task returns. Errors here
+        # must not surface to Celery — tracing is best-effort.
+        if trace is not None:
+            try:
+                trace.update(
+                    output={
+                        "final_response": final_response,
+                        "query_type": query_type,
+                    },
+                    metadata={
+                        "task_id": task_id,
+                        "query_type": query_type,
+                        "duration_seconds": round(duration, 3),
+                        "terminal_status": terminal_status,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("[WorkflowTask %s] Langfuse trace.update failed: %s", task_id, exc)
+        if langfuse_client is not None:
+            try:
+                langfuse_client.flush()
+            except Exception as exc:
+                logger.warning("[WorkflowTask %s] Langfuse flush failed: %s", task_id, exc)
 
 
 def _mark_processing_if_first(

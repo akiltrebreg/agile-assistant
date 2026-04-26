@@ -309,6 +309,27 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed CORS origins, or '*' for all",
     )
 
+    # Langfuse (LLM tracing, Phase 3)
+    langfuse_public_key: str = Field(
+        default="",
+        description="Langfuse project public key (pk-lf-...). Empty = disabled.",
+    )
+    langfuse_secret_key: str = Field(
+        default="",
+        description="Langfuse project secret key (sk-lf-...). Empty = disabled.",
+    )
+    langfuse_host: str = Field(
+        default="http://langfuse:3000",
+        description="Langfuse server URL (in-docker default).",
+    )
+    langfuse_enabled: bool = Field(
+        default=True,
+        description=(
+            "Master kill-switch for Langfuse tracing. "
+            "When False, all @observe decorators become no-ops."
+        ),
+    )
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins into a list.
