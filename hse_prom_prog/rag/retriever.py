@@ -13,6 +13,7 @@ All modes expose the same ``.invoke(query)`` interface returning
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from langchain_core.documents import Document
@@ -21,6 +22,13 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 
 from hse_prom_prog.config import settings
+from hse_prom_prog.metrics import (
+    RAG_CHUNKS_RETRIEVED,
+    RAG_FALLBACKS,
+    RAG_REQUESTS,
+    RAG_RETRIEVAL_DURATION,
+    RAG_TOP_SCORE,
+)
 from hse_prom_prog.rag.embeddings import get_embeddings, get_target_dim, truncate_vector
 from hse_prom_prog.rag.ingest import DENSE_VECTOR_NAME, SPARSE_VECTOR_NAME
 from hse_prom_prog.rag.sparse import embed_sparse
@@ -115,13 +123,20 @@ class MultiModeRetriever:
     def _dense_search(self, query: str) -> list[Document]:
         vector = self._embeddings.embed_query(query)
         vector = truncate_vector(vector, self._target_dim, self._full_dim)
+        start = time.time()
         results = self._client.query_points(
             collection_name=self._collection,
             query=vector,
             using=DENSE_VECTOR_NAME,
             limit=self.k,
         )
-        docs = [_point_to_document(p) for p in results.points]
+        RAG_RETRIEVAL_DURATION.labels(search_type="dense").observe(time.time() - start)
+        points = results.points
+        docs = [_point_to_document(p) for p in points]
+        RAG_CHUNKS_RETRIEVED.labels(search_type="dense").observe(len(docs))
+        if points:
+            RAG_TOP_SCORE.labels(search_type="dense").observe(float(points[0].score))
+        RAG_REQUESTS.labels(search_type="dense").inc()
         logger.debug("[Retriever] dense search returned %d docs", len(docs))
         return docs
 
@@ -129,6 +144,7 @@ class MultiModeRetriever:
 
     def _sparse_search(self, query: str) -> list[Document]:
         sparse_vec = embed_sparse(query)
+        start = time.time()
         try:
             results = self._client.query_points(
                 collection_name=self._collection,
@@ -142,8 +158,15 @@ class MultiModeRetriever:
                 "Falling back to dense search.",
                 exc_info=True,
             )
+            RAG_FALLBACKS.labels(from_mode="sparse", to_mode="dense").inc()
             return self._dense_search(query)
-        docs = [_point_to_document(p) for p in results.points]
+        RAG_RETRIEVAL_DURATION.labels(search_type="sparse").observe(time.time() - start)
+        points = results.points
+        docs = [_point_to_document(p) for p in points]
+        RAG_CHUNKS_RETRIEVED.labels(search_type="sparse").observe(len(docs))
+        if points:
+            RAG_TOP_SCORE.labels(search_type="sparse").observe(float(points[0].score))
+        RAG_REQUESTS.labels(search_type="sparse").inc()
         logger.debug("[Retriever] sparse search returned %d docs", len(docs))
         return docs
 
@@ -162,6 +185,7 @@ class MultiModeRetriever:
         dense_vector = truncate_vector(dense_vector, self._target_dim, self._full_dim)
         sparse_vector = embed_sparse(query)
 
+        start = time.time()
         try:
             results = self._client.query_points(
                 collection_name=self._collection,
@@ -186,8 +210,15 @@ class MultiModeRetriever:
                 "Falling back to dense search.",
                 exc_info=True,
             )
+            RAG_FALLBACKS.labels(from_mode="hybrid", to_mode="dense").inc()
             return self._dense_search(query)
-        docs = [_point_to_document(p) for p in results.points]
+        RAG_RETRIEVAL_DURATION.labels(search_type="hybrid").observe(time.time() - start)
+        points = results.points
+        docs = [_point_to_document(p) for p in points]
+        RAG_CHUNKS_RETRIEVED.labels(search_type="hybrid").observe(len(docs))
+        if points:
+            RAG_TOP_SCORE.labels(search_type="hybrid").observe(float(points[0].score))
+        RAG_REQUESTS.labels(search_type="hybrid").inc()
         logger.debug("[Retriever] hybrid RRF search returned %d docs", len(docs))
         return docs
 

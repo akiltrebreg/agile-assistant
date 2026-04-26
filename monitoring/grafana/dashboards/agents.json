@@ -1,0 +1,531 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Supervisor",
+      "id": 100,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "piechart",
+      "title": "Intent Distribution (1h)",
+      "id": 1,
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (intent) (increase(agile_assistant_supervisor_classifications_total[1h]))",
+          "legendFormat": "{{intent}}"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Query Type Distribution (1h)",
+      "id": 2,
+      "gridPos": { "x": 8, "y": 1, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (query_type) (increase(agile_assistant_supervisor_classifications_total[1h]))",
+          "legendFormat": "{{query_type}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Parse Errors (1h)",
+      "id": 3,
+      "gridPos": { "x": 16, "y": 1, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(agile_assistant_supervisor_parse_errors_total[1h])"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Fast Path vs Slow Path (rate)",
+      "id": 4,
+      "gridPos": { "x": 16, "y": 5, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_supervisor_fast_path_total[5m])",
+          "legendFormat": "Fast (regex)"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(agile_assistant_supervisor_llm_calls_total[5m])",
+          "legendFormat": "Slow (LLM)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Classification Latency by Path (p95)",
+      "id": 5,
+      "gridPos": { "x": 0, "y": 9, "w": 16, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_supervisor_duration_seconds_bucket{path=\"fast\"}[5m])) by (le))",
+          "legendFormat": "Fast p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_supervisor_duration_seconds_bucket{path=\"slow\"}[5m])) by (le))",
+          "legendFormat": "Slow p95"
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "SQL Agent",
+      "id": 200,
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "SQL Agent Latency by Intent (p95)",
+      "id": 6,
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_sql_agent_duration_seconds_bucket[5m])) by (le, intent))",
+          "legendFormat": "{{intent}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "SQL Query Execution Time (p50/p95)",
+      "id": 7,
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(agile_assistant_sql_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_sql_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "SQL Query Status (rate, stacked)",
+      "id": 8,
+      "gridPos": { "x": 0, "y": 26, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_sql_queries_total[5m])",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "SQL Retries",
+      "id": 9,
+      "gridPos": { "x": 8, "y": 26, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_sql_retries_total[5m])",
+          "legendFormat": "retries/s"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Empty Results by Intent (1h)",
+      "id": 10,
+      "gridPos": { "x": 16, "y": 26, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" },
+        "xField": "intent"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (intent) (increase(agile_assistant_sql_empty_results_total[1h]))",
+          "legendFormat": "{{intent}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "heatmap",
+      "title": "Result Row Distribution",
+      "id": 11,
+      "gridPos": { "x": 0, "y": 34, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "calculate": false, "yAxis": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(agile_assistant_sql_result_rows_bucket[5m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "RAG Agent",
+      "id": 300,
+      "gridPos": { "x": 0, "y": 42, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "RAG Retrieval Latency by Search Type (p95)",
+      "id": 12,
+      "gridPos": { "x": 0, "y": 43, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_rag_retrieval_duration_seconds_bucket[5m])) by (le, search_type))",
+          "legendFormat": "{{search_type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Reranker Latency (p50/p95)",
+      "id": 13,
+      "gridPos": { "x": 12, "y": 43, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(agile_assistant_rag_reranker_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_rag_reranker_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Full RAG Agent Duration (p95)",
+      "id": 14,
+      "gridPos": { "x": 0, "y": 51, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_rag_agent_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Top Chunk Score (median)",
+      "id": 15,
+      "gridPos": { "x": 8, "y": 51, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum(rate(agile_assistant_rag_top_score_bucket[5m])) by (le, search_type))",
+          "legendFormat": "{{search_type}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Chunks: Retrieved vs After Reranker (median)",
+      "id": 16,
+      "gridPos": { "x": 16, "y": 51, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum(rate(agile_assistant_rag_chunks_retrieved_bucket[5m])) by (le))",
+          "legendFormat": "Retrieved"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.5, sum(rate(agile_assistant_rag_chunks_after_reranker_bucket[5m])) by (le))",
+          "legendFormat": "After reranker"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RAG Fallbacks",
+      "id": 17,
+      "gridPos": { "x": 0, "y": 59, "w": 24, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_rag_fallbacks_total[5m])",
+          "legendFormat": "{{from_mode}}→{{to_mode}}"
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "Response Agent",
+      "id": 400,
+      "gridPos": { "x": 0, "y": 65, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Response Latency by Branch (p95)",
+      "id": 18,
+      "gridPos": { "x": 0, "y": 66, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_response_duration_seconds_bucket[5m])) by (le, branch))",
+          "legendFormat": "{{branch}}"
+        }
+      ]
+    },
+    {
+      "type": "heatmap",
+      "title": "Response Length Distribution (tokens)",
+      "id": 19,
+      "gridPos": { "x": 0, "y": 74, "w": 16, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "calculate": false, "yAxis": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(agile_assistant_response_length_tokens_bucket[5m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "LLM Timeouts (1h)",
+      "id": 20,
+      "gridPos": { "x": 16, "y": 74, "w": 4, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(agile_assistant_response_llm_timeouts_total[1h])"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Truncated Responses (1h)",
+      "id": 21,
+      "gridPos": { "x": 20, "y": 74, "w": 4, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(agile_assistant_response_truncated_total[1h])"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["agile-assistant", "agents"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Agile Assistant — Agents Deep Dive",
+  "uid": "agile-agents",
+  "version": 1,
+  "weekStart": ""
+}

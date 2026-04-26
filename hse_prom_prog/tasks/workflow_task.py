@@ -20,6 +20,7 @@ from hse_prom_prog.graph.workflow import AgileWorkflow
 from hse_prom_prog.llm.client import get_llm_client
 from hse_prom_prog.memory.manager import MemoryManager
 from hse_prom_prog.metrics import (
+    MEMORY_SESSION_ROTATIONS,
     PIPELINE_DURATION,
     PIPELINE_QUEUE_WAIT,
     TASKS_IN_PROGRESS,
@@ -295,6 +296,7 @@ def _maybe_rotate_stale_conversation(
         conv.id,
         now - conv.updated_at,
     )
+    MEMORY_SESSION_ROTATIONS.labels(reason="inactivity").inc()
     try:
         memory.conversation_repo.close(conv.id)
     except Exception as e:

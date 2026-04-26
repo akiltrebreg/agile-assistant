@@ -22,6 +22,8 @@ import logging
 import re
 from dataclasses import dataclass
 
+from hse_prom_prog.metrics import GUARDRAIL_L2_RESULTS
+
 logger = logging.getLogger(__name__)
 
 
@@ -176,6 +178,15 @@ class SQLGuardResult:
     layer: str  # "limits" | "regex" | "ast" | "ok"
 
 
+def _record_l2(result: SQLGuardResult) -> SQLGuardResult:
+    """Forward the result through Prometheus before returning to caller."""
+    GUARDRAIL_L2_RESULTS.labels(
+        allowed=str(result.allowed).lower(),
+        layer=result.layer,
+    ).inc()
+    return result
+
+
 def check_sql(sql: str) -> SQLGuardResult:
     """Three-layer SQL validation. Called from ``run_query`` before execution.
 
@@ -186,9 +197,9 @@ def check_sql(sql: str) -> SQLGuardResult:
     sql_stripped = sql.strip()
 
     if not sql_stripped:
-        return SQLGuardResult(False, "empty_query", "limits")
+        return _record_l2(SQLGuardResult(False, "empty_query", "limits"))
     if len(sql_stripped) > _MAX_QUERY_LENGTH:
-        return SQLGuardResult(False, "query_too_long", "limits")
+        return _record_l2(SQLGuardResult(False, "query_too_long", "limits"))
 
     for pattern in _DANGEROUS_PATTERNS:
         m = pattern.search(sql_stripped)
@@ -199,15 +210,15 @@ def check_sql(sql: str) -> SQLGuardResult:
                 m.group(),
                 sql_stripped[:200],
             )
-            return SQLGuardResult(False, f"dangerous_pattern: {m.group()}", "regex")
+            return _record_l2(SQLGuardResult(False, f"dangerous_pattern: {m.group()}", "regex"))
 
     ast_ok, ast_reason = _check_ast(sql_stripped)
     if not ast_ok:
         logger.warning("[SQLGuard] AST BLOCK: reason=%s sql=%r", ast_reason, sql_stripped[:200])
-        return SQLGuardResult(False, ast_reason, "ast")
+        return _record_l2(SQLGuardResult(False, ast_reason, "ast"))
 
     join_count = len(re.findall(r"\bJOIN\b", sql_stripped, re.IGNORECASE))
     if join_count > _MAX_JOIN_COUNT:
-        return SQLGuardResult(False, f"too_many_joins: {join_count}", "limits")
+        return _record_l2(SQLGuardResult(False, f"too_many_joins: {join_count}", "limits"))
 
-    return SQLGuardResult(True, "ok", "ok")
+    return _record_l2(SQLGuardResult(True, "ok", "ok"))

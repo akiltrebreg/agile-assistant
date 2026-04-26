@@ -7,7 +7,22 @@ the best combination for the final response.
 import logging
 from typing import Any
 
+from hse_prom_prog.metrics import VALIDATOR_DATA_MISSING, VALIDATOR_RESULTS
+
 logger = logging.getLogger(__name__)
+
+
+def _record(use_sql: bool, use_rag: bool) -> None:
+    """Record the (use_sql, use_rag) pair as Prometheus labels.
+
+    Bool→str cast is required: Prometheus labels must be strings, and
+    relying on `str(True)` produces "True"/"False" — explicit lower()
+    matches the convention used elsewhere in the codebase.
+    """
+    VALIDATOR_RESULTS.labels(
+        use_sql=str(use_sql).lower(),
+        use_rag=str(use_rag).lower(),
+    ).inc()
 
 
 class ValidatorAgent:
@@ -43,6 +58,9 @@ class ValidatorAgent:
         )
 
         if query_type == "sql":
+            _record(sql_ok, False)
+            if not sql_ok:
+                VALIDATOR_DATA_MISSING.labels(source="sql").inc()
             return {
                 "validation_result": {
                     "use_sql": sql_ok,
@@ -52,6 +70,9 @@ class ValidatorAgent:
             }
 
         if query_type == "rag":
+            _record(False, rag_ok)
+            if not rag_ok:
+                VALIDATOR_DATA_MISSING.labels(source="rag").inc()
             return {
                 "validation_result": {
                     "use_sql": False,
@@ -64,6 +85,8 @@ class ValidatorAgent:
         if not sql_ok and not rag_ok:
             note = sql_error or "No data from SQL or RAG"
             logger.warning("[Validator] Both agents returned nothing: %s", note)
+            _record(False, False)
+            VALIDATOR_DATA_MISSING.labels(source="both").inc()
             return {
                 "validation_result": {
                     "use_sql": False,
@@ -78,6 +101,12 @@ class ValidatorAgent:
             rag_ok,
             len(rag_sources),
         )
+        _record(sql_ok, rag_ok)
+        # Hybrid with one source missing — record which one didn't supply data.
+        if not sql_ok:
+            VALIDATOR_DATA_MISSING.labels(source="sql").inc()
+        if not rag_ok:
+            VALIDATOR_DATA_MISSING.labels(source="rag").inc()
         return {
             "validation_result": {
                 "use_sql": sql_ok,

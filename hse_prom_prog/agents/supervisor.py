@@ -14,6 +14,7 @@ It also determines *query_type* for the workflow router:
 import json
 import logging
 import re
+import time
 from typing import Any
 
 from hse_prom_prog.agents.entity_sanitizer import sanitize_entities
@@ -23,6 +24,13 @@ from hse_prom_prog.agents.schema_description import (
 )
 from hse_prom_prog.llm.client import LLMClient
 from hse_prom_prog.memory.formatter import format_history
+from hse_prom_prog.metrics import (
+    SUPERVISOR_CLASSIFICATIONS,
+    SUPERVISOR_DURATION,
+    SUPERVISOR_FAST_PATH,
+    SUPERVISOR_LLM_CALLS,
+    SUPERVISOR_PARSE_ERRORS,
+)
 from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
@@ -503,6 +511,7 @@ class SupervisorAgent:
         # JSON response is ~30-60 tokens; even a maximal hybrid answer stays
         # under ~120 tokens. 256 gives ~4x headroom while returning ~256
         # tokens of prompt budget vs. the old max_tokens=512.
+        SUPERVISOR_LLM_CALLS.inc()
         llm_response = self.llm_client.invoke(
             prompt,
             response_format=_RESPONSE_FORMAT,
@@ -539,6 +548,7 @@ class SupervisorAgent:
 
         if parsed is None:
             logger.warning("[Supervisor] Failed to parse LLM JSON: %s", raw[:200])
+            SUPERVISOR_PARSE_ERRORS.inc()
             return {"intent": "error", "entities": {}, "query_type": "error"}
 
         intent = parsed.get("intent", "general")
@@ -699,12 +709,16 @@ class SupervisorAgent:
         query_type, route.
         """
         logger.info("[Supervisor] Processing query: %s", user_query)
+        start = time.time()
 
         # Fast path: regex finds an issue key
         issue_key = self._extract_issue_key_regex(user_query)
 
         if issue_key:
             logger.info("[Supervisor] Fast path — issue key found: %s", issue_key)
+            SUPERVISOR_FAST_PATH.inc()
+            SUPERVISOR_CLASSIFICATIONS.labels(intent="task", query_type="sql").inc()
+            SUPERVISOR_DURATION.labels(path="fast").observe(time.time() - start)
             return {
                 "original_query": user_query,
                 "intent": "task",
@@ -723,6 +737,8 @@ class SupervisorAgent:
             )
         except Exception as e:
             logger.error("[Supervisor] LLM classification failed: %s", e)
+            SUPERVISOR_CLASSIFICATIONS.labels(intent="error", query_type="error").inc()
+            SUPERVISOR_DURATION.labels(path="slow").observe(time.time() - start)
             return {
                 "original_query": user_query,
                 "intent": "error",
@@ -772,6 +788,9 @@ class SupervisorAgent:
             entities,
             route,
         )
+
+        SUPERVISOR_CLASSIFICATIONS.labels(intent=intent, query_type=query_type).inc()
+        SUPERVISOR_DURATION.labels(path="slow").observe(time.time() - start)
 
         return {
             "original_query": user_query,

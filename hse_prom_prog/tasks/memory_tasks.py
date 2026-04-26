@@ -15,6 +15,7 @@ from uuid import UUID
 from hse_prom_prog.database.connection import get_database
 from hse_prom_prog.llm.client import get_llm_client
 from hse_prom_prog.memory.manager import MemoryManager
+from hse_prom_prog.metrics import MEMORY_PROFILE_UPDATES, MEMORY_SUMMARIZATIONS
 from hse_prom_prog.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ def summarize_session(conversation_id: str, user_id: str) -> dict[str, Any] | No
     """
     conv_uuid = UUID(conversation_id)
     user_uuid = UUID(user_id)
+    MEMORY_SUMMARIZATIONS.inc()
 
     db = None
     try:
@@ -123,6 +125,7 @@ def update_profile_async(user_id: str, conversation_id: str) -> dict[str, Any] |
     """
     user_uuid = UUID(user_id)
     conv_uuid = UUID(conversation_id)
+    MEMORY_PROFILE_UPDATES.inc()
 
     db = None
     try:

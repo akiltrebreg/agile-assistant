@@ -21,6 +21,12 @@ from typing import Any
 
 import pymorphy3
 
+from hse_prom_prog.metrics import (
+    SANITIZER_ANAPHORA_CARRIES,
+    SANITIZER_CORRECTIONS,
+    SANITIZER_FALLBACK_EXTRACTIONS,
+)
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -209,6 +215,11 @@ def normalize_enum_value(field: str, value: str | None) -> str | None:
     normalized = value.strip()
     result = synonyms.get(normalized.lower())
     if result is not None:
+        if result != normalized:
+            # Layer 1 fired: synonym table actually changed the value
+            # (e.g. Russian noun -> canonical English enum). Identity
+            # hits (LLM already returned the canonical) don't count.
+            SANITIZER_CORRECTIONS.labels(layer="1_synonym").inc()
         return result
 
     # Exact canonical match (LLM returned canonical directly)
@@ -346,16 +357,21 @@ def _check_team_name(value: str, user_query: str) -> bool:
 def is_hallucination(field: str, value: str, user_query: str) -> bool:
     """Detect likely hallucinated values in free-text fields."""
     if _is_generic_hallucination(value, user_query):
+        SANITIZER_CORRECTIONS.labels(layer="3_hallucination").inc()
         return True
     if field == "issue_key":
-        return _check_issue_key(value, user_query)
-    if field == "assignee":
-        return _check_assignee(value, user_query)
-    if field in ("sprint_name", "cluster"):
-        return _check_sprint_or_cluster(field, value, user_query)
-    if field == "team_name":
-        return _check_team_name(value, user_query)
-    return False
+        flagged = _check_issue_key(value, user_query)
+    elif field == "assignee":
+        flagged = _check_assignee(value, user_query)
+    elif field in ("sprint_name", "cluster"):
+        flagged = _check_sprint_or_cluster(field, value, user_query)
+    elif field == "team_name":
+        flagged = _check_team_name(value, user_query)
+    else:
+        return False
+    if flagged:
+        SANITIZER_CORRECTIONS.labels(layer="3_hallucination").inc()
+    return flagged
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +447,7 @@ def _sanitize_enum_field(
             field,
             validated,
         )
+        SANITIZER_CORRECTIONS.labels(layer="4_enum_check").inc()
         return None
     return validated
 
@@ -558,6 +575,8 @@ def _carry_forward_entities(
     for field in _CARRY_FORWARD_FIELDS:
         if not result.get(field) and prev_entities.get(field):
             result[field] = prev_entities[field]
+            SANITIZER_CORRECTIONS.labels(layer="6_anaphora").inc()
+            SANITIZER_ANAPHORA_CARRIES.labels(entity_type=field).inc()
             logger.info(
                 "[EntitySanitizer] carry-forward %s=%r from previous turn",
                 field,
@@ -628,6 +647,8 @@ def _fill_missing_enums_from_query(
         extracted = _fallback_extract_enum(field, query_lemmas, db_enums)
         if extracted is not None:
             out[field] = extracted
+            SANITIZER_CORRECTIONS.labels(layer="7_fallback").inc()
+            SANITIZER_FALLBACK_EXTRACTIONS.labels(field=field).inc()
             logger.info(
                 "[EntitySanitizer] fallback-extracted %s=%r from query lemmas",
                 field,

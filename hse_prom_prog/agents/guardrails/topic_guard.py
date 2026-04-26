@@ -19,7 +19,17 @@ import logging
 import re
 from dataclasses import dataclass
 
+from hse_prom_prog.metrics import GUARDRAIL_L1_RESULTS
+
 logger = logging.getLogger(__name__)
+
+# Map internal reason strings to a small, stable Prometheus label set —
+# wider cardinality would clutter the dashboard with one-off variants.
+_L1_REASON_LABELS = {
+    "blocked:prompt_injection": "injection_blocked",
+    "whitelist": "whitelist_fast_path",
+    "pass": "pass",
+}
 
 
 _ALWAYS_PASS_PATTERNS: list[re.Pattern[str]] = [
@@ -77,12 +87,17 @@ class TopicGuard:
         for pattern in _HARD_DENY_PATTERNS:
             if pattern.search(query):
                 logger.warning("[TopicGuard] HARD DENY: %r", query[:100])
+                GUARDRAIL_L1_RESULTS.labels(
+                    reason=_L1_REASON_LABELS["blocked:prompt_injection"]
+                ).inc()
                 return GuardResult(passed=False, reason="blocked:prompt_injection")
 
         for pattern in _ALWAYS_PASS_PATTERNS:
             if pattern.search(query):
+                GUARDRAIL_L1_RESULTS.labels(reason=_L1_REASON_LABELS["whitelist"]).inc()
                 return GuardResult(passed=True, reason="whitelist")
 
+        GUARDRAIL_L1_RESULTS.labels(reason=_L1_REASON_LABELS["pass"]).inc()
         return GuardResult(passed=True, reason="pass")
 
 

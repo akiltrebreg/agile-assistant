@@ -10,6 +10,7 @@ from uuid import UUID
 
 from hse_prom_prog.memory.conversation_repo import ConversationRepository
 from hse_prom_prog.memory.token_estimator import estimate_tokens
+from hse_prom_prog.metrics import MEMORY_CONTEXT_TOKENS, MEMORY_CONTEXT_TURNS
 from hse_prom_prog.models.memory import ConversationContext, Message
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,9 @@ class ContextBuilder:
             estimate_tokens(existing_summary) if existing_summary else 0
         )
 
+        MEMORY_CONTEXT_TOKENS.observe(history_tokens)
+        MEMORY_CONTEXT_TURNS.observe(len(kept))
+
         return ConversationContext(
             summary=existing_summary,
             recent_turns=[self._message_to_turn(m) for m in kept],
@@ -94,13 +98,13 @@ class ContextBuilder:
         Prefer ``content_truncated`` (always ≤ 150 tok) over the full body so
         long assistant replies don't blow the budget during replay.
         """
-        body = msg.content_truncated if msg.content_truncated else msg.content
+        body = msg.content_truncated or msg.content
         # +2 tokens for the role label and a separator, stable across turns.
         return estimate_tokens(body) + 2
 
     @staticmethod
     def _message_to_turn(msg: Message) -> dict:
-        body = msg.content_truncated if msg.content_truncated else msg.content
+        body = msg.content_truncated or msg.content
         return {
             "role": msg.role,
             "content": body,

@@ -18,6 +18,8 @@ import re
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from hse_prom_prog.metrics import GUARDRAIL_L3_CHECKS_FAILED, GUARDRAIL_L3_RESULTS
+
 logger = logging.getLogger(__name__)
 
 
@@ -144,8 +146,16 @@ class ResponseGuard:
         failed = [c for c in checks if not c.passed]
         blocked = any(c.name in self._CRITICAL_CHECKS for c in failed)
 
+        passed = not failed
+        GUARDRAIL_L3_RESULTS.labels(
+            passed=str(passed).lower(),
+            blocked=str(blocked).lower(),
+        ).inc()
+        for failed_check in failed:
+            GUARDRAIL_L3_CHECKS_FAILED.labels(check_name=failed_check.name).inc()
+
         return OutputGuardResult(
-            passed=not failed,
+            passed=passed,
             checks=checks,
             sanitized_response=sanitized,
             blocked=blocked,

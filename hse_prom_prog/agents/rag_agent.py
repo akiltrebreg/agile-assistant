@@ -7,10 +7,12 @@ with a cross-encoder, and sends the best ones as context to the LLM.
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from hse_prom_prog.config import settings
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.metrics import RAG_AGENT_DURATION
 from hse_prom_prog.rag.reranker import get_reranker
 
 if TYPE_CHECKING:
@@ -50,20 +52,24 @@ class RAGAgent:
         original_query = state.get("original_query", "")
         logger.info("[RAG Agent] Processing query: %s", original_query[:80])
 
-        docs = self._retrieve_and_rerank(original_query)
-        if not docs:
-            return {**_EMPTY}
-
-        context, sources = self._build_context(docs)
-
+        start = time.time()
         try:
-            answer = self._generate_answer(original_query, context)
-        except Exception as e:
-            logger.error("[RAG Agent] LLM generation failed: %s", e)
-            return {**_EMPTY, "rag_sources": sources, "error": str(e)}
+            docs = self._retrieve_and_rerank(original_query)
+            if not docs:
+                return {**_EMPTY}
 
-        logger.info("[RAG Agent] Generated answer with %d sources", len(sources))
-        return {"rag_response": answer, "rag_sources": sources}
+            context, sources = self._build_context(docs)
+
+            try:
+                answer = self._generate_answer(original_query, context)
+            except Exception as e:
+                logger.error("[RAG Agent] LLM generation failed: %s", e)
+                return {**_EMPTY, "rag_sources": sources, "error": str(e)}
+
+            logger.info("[RAG Agent] Generated answer with %d sources", len(sources))
+            return {"rag_response": answer, "rag_sources": sources}
+        finally:
+            RAG_AGENT_DURATION.observe(time.time() - start)
 
     # ------------------------------------------------------------------
     # Internal helpers

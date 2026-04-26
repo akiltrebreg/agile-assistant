@@ -94,3 +94,251 @@ CELERY_QUEUE_LENGTH = Gauge(
     "Number of tasks waiting in Redis queue",
     namespace=_NAMESPACE,
 )
+
+# ── Supervisor Agent ──────────────────────────────────────────
+# Bucket scale spans both paths: fast = regex hit (sub-ms) and slow =
+# vLLM call (~0.5-3s). Same Histogram so quantiles are comparable
+# without a label-aware aggregator.
+_SUPERVISOR_BUCKETS = (0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0)
+
+SUPERVISOR_CLASSIFICATIONS = Counter(
+    "supervisor_classifications_total",
+    "Supervisor classifications by intent and query_type",
+    labelnames=("intent", "query_type"),
+    namespace=_NAMESPACE,
+)
+SUPERVISOR_DURATION = Histogram(
+    "supervisor_duration_seconds",
+    "Supervisor classification latency",
+    labelnames=("path",),
+    namespace=_NAMESPACE,
+    buckets=_SUPERVISOR_BUCKETS,
+)
+SUPERVISOR_FAST_PATH = Counter(
+    "supervisor_fast_path_total",
+    "Requests classified by regex without LLM call",
+    namespace=_NAMESPACE,
+)
+SUPERVISOR_LLM_CALLS = Counter(
+    "supervisor_llm_calls_total",
+    "LLM calls for classification (slow path)",
+    namespace=_NAMESPACE,
+)
+SUPERVISOR_PARSE_ERRORS = Counter(
+    "supervisor_parse_errors_total",
+    "JSON parse failures from LLM classification response",
+    namespace=_NAMESPACE,
+)
+
+# ── SQL Agent ─────────────────────────────────────────────────
+SQL_AGENT_DURATION = Histogram(
+    "sql_agent_duration_seconds",
+    "Total SQL Agent duration (LangGraph StateGraph execution)",
+    labelnames=("intent",),
+    namespace=_NAMESPACE,
+    buckets=(0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0, 30.0),
+)
+# Indexed PG queries should land < 50ms; quarter-second is the warning
+# zone before we start blaming a missing index.
+SQL_QUERY_DURATION = Histogram(
+    "sql_query_duration_seconds",
+    "PostgreSQL query execution time in run_query tool",
+    namespace=_NAMESPACE,
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
+)
+SQL_QUERIES_TOTAL = Counter(
+    "sql_queries_total",
+    "SQL queries executed by status",
+    labelnames=("status",),
+    namespace=_NAMESPACE,
+)
+SQL_RETRIES = Counter(
+    "sql_retries_total",
+    "SQL Agent LLM retry attempts",
+    namespace=_NAMESPACE,
+)
+SQL_EMPTY_RESULTS = Counter(
+    "sql_empty_results_total",
+    "SQL queries returning zero rows",
+    labelnames=("intent",),
+    namespace=_NAMESPACE,
+)
+SQL_RESULT_ROWS = Histogram(
+    "sql_result_rows",
+    "Number of rows returned by SQL query",
+    namespace=_NAMESPACE,
+    buckets=(0, 1, 5, 10, 20, 50, 100, 200),
+)
+
+# ── RAG Agent ─────────────────────────────────────────────────
+RAG_RETRIEVAL_DURATION = Histogram(
+    "rag_retrieval_duration_seconds",
+    "Retrieval latency by search type",
+    labelnames=("search_type",),
+    namespace=_NAMESPACE,
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
+)
+# bge-reranker-v2-m3 on 20 chunks typically lands at 100-500 ms.
+RAG_RERANKER_DURATION = Histogram(
+    "rag_reranker_duration_seconds",
+    "Cross-encoder reranking latency",
+    namespace=_NAMESPACE,
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
+)
+RAG_AGENT_DURATION = Histogram(
+    "rag_agent_duration_seconds",
+    "Total RAG Agent duration (retrieval + reranking + LLM generation)",
+    namespace=_NAMESPACE,
+    buckets=(0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 21.0),
+)
+RAG_CHUNKS_RETRIEVED = Histogram(
+    "rag_chunks_retrieved",
+    "Chunks returned by retriever before reranking",
+    labelnames=("search_type",),
+    namespace=_NAMESPACE,
+    buckets=(0, 1, 2, 4, 8, 10, 15, 20, 30),
+)
+RAG_CHUNKS_AFTER_RERANKER = Histogram(
+    "rag_chunks_after_reranker",
+    "Chunks passing reranker threshold",
+    namespace=_NAMESPACE,
+    buckets=(0, 1, 2, 3, 4, 5, 10),
+)
+RAG_TOP_SCORE = Histogram(
+    "rag_top_score",
+    "Cosine similarity of the best retrieved chunk",
+    labelnames=("search_type",),
+    namespace=_NAMESPACE,
+    buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+)
+RAG_FALLBACKS = Counter(
+    "rag_fallbacks_total",
+    "RAG search mode fallbacks",
+    labelnames=("from_mode", "to_mode"),
+    namespace=_NAMESPACE,
+)
+RAG_REQUESTS = Counter(
+    "rag_requests_total",
+    "Total RAG requests by search type",
+    labelnames=("search_type",),
+    namespace=_NAMESPACE,
+)
+
+# ── Validator Agent ───────────────────────────────────────────
+VALIDATOR_RESULTS = Counter(
+    "validator_results_total",
+    "Validation results by data availability",
+    labelnames=("use_sql", "use_rag"),
+    namespace=_NAMESPACE,
+)
+VALIDATOR_DATA_MISSING = Counter(
+    "validator_data_missing_total",
+    "Validation: data source returned no data",
+    labelnames=("source",),
+    namespace=_NAMESPACE,
+)
+
+# ── Response Agent ────────────────────────────────────────────
+RESPONSE_DURATION = Histogram(
+    "response_duration_seconds",
+    "Response Agent generation latency by processing branch",
+    labelnames=("branch",),
+    namespace=_NAMESPACE,
+    buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0),
+)
+RESPONSE_LLM_TIMEOUTS = Counter(
+    "response_llm_timeouts_total",
+    "LLM timeouts during response generation",
+    namespace=_NAMESPACE,
+)
+# vllm_max_tokens=600 is the hard ceiling; if the histogram crowds the
+# top bucket the prompt is too tight or the cap is too low.
+RESPONSE_LENGTH_TOKENS = Histogram(
+    "response_length_tokens",
+    "Generated response length in estimated tokens",
+    labelnames=("branch",),
+    namespace=_NAMESPACE,
+    buckets=(10, 25, 50, 100, 150, 200, 300, 400, 500, 600),
+)
+RESPONSE_TRUNCATED = Counter(
+    "response_truncated_total",
+    "Responses truncated due to task list overflow (>20 tasks)",
+    namespace=_NAMESPACE,
+)
+
+# ── Guardrails (L1 / L2 / L3) ─────────────────────────────────
+GUARDRAIL_L1_RESULTS = Counter(
+    "guardrail_l1_results_total",
+    "L1 TopicGuard results",
+    labelnames=("reason",),
+    namespace=_NAMESPACE,
+)
+GUARDRAIL_L2_RESULTS = Counter(
+    "guardrail_l2_results_total",
+    "L2 SQLGuard results",
+    labelnames=("allowed", "layer"),
+    namespace=_NAMESPACE,
+)
+GUARDRAIL_L3_RESULTS = Counter(
+    "guardrail_l3_results_total",
+    "L3 ResponseGuard results",
+    labelnames=("passed", "blocked"),
+    namespace=_NAMESPACE,
+)
+GUARDRAIL_L3_CHECKS_FAILED = Counter(
+    "guardrail_l3_checks_failed_total",
+    "L3 ResponseGuard individual check failures",
+    labelnames=("check_name",),
+    namespace=_NAMESPACE,
+)
+
+# ── Entity Sanitizer ──────────────────────────────────────────
+SANITIZER_CORRECTIONS = Counter(
+    "sanitizer_corrections_total",
+    "Entity corrections by sanitizer layer",
+    labelnames=("layer",),
+    namespace=_NAMESPACE,
+)
+SANITIZER_ANAPHORA_CARRIES = Counter(
+    "sanitizer_anaphora_carries_total",
+    "Anaphoric carry-forward events by entity type",
+    labelnames=("entity_type",),
+    namespace=_NAMESPACE,
+)
+SANITIZER_FALLBACK_EXTRACTIONS = Counter(
+    "sanitizer_fallback_extractions_total",
+    "Fallback enum extractions from raw query (layer 7)",
+    labelnames=("field",),
+    namespace=_NAMESPACE,
+)
+
+# ── Memory Layer ──────────────────────────────────────────────
+# Context-window budget defaults to 1200 tokens (HISTORY_TOKEN_BUDGET).
+MEMORY_CONTEXT_TOKENS = Histogram(
+    "memory_context_tokens",
+    "Tokens in conversation_history block injected into prompts",
+    namespace=_NAMESPACE,
+    buckets=(0, 100, 200, 400, 600, 800, 1000, 1200, 1500),
+)
+MEMORY_CONTEXT_TURNS = Histogram(
+    "memory_context_turns",
+    "Dialog turns fitting in the sliding window",
+    namespace=_NAMESPACE,
+    buckets=(0, 1, 2, 3, 4, 5, 8, 10, 15, 20),
+)
+MEMORY_SESSION_ROTATIONS = Counter(
+    "memory_session_rotations_total",
+    "Session rotation events",
+    labelnames=("reason",),
+    namespace=_NAMESPACE,
+)
+MEMORY_PROFILE_UPDATES = Counter(
+    "memory_profile_updates_total",
+    "Async user profile update events",
+    namespace=_NAMESPACE,
+)
+MEMORY_SUMMARIZATIONS = Counter(
+    "memory_summarizations_total",
+    "Session summarization events",
+    namespace=_NAMESPACE,
+)

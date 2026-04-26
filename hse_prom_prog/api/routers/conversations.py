@@ -18,6 +18,7 @@ from hse_prom_prog.api.schemas.conversation import (
     MessageResponse,
 )
 from hse_prom_prog.memory.manager import MemoryManager
+from hse_prom_prog.metrics import MEMORY_SESSION_ROTATIONS
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ def close_conversation(
         )
 
     memory.conversation_repo.close(conversation_id)
+    MEMORY_SESSION_ROTATIONS.labels(reason="explicit_close").inc()
 
     summarize_task_id: str | None = None
     if conv.user_id is not None:

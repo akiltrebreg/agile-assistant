@@ -7,11 +7,13 @@ Provides reranking, threshold filtering, and "Lost in the Middle" reordering.
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from sentence_transformers import CrossEncoder
 
 from hse_prom_prog.config import settings
+from hse_prom_prog.metrics import RAG_CHUNKS_AFTER_RERANKER, RAG_RERANKER_DURATION
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
@@ -73,6 +75,7 @@ class Reranker:
         if not documents:
             return []
 
+        start = time.time()
         # Step 1: Score all documents against the query
         pairs = [(query, doc.page_content) for doc in documents]
         scores = self._model.predict(pairs)
@@ -84,6 +87,8 @@ class Reranker:
 
         if not scored_docs:
             logger.info("[Reranker] All documents below threshold %.2f", self._threshold)
+            RAG_RERANKER_DURATION.observe(time.time() - start)
+            RAG_CHUNKS_AFTER_RERANKER.observe(0)
             return []
 
         # Step 3: Sort by score descending, take top_n
@@ -96,6 +101,9 @@ class Reranker:
             scored_docs[0][0],
             scored_docs[-1][0],
         )
+
+        RAG_RERANKER_DURATION.observe(time.time() - start)
+        RAG_CHUNKS_AFTER_RERANKER.observe(len(scored_docs))
 
         # Step 4: "Lost in the Middle" reordering
         return self._lost_in_the_middle_reorder(scored_docs)

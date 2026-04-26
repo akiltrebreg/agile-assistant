@@ -10,18 +10,69 @@ a natural language response. Supports four query_types:
 
 import json
 import logging
+import time
 from datetime import datetime
 from typing import Any
 
 from hse_prom_prog.llm.client import LLMClient
 from hse_prom_prog.memory.formatter import format_history
 from hse_prom_prog.memory.token_estimator import estimate_tokens
+from hse_prom_prog.metrics import (
+    RESPONSE_DURATION,
+    RESPONSE_LENGTH_TOKENS,
+    RESPONSE_LLM_TIMEOUTS,
+    RESPONSE_TRUNCATED,
+)
 from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
 
 # Maximum rows to include in the LLM prompt to avoid token overflow
 _MAX_ROWS_IN_PROMPT = 20
+
+# Map (query_type, intent, route) -> branch label for RESPONSE_DURATION /
+# RESPONSE_LENGTH_TOKENS. Mirrors the if-chain in process() so the
+# branch label always reflects which generator actually ran.
+_SQL_INTENT_BRANCHES: dict[str, str] = {
+    "task": "sql_task",
+    "tasks_filter": "sql_tasks_filter",
+    "metric": "sql_metric",
+}
+
+
+def _resolve_branch(state: dict[str, Any]) -> str:
+    """Return the branch label that process() will land in."""
+    query_type = state.get("query_type", "sql")
+    intent = state.get("intent", "general")
+    route = state.get("route", "db_query")
+
+    if query_type == "error" or intent == "error":
+        return "error"
+    if route == "direct_response" or query_type == "simple":
+        return "simple"
+
+    validation = state.get("validation_result") or {}
+    use_sql = validation.get("use_sql", True)
+    use_rag = validation.get("use_rag", False)
+    note = validation.get("note")
+
+    # Hybrid/rag with no data → routed to the "both failed" reply, which
+    # is a fixed message; treat it as the error branch for latency tracking.
+    if query_type != "sql" and note and not use_sql and not use_rag:
+        return "error"
+    if query_type == "rag" and use_rag:
+        return "rag"
+    if query_type == "hybrid" and (use_sql or use_rag):
+        return "hybrid"
+    return _SQL_INTENT_BRANCHES.get(intent, "sql_task")
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    """Heuristic: any TimeoutError-ish exception, including httpx/openai variants."""
+    if isinstance(exc, TimeoutError):
+        return True
+    return "timeout" in type(exc).__name__.lower()
+
 
 _SYSTEM_ROLE = (
     "Ты — ассистент для анализа данных о Jira-задачах и Agile-метриках. "
@@ -137,6 +188,7 @@ class ResponseAgent:
         if total > _MAX_ROWS_IN_PROMPT:
             extra = total - _MAX_ROWS_IN_PROMPT
             result += f"\n\n... и ещё {extra} задач (показаны первые {_MAX_ROWS_IN_PROMPT})"
+            RESPONSE_TRUNCATED.inc()
         return result
 
     def _prepare_metrics(self, rows: list[dict[str, Any]]) -> str:
@@ -430,6 +482,8 @@ class ResponseAgent:
             logger.info("[Response Agent] Generated SQL response for intent=%s", intent)
 
         except Exception as e:
+            if _is_timeout(e):
+                RESPONSE_LLM_TIMEOUTS.inc()
             logger.error("[Response Agent] Error generating response: %s", e)
             response = (
                 f"Не удалось сгенерировать ответ: {e}\n\n---\n*Попробуйте переформулировать запрос*"
@@ -442,6 +496,21 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Generate natural language response. Thin wrapper that records
+        latency and length per branch — the routing logic itself lives in
+        ``_process_impl`` so the metrics here stay declarative."""
+        branch = _resolve_branch(state)
+        start = time.time()
+        try:
+            update = self._process_impl(state)
+        finally:
+            RESPONSE_DURATION.labels(branch=branch).observe(time.time() - start)
+        final = (update or {}).get("final_response") or ""
+        if final:
+            RESPONSE_LENGTH_TOKENS.labels(branch=branch).observe(estimate_tokens(final))
+        return update
+
+    def _process_impl(self, state: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915, C901
         """Generate natural language response based on query_type and data.
 
         Args:
@@ -480,6 +549,8 @@ class ResponseAgent:
             try:
                 response = self._generate_direct_response(original_query, history=prefix)
             except Exception as e:
+                if _is_timeout(e):
+                    RESPONSE_LLM_TIMEOUTS.inc()
                 logger.error("[Response Agent] Direct response error: %s", e)
                 response = (
                     f"Не удалось сгенерировать ответ: {e}\n\n"
@@ -517,6 +588,8 @@ class ResponseAgent:
             try:
                 response = self._generate_rag_response(original_query, rag_response, rag_sources)
             except Exception as e:
+                if _is_timeout(e):
+                    RESPONSE_LLM_TIMEOUTS.inc()
                 logger.error("[Response Agent] RAG response error: %s", e)
                 response = f"Не удалось сгенерировать ответ: {e}"
             return {"final_response": response}
@@ -540,6 +613,8 @@ class ResponseAgent:
                     history=prefix,
                 )
             except Exception as e:
+                if _is_timeout(e):
+                    RESPONSE_LLM_TIMEOUTS.inc()
                 logger.error("[Response Agent] Hybrid response error: %s", e)
                 response = f"Не удалось сгенерировать ответ: {e}"
             return {"final_response": response}

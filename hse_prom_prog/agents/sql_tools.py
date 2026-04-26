@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 from langchain_core.tools import tool
@@ -17,6 +18,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from hse_prom_prog.agents.guardrails import check_sql
 from hse_prom_prog.database.connection import DatabaseConnection
+from hse_prom_prog.metrics import (
+    SQL_QUERIES_TOTAL,
+    SQL_QUERY_DURATION,
+    SQL_RESULT_ROWS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,7 @@ def run_query(query: str) -> str:
     guard = check_sql(sql)
     if not guard.allowed:
         logger.warning("[SQL Tools] Blocked by SQLGuard (%s): %s", guard.layer, guard.reason)
+        SQL_QUERIES_TOTAL.labels(status="blocked").inc()
         return (
             f"ERROR: Query blocked by security policy "
             f"(layer={guard.layer}, reason={guard.reason}). "
@@ -64,12 +71,18 @@ def run_query(query: str) -> str:
 
     logger.info("[SQL Tools] run_query: %s", sql[:200])
 
+    sql_start = time.time()
     try:
         results = db.execute_query(sql)
     except SQLAlchemyError as e:
+        SQL_QUERY_DURATION.observe(time.time() - sql_start)
+        SQL_QUERIES_TOTAL.labels(status="error").inc()
         error_msg = f"SQL Error: {e!s}"
         logger.warning("[SQL Tools] %s", error_msg)
         return error_msg
+    SQL_QUERY_DURATION.observe(time.time() - sql_start)
+    SQL_QUERIES_TOTAL.labels(status="success").inc()
+    SQL_RESULT_ROWS.observe(len(results))
 
     if not results:
         return json.dumps({"row_count": 0, "rows": []})

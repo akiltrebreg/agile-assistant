@@ -17,6 +17,7 @@ import contextlib
 import json
 import logging
 import re
+import time
 from typing import Annotated, Any
 
 from langchain_core.messages import (
@@ -36,6 +37,11 @@ from hse_prom_prog.agents.schema_loader import get_schema_compact
 from hse_prom_prog.agents.sql_tools import SQL_TOOLS, set_db
 from hse_prom_prog.config import settings
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
+from hse_prom_prog.metrics import (
+    SQL_AGENT_DURATION,
+    SQL_EMPTY_RESULTS,
+    SQL_RETRIES,
+)
 from hse_prom_prog.models.memory import ConversationContext
 
 logger = logging.getLogger(__name__)
@@ -469,6 +475,7 @@ def _check_retry(state: AgentState) -> dict:
 
         if is_error:
             retry += 1
+            SQL_RETRIES.inc()
             if retry >= _MAX_RETRIES:
                 logger.warning("[SQL Agent] Max retries reached (%d)", retry)
             else:
@@ -487,6 +494,7 @@ def _check_retry(state: AgentState) -> dict:
             hint = _semantic_check(user_query, last_sql)
             if hint:
                 retry += 1
+                SQL_RETRIES.inc()
                 extra_messages.append(
                     HumanMessage(
                         content=f"The query returned data, but it is wrong. {hint} "
@@ -622,6 +630,7 @@ class SQLAgent:
             dict with sql_query, sql_result, error, original_query.
         """
         original_query = state.get("original_query", "")
+        intent = state.get("intent") or "unknown"
         logger.info("[SQL Agent] Processing: %s", original_query[:80])
 
         self._ensure_db()
@@ -648,44 +657,48 @@ class SQLAgent:
             HumanMessage(content=original_query),
         ]
 
+        agent_start = time.time()
         try:
-            result = self._graph.invoke(
-                {
-                    "messages": messages,
-                    "retry_count": 0,
-                    "final_sql": "",
-                    "final_result": [],
-                    "final_error": "",
+            try:
+                result = self._graph.invoke(
+                    {
+                        "messages": messages,
+                        "retry_count": 0,
+                        "final_sql": "",
+                        "final_result": [],
+                        "final_error": "",
+                    }
+                )
+            except Exception as e:
+                logger.error("[SQL Agent] Graph execution failed: %s", e)
+                return {
+                    "original_query": original_query,
+                    "sql_query": None,
+                    "sql_result": None,
+                    "error": f"Agent error: {e}",
                 }
-            )
-        except Exception as e:
-            logger.error("[SQL Agent] Graph execution failed: %s", e)
+
+            sql = result.get("final_sql", "")
+            sql_result = result.get("final_result")
+            error = result.get("final_error", "")
+
+            if sql:
+                logger.info("[SQL Agent] Final SQL: %s", sql[:200])
+            if error:
+                logger.warning("[SQL Agent] Error: %s", error[:200])
+            row_count = len(sql_result) if sql_result else 0
+            logger.info("[SQL Agent] Returned %d row(s)", row_count)
+            if row_count == 0 and not error:
+                SQL_EMPTY_RESULTS.labels(intent=intent).inc()
+
             return {
                 "original_query": original_query,
-                "sql_query": None,
-                "sql_result": None,
-                "error": f"Agent error: {e}",
+                "sql_query": sql or None,
+                "sql_result": sql_result or None,
+                "error": error or None,
             }
-
-        sql = result.get("final_sql", "")
-        sql_result = result.get("final_result")
-        error = result.get("final_error", "")
-
-        if sql:
-            logger.info("[SQL Agent] Final SQL: %s", sql[:200])
-        if error:
-            logger.warning("[SQL Agent] Error: %s", error[:200])
-        logger.info(
-            "[SQL Agent] Returned %d row(s)",
-            len(sql_result) if sql_result else 0,
-        )
-
-        return {
-            "original_query": original_query,
-            "sql_query": sql or None,
-            "sql_result": sql_result or None,
-            "error": error or None,
-        }
+        finally:
+            SQL_AGENT_DURATION.labels(intent=intent).observe(time.time() - agent_start)
 
 
 # ── Utilities ────────────────────────────────────────────────
