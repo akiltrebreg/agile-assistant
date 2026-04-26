@@ -567,9 +567,11 @@ services:
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-hse_user}:${POSTGRES_PASSWORD:-hse_password}@postgres:5432/langfuse_db"
       NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET:-changeme-in-production}"
-      # NEXTAUTH_URL must match the URL the user types in the browser;
-      # localhost:3001 is the host-side mapping below.
-      NEXTAUTH_URL: "http://localhost:3001"
+      # NEXTAUTH_URL MUST match the URL the user types in the browser
+      # (cookies are scoped to host:port). Override via .env on hosts
+      # that aren't localhost — otherwise sign-in / sign-up hang on
+      # callback because the cookie domain doesn't match.
+      NEXTAUTH_URL: "${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}"
       SALT: "${LANGFUSE_SALT:-changeme-in-production}"
       TELEMETRY_ENABLED: "false"
       LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
@@ -577,21 +579,12 @@ services:
     # docker network Langfuse listens on 3000 (LANGFUSE_HOST default).
     ports:
       - "3001:3000"
-    healthcheck:
-      # node is always present in the Next.js base image, unlike wget /
-      # curl. Hits the public health endpoint and exits 0 only on 200.
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://localhost:3000/api/public/health').then(r =>
-          process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
+    # No healthcheck: the Langfuse v2 image ships without wget/curl,
+    # and the Node-based fetch probe gave false negatives even on a
+    # working server. Real liveness is checked externally via
+    # `curl http://localhost:3001/api/public/health`. tracing.py
+    # degrades gracefully if Langfuse is unreachable, so an absent
+    # healthcheck doesn't risk silent breakage in api/celery-worker.
     networks:
       - hse-network
 
