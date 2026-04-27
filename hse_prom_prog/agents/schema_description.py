@@ -47,7 +47,11 @@ issue_key — паттерн [A-Z]+-число (например, AL-38787, DATA
 """.strip()
 
 SUPERVISOR_FEW_SHOT_EXAMPLES = """
-## Примеры (по одному на каждую комбинацию query_type × intent)
+## Примеры
+Каждая комбинация query_type × intent представлена хотя бы одним
+примером. Граница ``rag`` ↔ ``hybrid`` важна для модели, поэтому
+hybrid (метрика + команда + совет) показан несколькими формулировками
+советов: "что можно улучшить", "это нормально".
 
 Q: "AL-38787"
 A: {"query_type": "sql", "intent": "task", "entities": {"issue_key": "AL-38787"}}
@@ -80,6 +84,10 @@ A: {"query_type": "rag", "intent": "general", "entities": {}}
 Q: "Done total команды lpop и что можно улучшить"
 A: {"query_type": "hybrid", "intent": "metric", \
 "entities": {"team_name": "lpop", "metric_name": "done_total"}}
+
+Q: "Cancel rate команды cthulhu — это нормально?"
+A: {"query_type": "hybrid", "intent": "metric", \
+"entities": {"team_name": "cthulhu", "metric_name": "cancel_rate"}}
 
 Q: "Привет"
 A: {"query_type": "simple", "intent": "general", "entities": {}}
