@@ -71,6 +71,12 @@ A: {"query_type": "sql", "intent": "metric", \
 Q: "Как рассчитывается Done Total?"
 A: {"query_type": "rag", "intent": "general", "entities": {}}
 
+Q: "Какими лейблами отметить задачу, чтобы она была прогрумлена?"
+A: {"query_type": "rag", "intent": "general", "entities": {}}
+
+Q: "Как проводить груминг беклога?"
+A: {"query_type": "rag", "intent": "general", "entities": {}}
+
 Q: "Done total команды lpop и что можно улучшить"
 A: {"query_type": "hybrid", "intent": "metric", \
 "entities": {"team_name": "lpop", "metric_name": "done_total"}}

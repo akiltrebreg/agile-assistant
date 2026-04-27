@@ -594,9 +594,9 @@ class ResponseAgent:
             return {
                 "final_response": (
                     "К сожалению, в моей базе знаний нет ответа на этот вопрос.\n\n"
-                    "Я могу помочь с:\n"
-                    "• Agile-практиками (Sprint Goal, Velocity, Backlog Grooming)\n"
-                    "• Метриками команд (Done Total, Scope Drop, Cancel Rate)\n"
+                    "Я могу помочь с:\n\n"
+                    "• Agile-практиками (Sprint Goal, Velocity, Backlog Grooming)\n\n"
+                    "• Метриками команд (Done Total, Scope Drop, Cancel Rate)\n\n"
                     "• Деталях о задачах Jira (текущий статус, описание)\n\n"
                     "Попробуйте переформулировать запрос ближе к этим темам."
                 ),

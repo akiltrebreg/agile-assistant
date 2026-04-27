@@ -31,14 +31,27 @@ from hse_prom_prog.models.memory import Conversation, ConversationContext
 from hse_prom_prog.models.task import TaskStatus
 from hse_prom_prog.rag.retriever import get_retriever
 from hse_prom_prog.tasks.celery_app import celery_app
-from hse_prom_prog.tracing import langfuse_client, langfuse_context
+from hse_prom_prog.tracing import langfuse_client
 
 logger = logging.getLogger(__name__)
 
-# Default token budget for the history slot injected into prompts.
-# 1200 ≈ the Response Agent's hybrid-branch floor; context builder
-# trims older turns when the total would exceed this.
-HISTORY_TOKEN_BUDGET = 1200
+# Default token budget for the conversation history slot injected
+# into prompts.
+#
+# Sized against the Supervisor classifier (the tightest prompt budget
+# in the pipeline): the avibe vLLM has max_model_len=4096 and the
+# static rubric (schema + few-shots + instructions) is already ~3500
+# tokens. After reserving 256 for the completion and ~100 for chat
+# template overhead we're left with roughly 240 tokens of free room
+# *before* this history block kicks in. Setting the budget at 800
+# keeps history generous while supervisor's hard truncation guard
+# (see :data:`_PROMPT_MAX_TOKENS` in agents/supervisor.py) can still
+# rescue pathological cases by dropping history entirely.
+#
+# Bumping this back up requires raising max_model_len on vLLM or
+# trimming the supervisor rubric — see the budget arithmetic in
+# the supervisor module-level docstring.
+HISTORY_TOKEN_BUDGET = 800
 
 # Any message-bearing conversation idle for longer than this gets closed
 # and replaced with a fresh one on the next user request. Keeps sessions
@@ -126,6 +139,13 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
     # Langfuse root trace — created up front so every nested @observe in
     # the workflow attaches to it via contextvars. ``langfuse_client`` is
     # None when the SDK is disabled / missing (graceful degradation).
+    #
+    # Note on context propagation: in Langfuse SDK v2,
+    # ``langfuse_context.update_current_trace`` does NOT accept a
+    # ``trace_id`` kwarg — the current trace is implicit (set by
+    # ``@observe`` decorators or by ``langfuse_client.trace``). Passing
+    # ``trace_id=`` raises ``TypeError`` and aborts the trace setup,
+    # which is exactly the bug we hit on the running server.
     trace = None
     if langfuse_client is not None:
         try:
@@ -139,7 +159,6 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
                     "celery_retry": self.request.retries,
                 },
             )
-            langfuse_context.update_current_trace(trace_id=trace.id)
         except Exception as exc:
             logger.warning("[WorkflowTask %s] Langfuse trace init failed: %s", task_id, exc)
             trace = None

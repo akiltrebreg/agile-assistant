@@ -49,6 +49,29 @@ _INTENT_TO_QUERY_TYPE: dict[str, str] = {
 # Valid query types
 _VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple", "off_topic"})
 
+# Hard token budget for the Supervisor classifier prompt.
+# vLLM ``avibe-gptq-8bit`` runs with ``--max-model-len=4096``. Subtract
+# the completion budget (``max_tokens=256``) and a safety margin for
+# the BOS/EOS/system tokens the chat template adds, and we get the
+# upper bound on what the prompt itself may contain.
+#
+# 4096 - 256 (completion) - 100 (chat template + safety) = 3740
+_PROMPT_MAX_TOKENS = 3740
+
+# Approximate token size from the rendered character count. The
+# tokenizer used by avibe (a Qwen-family BPE) compresses Cyrillic at
+# roughly 1 token per 2.3 characters; for mixed Russian + JSON braces
+# the number drifts slightly higher. 2.3 is conservative — it tends to
+# *over*-estimate, which is what we want from a safety guard.
+_CHARS_PER_TOKEN = 2.3
+_PROMPT_MAX_CHARS = int(_PROMPT_MAX_TOKENS * _CHARS_PER_TOKEN)
+
+
+def _approx_tokens(text: str) -> int:
+    """Cheap char-based token estimate; see ``_CHARS_PER_TOKEN`` above."""
+    return int(len(text) / _CHARS_PER_TOKEN)
+
+
 # Deterministic post-processing markers
 _RAG_MARKERS = (
     "целевой порог",
@@ -294,18 +317,19 @@ class SupervisorAgent:
                 return entities
         return None
 
-    def _classify_with_llm(
+    def _build_classifier_prompt(
         self,
         user_query: str,
         conversation_context: ConversationContext | None = None,
         user_profile: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Classify query intent, entities, and query_type via LLM.
+    ) -> str:
+        """Render the full classifier prompt for *user_query*.
 
-        Returns:
-            Dict with 'intent', 'entities', and 'query_type' keys.
+        Split out from :meth:`_classify_with_llm` so the overflow guard
+        can re-render with the optional blocks (history, profile)
+        progressively dropped without duplicating the static body.
         """
-        prompt = (
+        return (
             "Ты — классификатор запросов к базе данных Jira и базе знаний.\n\n"
             f"{SCHEMA_DESCRIPTION}\n\n"
             "Верни ТОЛЬКО JSON (без пояснений, без markdown):\n"
@@ -508,6 +532,73 @@ class SupervisorAgent:
             f'Запрос пользователя: "{user_query}"\n'
             "JSON:"
         )
+
+    def _build_prompt_within_budget(
+        self,
+        user_query: str,
+        conversation_context: ConversationContext | None,
+        user_profile: dict[str, Any] | None,
+    ) -> str:
+        """Render the prompt and progressively drop optional blocks until it fits.
+
+        vLLM's avibe model has ``max-model-len=4096``; the static rubric
+        already eats ~3500 tokens. When a long conversation + a populated
+        profile push the prompt past :data:`_PROMPT_MAX_TOKENS`, the LLM
+        returns HTTP 400 ("maximum context length is 4096 tokens") and
+        Supervisor crashes the workflow. We'd rather degrade gracefully:
+
+          1. Try the full prompt (history + profile).
+          2. If too long, drop the conversation history and rebuild
+             (anaphora resolution suffers, classification still works).
+          3. Still too long → drop the user profile too.
+          4. Last resort: return the bare prompt and log a warning. The
+             query itself is short, so this should never happen unless
+             the static rubric grows past the budget.
+        """
+        prompt = self._build_classifier_prompt(user_query, conversation_context, user_profile)
+        if _approx_tokens(prompt) <= _PROMPT_MAX_TOKENS:
+            return prompt
+
+        logger.warning(
+            "[Supervisor] Prompt overflow (%d tokens > %d budget) — dropping conversation history",
+            _approx_tokens(prompt),
+            _PROMPT_MAX_TOKENS,
+        )
+        prompt = self._build_classifier_prompt(user_query, None, user_profile)
+        if _approx_tokens(prompt) <= _PROMPT_MAX_TOKENS:
+            return prompt
+
+        logger.warning(
+            "[Supervisor] Prompt still overflows after dropping history "
+            "(%d tokens) — dropping user profile too",
+            _approx_tokens(prompt),
+        )
+        prompt = self._build_classifier_prompt(user_query, None, None)
+        if _approx_tokens(prompt) <= _PROMPT_MAX_TOKENS:
+            return prompt
+
+        # Static rubric alone is over budget — this is a deploy-time
+        # bug, not a runtime overflow. Log it loudly and let vLLM 400.
+        logger.error(
+            "[Supervisor] Static prompt (%d tokens) exceeds budget (%d). "
+            "Trim SCHEMA_DESCRIPTION / SUPERVISOR_FEW_SHOT_EXAMPLES.",
+            _approx_tokens(prompt),
+            _PROMPT_MAX_TOKENS,
+        )
+        return prompt
+
+    def _classify_with_llm(
+        self,
+        user_query: str,
+        conversation_context: ConversationContext | None = None,
+        user_profile: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Classify query intent, entities, and query_type via LLM.
+
+        Returns:
+            Dict with 'intent', 'entities', and 'query_type' keys.
+        """
+        prompt = self._build_prompt_within_budget(user_query, conversation_context, user_profile)
 
         # JSON response is ~30-60 tokens; even a maximal hybrid answer stays
         # under ~120 tokens. 256 gives ~4x headroom while returning ~256

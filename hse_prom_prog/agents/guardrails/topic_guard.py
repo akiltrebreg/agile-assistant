@@ -117,9 +117,11 @@ class TopicGuard:
 OFF_TOPIC_RESPONSE = (
     "К сожалению, этот вопрос выходит за рамки моих компетенций. "
     "Я — ассистент для анализа Jira-задач и Agile-метрик.\n\n"
-    "Я могу помочь с:\n"
-    "• Agile-практиками (Sprint Goal, Velocity, Backlog Grooming)\n"
-    "• Метриками команд (Done Total, Scope Drop, Cancel Rate)\n"
+    # Streamlit renders Markdown — single \n collapses bullets onto one
+    # line. Use \n\n between bullets so each • starts a new paragraph.
+    "Я могу помочь с:\n\n"
+    "• Agile-практиками (Sprint Goal, Velocity, Backlog Grooming)\n\n"
+    "• Метриками команд (Done Total, Scope Drop, Cancel Rate)\n\n"
     "• Деталях о задачах Jira (текущий статус, описание)\n\n"
     "Попробуйте задать вопрос по одной из этих тем!"
 )
