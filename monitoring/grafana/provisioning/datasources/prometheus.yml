@@ -1,8 +1,16 @@
 apiVersion: 1
 datasources:
   - name: Prometheus
+    # UID is referenced by every dashboard JSON ("uid": "prometheus").
+    # Without an explicit value Grafana auto-generates one and the
+    # dashboards can't resolve their datasource → "Datasource prometheus
+    # was not found" on every panel.
+    uid: prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    # Prometheus runs with --web.route-prefix=/prometheus/, so the
+    # API endpoints live under /prometheus/api/v1/...; Grafana must
+    # include the prefix in the base URL or every query 404s.
+    url: http://prometheus:9090/prometheus
     isDefault: true
     editable: false
