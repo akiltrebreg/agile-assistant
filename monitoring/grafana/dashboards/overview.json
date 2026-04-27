@@ -307,33 +307,33 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h])",
-          "legendFormat": "practicality"
-        },
-        {
-          "refId": "B",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h])",
-          "legendFormat": "language_quality"
-        },
-        {
-          "refId": "C",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h])",
-          "legendFormat": "text_cleanliness"
-        },
-        {
-          "refId": "D",
           "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h])",
           "legendFormat": "agile_correctness"
         },
         {
+          "refId": "B",
+          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h])",
+          "legendFormat": "practicality"
+        },
+        {
+          "refId": "C",
+          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h])",
+          "legendFormat": "context_handling"
+        },
+        {
+          "refId": "D",
+          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h])",
+          "legendFormat": "politeness"
+        },
+        {
           "refId": "E",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"completeness\"}[1h])",
-          "legendFormat": "completeness"
+          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h])",
+          "legendFormat": "text_cleanliness"
         },
         {
           "refId": "F",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h])",
-          "legendFormat": "politeness"
+          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h])",
+          "legendFormat": "language_quality"
         }
       ]
     }

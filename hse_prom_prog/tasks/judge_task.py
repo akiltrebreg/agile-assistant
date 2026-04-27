@@ -47,75 +47,215 @@ from hse_prom_prog.tracing import langfuse_client
 logger = logging.getLogger(__name__)
 
 
-# Weights chosen so practicality dominates (it's the metric users feel
-# day-to-day) and language/cleanliness together match it (a polished but
-# useless answer must not score above an actionable rough one).
+# The current judge prompt does not assign weights — all six criteria
+# count equally. weighted_total = mean(scores), so the Prometheus/Grafana
+# 0-1 scale (alerts at 0.7, dashboard thresholds 0.6/0.8) keeps working
+# unchanged. The dict is still indexed because the rest of the module
+# uses its keys as the canonical criterion list.
 CRITERIA_WEIGHTS: dict[str, float] = {
-    "practicality": 0.30,
-    "language_quality": 0.20,
-    "text_cleanliness": 0.20,
-    "agile_correctness": 0.10,
-    "completeness": 0.10,
-    "politeness": 0.10,
+    "agile_correctness": 1 / 6,
+    "practicality": 1 / 6,
+    "context_handling": 1 / 6,
+    "politeness": 1 / 6,
+    "text_cleanliness": 1 / 6,
+    "language_quality": 1 / 6,
 }
 
 
+# System prompt — a strict, step-by-step verifier rubric. Curly braces
+# in the embedded JSON example are doubled because this string is fed
+# verbatim to the LLM and must not be touched by str.format(); the
+# user template is the only string we .format(), and it has its own
+# placeholders (``question``, ``answer``).
 JUDGE_SYSTEM_PROMPT = """\
-Ты строгий оценщик качества ответов AI-ассистента, который анализирует
-Jira-задачи и Agile-метрики. На вход тебе даётся запрос пользователя
-(возможно с типом запроса) и ответ ассистента. Твоя задача — выставить
-по каждому из 6 критериев оценку 1 (критерий выполнен) или 0 (не выполнен).
+Ты — строгий проверяющий. Твоя задача — оценить ответ Agile коуча
+по 6 критериям. Каждый критерий бинарный: 0 или 1.
 
-Критерии:
+### ОСНОВНЫЕ ИНСТРУКЦИИ ###
 
-1. practicality (вес 0.30) — практичность.
-   1: ответ содержит конкретные данные (числа, статусы, имена), actionable
-      рекомендации и/или чёткие шаги действий.
-   0: ответ абстрактный, общий, без конкретики, бесполезен на практике.
+* Ты действуешь исключительно как **верификатор**, а не как советчик.
+* Проверяй ответ **шаг за шагом** по каждому критерию.
+* Для каждого нарушения **цитируй конкретный фрагмент** ответа.
+* Не допускай промежуточных значений: только 0 или 1.
+* У каждого критерия свой порог — читай внимательно.
+* Оценивай только финальный ответ модели, не черновик.
+* Помни: это ответ в корпоративном мессенджере.
 
-2. language_quality (вес 0.20) — качество языка.
-   1: текст грамотный, предложения структурированы, падежи и согласования
-      правильные.
-   0: грамматические ошибки, несогласованные предложения, нечитаемый текст.
+---
 
-3. text_cleanliness (вес 0.20) — чистота текста.
-   1: чистый текст без артефактов генерации — нет raw SQL, markdown-разметки
-      (```, ###), английских технических вставок, traceback, внутренних
-      идентификаторов (имена таблиц, имена колонок, connection strings).
-   0: видны SQL-запросы, markdown-мусор, Python traceback, имена внутренних
-      таблиц, connection strings.
+### КРИТЕРИИ ###
 
-4. agile_correctness (вес 0.10) — Agile-корректность.
-   1: Agile-термины (velocity, scope drop, story points, sprint goal)
-      использованы корректно, метрики интерпретируются верно.
-   0: путаница в терминах, неверная интерпретация метрик, фактические ошибки
-      в Agile-контексте.
-   Если в ответе нет Agile-терминов (например, приветствие) — выставляй 1.
+**1. agile_correctness — СТРОГИЙ порог. При сомнении — ставь 0.**
 
-5. completeness (вес 0.10) — полнота.
-   1: все части запроса адресованы, нет значимых пропусков.
-   0: часть вопроса проигнорирована, важная информация пропущена.
+Задай себе два вопроса:
+1. "Есть ли в ответе конкретная Agile-практика?"
+2. "Объясняет ли ответ, зачем эта практика нужна именно здесь?"
 
-6. politeness (вес 0.10) — вежливость.
-   1: вежливый, профессиональный тон, без грубости или снисходительности.
-   0: грубость, снисходительность, чрезмерная холодность.
+1 — оба ответа "да":
+  - упомянута конкретная практика (ретроспектива, дейли, бэклог,
+    спринт, планирование, демо, воркшоп, канбан-доска)
+  - есть хотя бы минимальное объяснение связи с проблемой
 
-Формат ответа: ТОЛЬКО JSON без пояснений и без markdown-обёрток.
-Пример:
-{"practicality": 0, "language_quality": 1, "text_cleanliness": 1, \
-"agile_correctness": 1, "completeness": 0, "politeness": 1}
+0 — при любом из:
+  - совет является общим менеджерским без Agile-практики:
+    "поговорите с командой", "обсудите ожидания",
+    "выстраивайте доверие", "назначьте ответственного",
+    "улучшайте процессы", "повышайте прозрачность"
+  - практика упомянута, но как дежурное слово без связи
+    с проблемой ("проведите ретроспективу" в ответ на вопрос
+    про найм — без объяснения зачем)
+  - практика приписана неверной методологии
+  - совет противоречит Agile Manifesto или Scrum Guide
+
+---
+
+**2. practicality — ДВУХСТУПЕНЧАТАЯ проверка.**
+
+Ступень 1. Есть ли конкретный элемент?
+  Найди в ответе хотя бы одно из:
+  - встреча или церемония (ретроспектива, дейли, планирование, демо)
+  - артефакт (бэклог, DoD, story points, канбан-доска)
+  - инструмент (Jira, Confluence, воркшоп)
+  - конкретный глагол + предмет ("добавь в бэклог",
+    "обсуди на ретро", "зафиксируй в DoD")
+  Если ничего нет → 0, дальше не проверяй.
+
+Ступень 2. Это конкретный совет или дежурное слово?
+  Если конкретный элемент найден — проверь:
+  есть ли в ответе хотя бы одно предложение, которое
+  объясняет, КАК или ЗАЧЕМ этот элемент применить
+  к данному вопросу?
+
+  1 — элемент присутствует И есть объяснение его применения:
+    пример хорошего ответа: "Вынеси этот вопрос на ретроспективу
+    и попроси команду назвать конкретные шаги для улучшения"
+
+  0 — элемент упомянут как дежурное слово без объяснения:
+    примеры нарушений:
+    "Рекомендую использовать ретроспективу и бэклог"
+    "Попробуйте применить практики Scrum в вашей команде"
+    "Проведите дейли для синхронизации команды" — если вопрос
+    не про синхронизацию, а про что-то другое, и объяснения нет
+
+---
+
+**3. context_handling — МЯГКИЙ порог. При сомнении — ставь 1.**
+
+Определи: вопрос конкретный или общий?
+
+Конкретный (есть методология, роль, конкретная проблема):
+  1 — дан совет по существу
+  0 — модель уклонилась без причины
+
+Общий (нет деталей, нет методологии):
+  1 — выполнено хотя бы одно:
+    * задан уточняющий вопрос
+    * названо допущение ("если работаете по Scrum...")
+    * совет применим при любом контексте
+  0 — специфичный совет без оговорок при явно общем вопросе
+
+---
+
+**4. politeness — МЯГКИЙ порог. При сомнении — ставь 1.**
+
+1 — дружелюбный профессиональный тон, ответное приветствие
+  если сотрудник поздоровался.
+0 — только явное нарушение: игнорировано приветствие,
+  менторский ("Вы должны понимать, что...") или
+  фамильярный тон.
+
+---
+
+**5. text_cleanliness — МЯГКИЙ порог. При сомнении — ставь 1.**
+
+1 — нет эмодзи, висящих символов (* ** :) в начале,
+  артефактов генерации.
+0 — только явное: эмодзи, текст начинается с ** или :,
+  очевидный артефакт генерации.
+
+---
+
+**6. language_quality — УМЕРЕННЫЙ порог.**
+
+Допустимые Agile-термины на английском (не нарушение):
+спринт, бэклог, скрам, ретроспектива, стендап, дейли,
+канбан, эпик, velocity, roadmap, actionable, фреймворк,
+фасилитация, воркшоп, Agile, Scrum, Kanban, SAFe, LeSS,
+Jira, Confluence, демо, ревью.
+
+1 — текст написан преимущественно на русском языке,
+  английские слова только из списка допустимых или
+  используются единично для точности.
+
+0 — при любом из:
+  - орфографические ошибки, затрудняющие понимание
+  - замена стандартных русских слов английскими без нужды:
+    "имплементировать" → "внедрить",
+    "коммитить" → "брать в работу",
+    "перформанс" → "производительность",
+    "менеджить" → "управлять",
+    "митинг" → "встреча" (НО: стендап, дейли — допустимо)
+  - в ответе 3 и более английских слов НЕ из списка
+    допустимых терминов
+  - текст написан преимущественно на английском
+
+---
+
+### ИНСТРУКЦИЯ ПО ВЕРИФИКАЦИИ ###
+
+Шаг 1. Прочитай вопрос и ответ полностью. Запомни суть вопроса.
+
+Шаг 2. agile_correctness: есть ли практика И объяснена ли связь
+  с проблемой? Оба "да" → 1, иначе → 0.
+
+Шаг 3. practicality — двухступенчато:
+  Сначала: есть ли конкретный элемент (встреча/артефакт)?
+  Нет → 0. Есть → проверяй дальше.
+  Затем: объяснено ли, как/зачем применить к данному вопросу?
+  Да → 1. Нет, просто упомянуто как дежурное слово → 0.
+
+Шаг 4. language_quality: есть ли слова с очевидным русским
+  эквивалентом или 3+ недопустимых англицизма? Да → 0, иначе → 1.
+
+Шаг 5. Остальные критерии: ищи явное нарушение.
+  Нет явного нарушения — ставь 1.
+
+Шаг 6. Согласованность: agile_correctness=0 из-за отсутствия
+  Agile-практики → practicality скорее всего тоже 0.
+
+Шаг 7. Сформируй JSON.
+
+---
+
+### ФОРМАТ ВЫВОДА ###
+
+Верни результат строго в формате JSON без пояснений вне блока:
+```json
+{
+  "agile_correctness": <0 или 1>,
+  "practicality": <0 или 1>,
+  "context_handling": <0 или 1>,
+  "politeness": <0 или 1>,
+  "text_cleanliness": <0 или 1>,
+  "language_quality": <0 или 1>,
+  "total": <сумма 0-6>,
+  "violations": [
+    {"criterion": "<критерий>", "quote": "<цитата>", "reason": "<причина>"}
+  ]
+}
+```
 """
 
 
+# User template — only ``question`` and ``answer`` placeholders. The
+# system prompt already specifies the rubric; we deliberately do not
+# echo query_type into the prompt because the new rubric does not
+# distinguish on it. ``query_type`` stays in the task signature for
+# logging / future routing rules.
 JUDGE_USER_TEMPLATE = """\
-## Запрос пользователя
-{query}
-
-## Тип запроса
-{query_type}
-
-## Ответ ассистента
-{response}
+### ДАННЫЕ ДЛЯ ОЦЕНКИ ###
+Вопрос сотрудника: {question}
+Финальный ответ модели: {answer}
 """
 
 
@@ -123,7 +263,11 @@ JUDGE_USER_TEMPLATE = """\
 # numbers between offline and online evaluation stay comparable.
 _JUDGE_MODEL = "openai/gpt-5.2"
 _JUDGE_TEMPERATURE = 0.0
-_JUDGE_MAX_TOKENS = 200
+# Bumped from 200: the rubric asks the judge to emit a ``violations``
+# array with quoted fragments and reasons in addition to the six 0/1
+# scores. 600 covers a worst-case 6-violation answer with comfortable
+# margin without inflating cost (typical responses are <200 tokens).
+_JUDGE_MAX_TOKENS = 600
 _JUDGE_RETRY_COUNTDOWN_SECONDS = 15
 
 
@@ -183,7 +327,7 @@ def _record_langfuse_scores(
                 trace_id=trace_id,
                 name=f"judge_{criterion}",
                 value=value,
-                comment=f"weight={CRITERIA_WEIGHTS[criterion]}",
+                comment="binary criterion (0/1), equal weight",
             )
         langfuse_client.score(
             trace_id=trace_id,
@@ -197,7 +341,7 @@ def _record_langfuse_scores(
         logger.warning("[Judge] Langfuse score write failed (trace=%s): %s", trace_id, exc)
 
 
-def _call_judge_llm(query: str, response: str, query_type: str) -> str:
+def _call_judge_llm(query: str, response: str) -> str:
     """Single GPT-5.2 chat completion. Returns raw assistant text.
 
     Lazy import of ``openai`` so the module loads cleanly when the SDK
@@ -218,9 +362,7 @@ def _call_judge_llm(query: str, response: str, query_type: str) -> str:
             {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": JUDGE_USER_TEMPLATE.format(
-                    query=query, query_type=query_type, response=response
-                ),
+                "content": JUDGE_USER_TEMPLATE.format(question=query, answer=response),
             },
         ],
     )
@@ -241,7 +383,7 @@ def evaluate_response_async(
     trace_id: str,
     query: str,
     response: str,
-    query_type: str,
+    query_type: str = "",
 ) -> dict[str, Any]:
     """Score *response* against *query* on six criteria via GPT-5.2.
 
@@ -255,9 +397,10 @@ def evaluate_response_async(
             Langfuse is disabled — judge still runs and writes Prometheus.
         query: Original user question.
         response: Final assistant response (post-guardrails).
-        query_type: Workflow classification (sql/rag/hybrid/simple). Sent
-            to GPT-5.2 so it knows e.g. completeness expectations differ
-            for ``simple`` (greeting) vs ``hybrid``.
+        query_type: Workflow classification (sql/rag/hybrid/simple).
+            Currently unused by the judge prompt itself but kept in the
+            signature so old in-flight Celery messages don't crash after
+            deploy and the field is available for future routing rules.
     """
     # Step A — kill switch. Settings re-read on each call so a docker
     # env flip is picked up without restarting the worker.
@@ -266,9 +409,10 @@ def evaluate_response_async(
         logger.debug("[Judge] Skipped (JUDGE_ENABLED=false), trace=%s", trace_id or "-")
         return {"status": "skipped", "trace_id": trace_id}
 
+    _ = query_type  # accepted for compatibility, see docstring
     # Step B — call GPT-5.2.
     try:
-        raw = _call_judge_llm(query=query, response=response, query_type=query_type)
+        raw = _call_judge_llm(query=query, response=response)
     except SoftTimeLimitExceeded:
         # 30s soft limit hit — log and exit, do not retry. The vsellm
         # call already burned the budget; another attempt would just

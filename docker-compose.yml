@@ -416,12 +416,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 10",
+          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 20",
         ]
-      interval: 30s
+      # ``inspect ping`` is heavy under --pool=threads (full app import +
+      # broadcast roundtrip). 30s start_period was too aggressive — the
+      # worker is functionally ready in ~5s but the probe takes 15-25s,
+      # so docker flagged it ``unhealthy`` even on a working node.
+      interval: 60s
       timeout: 30s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 90s
     networks:
       - hse-network
 
@@ -480,12 +484,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 10",
+          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 20",
         ]
-      interval: 30s
+      # ``inspect ping`` is heavy under --pool=threads (full app import +
+      # broadcast roundtrip). 30s start_period was too aggressive — the
+      # worker is functionally ready in ~5s but the probe takes 15-25s,
+      # so docker flagged it ``unhealthy`` even on a working node.
+      interval: 60s
       timeout: 30s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 90s
     networks:
       - hse-network
 

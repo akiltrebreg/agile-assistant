@@ -107,6 +107,22 @@ groups:
             per-criterion breakdown. Common causes: degraded LLM, changed
             prompts, Qdrant issues (RAG path).
 
+      - alert: JudgeAgileCorrectnessDrop
+        expr:
+          avg_over_time(agile_assistant_judge_criterion_score{criterion="agile_correctness"}[1h])
+          < 0.6
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agile correctness dropped below 0.6"
+          description: >
+            agile_correctness is the strict-threshold criterion: it scores 1
+            only when a concrete Agile practice is named AND its connection to
+            the user's problem is explained. Current 1h average: {{ $value |
+            printf "%.2f" }}. Responses are sliding into generic managerial
+            advice — review Response Agent prompts and Agile knowledge base.
+
       - alert: JudgePracticalityDrop
         expr:
           avg_over_time(agile_assistant_judge_criterion_score{criterion="practicality"}[1h])
@@ -115,27 +131,27 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Practicality score (weight 0.30) dropped below 0.6"
+          summary: "Practicality dropped below 0.6"
           description: >
-            Practicality is the highest-weighted criterion. Current 1h average:
-            {{ $value | printf "%.2f" }}. Responses are losing actionable detail
-            — review Response Agent prompts and the data fetched by SQL/RAG
-            paths.
+            Practicality requires both a concrete element (ceremony / artifact /
+            tool) AND an explanation of how to apply it. Current 1h average: {{
+            $value | printf "%.2f" }}. Responses likely list practices as
+            buzzwords without actionable guidance.
 
-      - alert: JudgeTextCleanlinessDrop
+      - alert: JudgeLanguageQualityDrop
         expr:
-          avg_over_time(agile_assistant_judge_criterion_score{criterion="text_cleanliness"}[1h])
+          avg_over_time(agile_assistant_judge_criterion_score{criterion="language_quality"}[1h])
           < 0.6
         for: 15m
         labels:
           severity: warning
         annotations:
-          summary: "Text cleanliness score (weight 0.20) dropped below 0.6"
+          summary: "Language quality dropped below 0.6"
           description: >
-            Generation artifacts (raw SQL, markdown, traceback, internal
-            identifiers) are leaking through. Current 1h average: {{ $value |
-            printf "%.2f" }}. Inspect L3 ResponseGuard and Response Agent output
-            formatting.
+            language_quality has a moderate threshold: penalises 3+ unjustified
+            anglicisms or words with obvious Russian equivalents. Current 1h
+            average: {{ $value | printf "%.2f" }}. Check Response Agent
+            generation parameters and the Russian-style prompt.
 
       - alert: JudgeUnavailable
         expr: >
