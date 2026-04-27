@@ -24,6 +24,7 @@ from hse_prom_prog.agents.schema_description import (
 )
 from hse_prom_prog.llm.client import LLMClient
 from hse_prom_prog.memory.formatter import format_history
+from hse_prom_prog.memory.token_estimator import estimate_tokens
 from hse_prom_prog.metrics import (
     SUPERVISOR_CLASSIFICATIONS,
     SUPERVISOR_DURATION,
@@ -32,7 +33,7 @@ from hse_prom_prog.metrics import (
     SUPERVISOR_PARSE_ERRORS,
 )
 from hse_prom_prog.models.memory import ConversationContext
-from hse_prom_prog.tracing import langfuse_context, observe
+from hse_prom_prog.tracing import langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -49,27 +50,30 @@ _INTENT_TO_QUERY_TYPE: dict[str, str] = {
 # Valid query types
 _VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple", "off_topic"})
 
-# Hard token budget for the Supervisor classifier prompt.
-# vLLM ``avibe-gptq-8bit`` runs with ``--max-model-len=4096``. Subtract
-# the completion budget (``max_tokens=256``) and a safety margin for
-# the BOS/EOS/system tokens the chat template adds, and we get the
-# upper bound on what the prompt itself may contain.
+# Hard token budget for the Supervisor classifier prompt, expressed
+# in *estimate-tokens* (what ``estimate_tokens`` returns), not real
+# tokens. The two scales differ because the estimator uses
+# CHARS_PER_TOKEN=3 while the avibe Qwen-BPE tokenizer compresses at
+# ~3.49 chars/token — i.e. the estimator overestimates by ~16%.
 #
-# 4096 - 256 (completion) - 100 (chat template + safety) = 3740
-_PROMPT_MAX_TOKENS = 3740
+# Real budget:
+#   4096 (max_model_len) - 256 (completion) - 100 (chat template) = 3740
+# Estimate-budget (what we compare against in this module):
+#   3740 * 1.16 ~= 4340  (rounded down to leave a small safety margin)
+#
+# If the estimator is later replaced with a real BPE call, drop the
+# 1.16 factor and use 3740 directly.
+_PROMPT_MAX_TOKENS = 4340
 
-# Approximate token size from the rendered character count. The
-# tokenizer used by avibe (a Qwen-family BPE) compresses Cyrillic at
-# roughly 1 token per 2.3 characters; for mixed Russian + JSON braces
-# the number drifts slightly higher. 2.3 is conservative — it tends to
-# *over*-estimate, which is what we want from a safety guard.
-_CHARS_PER_TOKEN = 2.3
-_PROMPT_MAX_CHARS = int(_PROMPT_MAX_TOKENS * _CHARS_PER_TOKEN)
-
-
-def _approx_tokens(text: str) -> int:
-    """Cheap char-based token estimate; see ``_CHARS_PER_TOKEN`` above."""
-    return int(len(text) / _CHARS_PER_TOKEN)
+# Token estimation is delegated to the shared ``estimate_tokens`` helper
+# (memory.token_estimator, CHARS_PER_TOKEN=3). Calibrated against actual
+# SQL Agent telemetry on this deployment:
+#   chars=12554 → tokens=3592   (≈ 3.49 chars/token)
+# An earlier private helper used 2.3 chars/token — that over-estimated
+# by ~1.5x and made the guard fire on every turn, silently dropping
+# history+profile even when the real prompt fit comfortably inside
+# max_model_len. Aligning with the rest of the codebase removes the
+# constant drift and keeps the budget arithmetic single-source.
 
 
 # Deterministic post-processing markers
@@ -556,25 +560,25 @@ class SupervisorAgent:
              the static rubric grows past the budget.
         """
         prompt = self._build_classifier_prompt(user_query, conversation_context, user_profile)
-        if _approx_tokens(prompt) <= _PROMPT_MAX_TOKENS:
+        if estimate_tokens(prompt) <= _PROMPT_MAX_TOKENS:
             return prompt
 
         logger.warning(
             "[Supervisor] Prompt overflow (%d tokens > %d budget) — dropping conversation history",
-            _approx_tokens(prompt),
+            estimate_tokens(prompt),
             _PROMPT_MAX_TOKENS,
         )
         prompt = self._build_classifier_prompt(user_query, None, user_profile)
-        if _approx_tokens(prompt) <= _PROMPT_MAX_TOKENS:
+        if estimate_tokens(prompt) <= _PROMPT_MAX_TOKENS:
             return prompt
 
         logger.warning(
             "[Supervisor] Prompt still overflows after dropping history "
             "(%d tokens) — dropping user profile too",
-            _approx_tokens(prompt),
+            estimate_tokens(prompt),
         )
         prompt = self._build_classifier_prompt(user_query, None, None)
-        if _approx_tokens(prompt) <= _PROMPT_MAX_TOKENS:
+        if estimate_tokens(prompt) <= _PROMPT_MAX_TOKENS:
             return prompt
 
         # Static rubric alone is over budget — this is a deploy-time
@@ -582,7 +586,7 @@ class SupervisorAgent:
         logger.error(
             "[Supervisor] Static prompt (%d tokens) exceeds budget (%d). "
             "Trim SCHEMA_DESCRIPTION / SUPERVISOR_FEW_SHOT_EXAMPLES.",
-            _approx_tokens(prompt),
+            estimate_tokens(prompt),
             _PROMPT_MAX_TOKENS,
         )
         return prompt
@@ -777,7 +781,6 @@ class SupervisorAgent:
 
         return result
 
-    @observe(name="supervisor")
     def process(
         self,
         user_query: str,

@@ -31,6 +31,7 @@ from hse_prom_prog.database.connection import DatabaseConnection
 from hse_prom_prog.graph.state import WorkflowState
 from hse_prom_prog.llm.client import LLMClient
 from hse_prom_prog.models.memory import ConversationContext
+from hse_prom_prog.tracing import make_langgraph_callback
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,7 @@ class AgileWorkflow:
     # Public API
     # ------------------------------------------------------------------
 
-    def run(
+    def run(  # noqa: PLR0913 — keyword-only DTO-style entrypoint
         self,
         user_query: str,
         *,
@@ -289,6 +290,9 @@ class AgileWorkflow:
         user_id: str | None = None,
         conversation_context: ConversationContext | None = None,
         user_profile: dict[str, Any] | None = None,
+        trace_user_id: str | None = None,
+        trace_metadata: dict[str, Any] | None = None,
+        trace_tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Execute the workflow with a user query.
 
@@ -296,15 +300,32 @@ class AgileWorkflow:
         memory layer (tests, direct invocations, pre-memory deployments)
         get the original stateless behaviour.
 
+        Tracing kwargs (``trace_*``) are also optional. When the
+        Langfuse SDK is initialised, this method attaches a callback
+        handler to ``graph.invoke`` so every node and LLM call lands
+        inside a single trace tree — replacing the previous imperative
+        ``langfuse_client.trace(...)`` pattern, which did not propagate
+        across LangGraph's Pregel runtime.
+
         Args:
             user_query: The user's natural language query.
             conversation_id: Short-term memory conversation id (if any).
             user_id: Long-term memory user id (if any).
             conversation_context: Pre-assembled history to inject.
             user_profile: Pre-loaded preferences to inject.
+            trace_user_id: External user identifier surfaced in Langfuse
+                (cookie/SSO id from the API layer). ``user_id`` above is
+                an *internal* memory uuid and would not be useful in the
+                tracing UI.
+            trace_metadata: Free-form key/value bag attached to the
+                trace (task_id, celery_retry, etc.). Avoid PII.
+            trace_tags: Optional tag list for filtering in Langfuse UI.
 
         Returns:
-            Final state after processing through all agents.
+            Final state after processing through all agents. When
+            tracing is active the dict additionally carries
+            ``_langfuse_trace_id`` so downstream consumers (e.g. the
+            judge task) can attach scores to the same trace.
         """
         logger.info("[Workflow] Starting workflow with query: %s", user_query)
 
@@ -330,9 +351,29 @@ class AgileWorkflow:
             "user_profile": user_profile,
         }
 
+        # Build the Langfuse callback per-invocation so user_id /
+        # session_id / metadata land on the right trace. The handler is
+        # stateful (one trace per call), so reusing a single instance
+        # across requests would interleave events.
+        callback = make_langgraph_callback(
+            user_id=trace_user_id,
+            session_id=conversation_id,
+            metadata=trace_metadata,
+            tags=trace_tags,
+        )
+        config: dict[str, Any] = {"callbacks": [callback]} if callback else {}
+
         try:
-            result = self.graph.invoke(initial_state)
+            result = self.graph.invoke(initial_state, config=config or None)
             logger.info("[Workflow] Workflow completed successfully")
+            # Surface the trace id to the caller so downstream async
+            # work (judge scoring) can attach to the same trace.
+            # ``trace_id`` becomes available on the handler after the
+            # first node runs; reading it here is safe and idempotent.
+            if callback is not None:
+                trace_id = getattr(callback, "get_trace_id", lambda: "")()
+                if trace_id:
+                    result["_langfuse_trace_id"] = trace_id
             return result
         except Exception as e:
             logger.error("[Workflow] Error during workflow execution: %s", e)

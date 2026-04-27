@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 from hse_prom_prog.metrics import GUARDRAIL_L3_CHECKS_FAILED, GUARDRAIL_L3_RESULTS
-from hse_prom_prog.tracing import langfuse_context, observe
+from hse_prom_prog.tracing import langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,6 @@ class ResponseGuard:
     # Public API
     # ------------------------------------------------------------------
 
-    @observe(name="guardrail_l3")
     def check(
         self,
         response: str,

@@ -24,7 +24,7 @@ from hse_prom_prog.metrics import (
     RESPONSE_TRUNCATED,
 )
 from hse_prom_prog.models.memory import ConversationContext
-from hse_prom_prog.tracing import langfuse_context, observe
+from hse_prom_prog.tracing import langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -496,7 +496,6 @@ class ResponseAgent:
     # Main entry point
     # ------------------------------------------------------------------
 
-    @observe(name="response_agent")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Generate natural language response. Thin wrapper that records
         latency and length per branch — the routing logic itself lives in

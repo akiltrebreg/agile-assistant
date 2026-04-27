@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass
 
 from hse_prom_prog.metrics import GUARDRAIL_L1_RESULTS
-from hse_prom_prog.tracing import langfuse_context, observe
+from hse_prom_prog.tracing import langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,6 @@ class TopicGuard:
     Supervisor agent, which is an LLM call anyway.
     """
 
-    @observe(name="guardrail_l1")
     def check(self, query: str) -> GuardResult:
         """Classify the query via two regex stages.
 

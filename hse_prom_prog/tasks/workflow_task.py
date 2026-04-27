@@ -36,21 +36,21 @@ from hse_prom_prog.tracing import langfuse_client
 logger = logging.getLogger(__name__)
 
 # Default token budget for the conversation history slot injected
-# into prompts.
+# into prompts. Counted in *estimate-tokens* (memory.token_estimator,
+# CHARS_PER_TOKEN=3), the same scale used by Supervisor's overflow
+# guard.
 #
 # Sized against the Supervisor classifier (the tightest prompt budget
-# in the pipeline): the avibe vLLM has max_model_len=4096 and the
-# static rubric (schema + few-shots + instructions) is already ~3500
-# tokens. After reserving 256 for the completion and ~100 for chat
-# template overhead we're left with roughly 240 tokens of free room
-# *before* this history block kicks in. Setting the budget at 800
-# keeps history generous while supervisor's hard truncation guard
-# (see :data:`_PROMPT_MAX_TOKENS` in agents/supervisor.py) can still
-# rescue pathological cases by dropping history entirely.
+# in the pipeline): avibe vLLM caps at max_model_len=4096 real tokens,
+# which is ~4340 estimate-tokens after the estimator's ~16% over-
+# estimate. The static rubric is ~3500 estimate-tokens, leaving ~800
+# for history+profile combined. Supervisor's guard
+# (:data:`_PROMPT_MAX_TOKENS` in agents/supervisor.py) drops history
+# first and profile second when even that is too much.
 #
 # Bumping this back up requires raising max_model_len on vLLM or
-# trimming the supervisor rubric — see the budget arithmetic in
-# the supervisor module-level docstring.
+# trimming the supervisor rubric — see budget arithmetic at the top
+# of agents/supervisor.py.
 HISTORY_TOKEN_BUDGET = 800
 
 # Any message-bearing conversation idle for longer than this gets closed
@@ -136,34 +136,16 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
     terminal_status: str | None = None
     TASKS_IN_PROGRESS.inc()
 
-    # Langfuse root trace — created up front so every nested @observe in
-    # the workflow attaches to it via contextvars. ``langfuse_client`` is
-    # None when the SDK is disabled / missing (graceful degradation).
-    #
-    # Note on context propagation: in Langfuse SDK v2,
-    # ``langfuse_context.update_current_trace`` does NOT accept a
-    # ``trace_id`` kwarg — the current trace is implicit (set by
-    # ``@observe`` decorators or by ``langfuse_client.trace``). Passing
-    # ``trace_id=`` raises ``TypeError`` and aborts the trace setup,
-    # which is exactly the bug we hit on the running server.
-    trace = None
-    if langfuse_client is not None:
-        try:
-            trace = langfuse_client.trace(
-                name="workflow",
-                user_id=external_id,
-                session_id=conversation_id,
-                input={"query": query},
-                metadata={
-                    "task_id": task_id,
-                    "celery_retry": self.request.retries,
-                },
-            )
-        except Exception as exc:
-            logger.warning("[WorkflowTask %s] Langfuse trace init failed: %s", task_id, exc)
-            trace = None
-
+    # Langfuse tracing is now driven by the LangGraph callback handler
+    # (see ``AgileWorkflow.run``). The handler receives user_id,
+    # session_id and metadata at invoke time, then emits one trace per
+    # ``graph.invoke`` with one span per node — this is what survives
+    # LangGraph's Pregel runtime, unlike the previous imperative
+    # ``langfuse_client.trace(...)`` pattern. We capture the resulting
+    # trace_id from the workflow result so the judge task can attach
+    # scores to the same trace.
     final_response = ""
+    langfuse_trace_id = ""
 
     try:
         db = get_database()
@@ -191,7 +173,20 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
             user_id=str(internal_user_uuid) if internal_user_uuid else None,
             conversation_context=ctx,
             user_profile=user_profile,
+            # Tracing metadata — picked up by the Langfuse callback
+            # handler inside ``workflow.run``. Kept separate from the
+            # internal ``user_id`` (a memory uuid) so the trace UI
+            # shows the human-meaningful external identifier.
+            trace_user_id=external_id,
+            trace_metadata={
+                "task_id": task_id,
+                "celery_retry": self.request.retries,
+            },
         )
+        # The handler exposes the freshly created trace_id via
+        # the result dict; pop it so it doesn't leak into the
+        # workflow_state we persist in PostgreSQL.
+        langfuse_trace_id = result.pop("_langfuse_trace_id", "") or ""
 
         if conv_uuid is not None:
             _persist_turn_safe(memory, conv_uuid, query, result, task_id)
@@ -249,24 +244,13 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
         if db is not None:
             db.close()
 
-        # Finalise Langfuse trace before the task returns. Errors here
-        # must not surface to Celery — tracing is best-effort.
-        if trace is not None:
-            try:
-                trace.update(
-                    output={
-                        "final_response": final_response,
-                        "query_type": query_type,
-                    },
-                    metadata={
-                        "task_id": task_id,
-                        "query_type": query_type,
-                        "duration_seconds": round(duration, 3),
-                        "terminal_status": terminal_status,
-                    },
-                )
-            except Exception as exc:
-                logger.warning("[WorkflowTask %s] Langfuse trace.update failed: %s", task_id, exc)
+        # The LangGraph callback handler closes the trace and flushes
+        # asynchronously when ``graph.invoke`` returns, so there's no
+        # imperative ``trace.update(...)`` or ``flush()`` to make here.
+        # We still call ``flush`` defensively to make sure events are
+        # shipped before the worker process moves on (the SDK uses a
+        # background thread, and a long Celery idle gap could swallow
+        # the queued events).
         if langfuse_client is not None:
             try:
                 langfuse_client.flush()
@@ -283,7 +267,7 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
             and final_response
             and query_type not in ("off_topic", "error")
         ):
-            judge_trace_id = trace.id if trace is not None else ""
+            judge_trace_id = langfuse_trace_id
             try:
                 # Lazy import keeps the workflow_task <-> judge_task
                 # import graph acyclic and lets the workflow worker

@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from hse_prom_prog.metrics import VALIDATOR_DATA_MISSING, VALIDATOR_RESULTS
-from hse_prom_prog.tracing import langfuse_context, observe
+from hse_prom_prog.tracing import langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,6 @@ class ValidatorAgent:
     results are usable and passes them to the Response Agent.
     """
 
-    @observe(name="validator")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Validate agent outputs and produce a validation_result.
 

@@ -652,7 +652,6 @@ class SQLAgent:
         if not self.db:
             self.db = get_database()
 
-    @observe(name="sql_agent")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Process a user query through the LangGraph SQL agent.
 

@@ -120,4 +120,62 @@ def _initialize() -> tuple[Any, Callable[..., Any], Any]:
 langfuse_client, observe, langfuse_context = _initialize()
 
 
-__all__ = ["langfuse_client", "langfuse_context", "observe"]
+def make_langgraph_callback(
+    *,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+) -> Any | None:
+    """Build a Langfuse ``CallbackHandler`` for a single LangGraph run.
+
+    LangGraph's Pregel runtime executes each node in its own RunnableConfig
+    scope and does not propagate Python contextvars across nodes. That is
+    why ``@observe`` decorators on node methods (Supervisor, ResponseAgent,
+    ResponseGuard, ...) created spans that never reached the active trace
+    in Langfuse v2: every node opened a fresh root trace and the spans
+    were silently dropped on flush.
+
+    The Langchain/LangGraph callback handler is the supported integration:
+    it hooks into the runtime via ``RunnableConfig.callbacks`` and emits
+    one trace per ``graph.invoke``, with one span per node and per LLM
+    call. It supersedes the imperative ``langfuse_client.trace(...)``
+    pattern we used before.
+
+    Returns ``None`` when tracing is disabled or the SDK / langchain
+    integration is unavailable, so callers can pass the result to
+    ``RunnableConfig.callbacks`` unconditionally (use ``[h] if h else []``).
+    """
+    if langfuse_client is None:
+        return None
+
+    try:
+        # langfuse.callback ships inside the main langfuse v2 package;
+        # no extra dependency required (the integration sits next to the
+        # decorator API we already use).
+        from langfuse.callback import CallbackHandler  # noqa: PLC0415
+    except Exception as exc:
+        logger.warning("[Tracing] Langfuse CallbackHandler unavailable: %s", exc)
+        return None
+
+    try:
+        return CallbackHandler(
+            public_key=settings.langfuse_public_key or None,
+            secret_key=settings.langfuse_secret_key or None,
+            host=settings.langfuse_host,
+            user_id=user_id,
+            session_id=session_id,
+            metadata=metadata or {},
+            tags=tags or [],
+        )
+    except Exception as exc:
+        logger.warning("[Tracing] CallbackHandler init failed: %s", exc)
+        return None
+
+
+__all__ = [
+    "langfuse_client",
+    "langfuse_context",
+    "make_langgraph_callback",
+    "observe",
+]

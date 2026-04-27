@@ -14,7 +14,7 @@ from hse_prom_prog.config import settings
 from hse_prom_prog.llm.client import LLMClient
 from hse_prom_prog.metrics import RAG_AGENT_DURATION
 from hse_prom_prog.rag.reranker import get_reranker
-from hse_prom_prog.tracing import langfuse_context, observe
+from hse_prom_prog.tracing import langfuse_context
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
@@ -48,7 +48,6 @@ class RAGAgent:
     # Public interface
     # ------------------------------------------------------------------
 
-    @observe(name="rag_agent")
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
         """Retrieve context and generate RAG-based answer."""
         original_query = state.get("original_query", "")
