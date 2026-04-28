@@ -1,0 +1,20 @@
+# Headless Service for celery-judge pods (same rationale as
+# celery-worker-svc.yaml — exists solely for ServiceMonitor discovery).
+apiVersion: v1
+kind: Service
+metadata:
+  name: celery-judge
+  namespace: agile-assistant
+  labels:
+    app: celery-judge
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: celery-judge
+  ports:
+    - name: http-metrics
+      port: 9101
+      targetPort: http-metrics
+      protocol: TCP

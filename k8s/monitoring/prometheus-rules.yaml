@@ -1,0 +1,257 @@
+# PrometheusRule — k8s-native equivalent of monitoring/prometheus/alerts.yml.
+#
+# In docker-compose Prometheus loads alerts.yml directly from a bind
+# mount. In k8s, Prometheus Operator owns the Prometheus config and
+# refuses to honour external rule_files; rules must be expressed as
+# PrometheusRule CRDs which the operator merges into the active
+# config on every change. Editing this file === editing alerts.yml.
+#
+# Keep these two sources in sync until docker-compose is retired.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agile-assistant-alerts
+  namespace: agile-assistant
+  labels:
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: agile_assistant_pipeline
+      rules:
+        # E2E latency SLO: p95 < 30s for hybrid (slowest path).
+        - alert: HighE2ELatency
+          expr:
+            histogram_quantile(0.95,
+            sum(rate(agile_assistant_pipeline_duration_seconds_bucket[5m])) by
+            (le)) > 30
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pipeline p95 latency exceeds 30s"
+            description:
+              "p95 latency is {{ $value | humanizeDuration }}. Check vLLM load
+              and Celery queue."
+
+        # Error rate > 10% — fail-fast threshold for noisy regressions.
+        - alert: HighErrorRate
+          expr: |
+            (
+              sum(rate(agile_assistant_tasks_total{status="FAILED"}[5m]))
+              /
+              sum(rate(agile_assistant_tasks_total[5m]))
+            ) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Task error rate exceeds 10%"
+            description:
+              "{{ $value | humanizePercentage }} of tasks are failing."
+
+        # Backlog growing faster than workers drain it.
+        - alert: CeleryQueueBacklog
+          expr: agile_assistant_celery_queue_length > 20
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Celery queue has {{ $value }} pending tasks"
+            description:
+              "Consider scaling workers: kubectl scale deployment/celery-worker
+              --replicas=N"
+
+    - name: infrastructure
+      rules:
+        - alert: VLLMMainQueueOverflow
+          expr: vllm:num_requests_waiting{job="vllm-main"} > 5
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "vLLM main has {{ $value }} requests waiting"
+
+        - alert: VLLMSQLQueueOverflow
+          expr: vllm:num_requests_waiting{job="vllm-sql"} > 3
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "vLLM SQL has {{ $value }} requests waiting"
+
+        - alert: VLLMKVCacheExhausted
+          expr: vllm:gpu_cache_usage_perc > 0.95
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary:
+              "vLLM GPU KV-cache usage at {{ $value | humanizePercentage }}"
+
+        # In CNPG (this k8s setup) replication lag is exposed as
+        # cnpg_pg_replication_lag from the built-in metrics endpoint.
+        # Renamed from pg_replication_lag_seconds (postgres-exporter
+        # in docker-compose) so the alert actually fires under k8s.
+        - alert: PostgreSQLReplicationLag
+          expr: cnpg_pg_replication_lag > 5
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL replication lag is {{ $value }}s"
+
+        - alert: QdrantDown
+          expr: up{job="qdrant"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Qdrant is unreachable"
+
+        # Layer 7 (fallback) of the entity sanitizer is the LLM-failure
+        # safety net: it kicks in only when Supervisor's avibe-gptq-8bit
+        # extraction missed an enum field (issue_type, status,
+        # metric_name) that the lemma-based fallback could still recover.
+        # Sustained high rate => prompt is degrading and masking
+        # real Supervisor regressions behind silent recoveries.
+        - alert: SanitizerFallbackHigh
+          expr:
+            rate(agile_assistant_sanitizer_corrections_total{layer="7_fallback"}[5m])
+            > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Sanitizer layer 7 (fallback) firing > 0.5/s"
+            description: |
+              Fallback enum extraction is firing at {{ $value | printf "%.2f" }}/s, indicating Supervisor (avibe-gptq-8bit) is failing to extract enum fields ~half of requests. Review Supervisor prompt and few-shot examples — fallback masks the regression behind silent corrections.
+
+    # Phase 4: LLM-as-a-Judge quality alerts. ``avg_over_time`` of a
+    # 0/1 gauge over 1h gives the share-of-1s — equivalent to the mean
+    # of binary observations. ``for: 15m`` filters out single-point
+    # noise so we only page on sustained degradation.
+    - name: agile_assistant_quality
+      rules:
+        - alert: JudgeQualityDrop
+          expr: avg_over_time(agile_assistant_judge_weighted_total[1h]) < 0.7
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "LLM-as-a-Judge quality score dropped below 0.7"
+            description: |
+              Weighted average quality score over the last hour is {{ $value | printf "%.2f" }}. Threshold: 0.7. Check the Quality dashboard for per-criterion breakdown. Common causes: degraded LLM, changed prompts, Qdrant issues (RAG path).
+
+        - alert: JudgeAgileCorrectnessDrop
+          expr:
+            avg_over_time(agile_assistant_judge_criterion_score{criterion="agile_correctness"}[1h])
+            < 0.6
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Agile correctness dropped below 0.6"
+            description: |
+              agile_correctness is the strict-threshold criterion: it scores 1 only when a concrete Agile practice is named AND its connection to the user's problem is explained. Current 1h average: {{ $value | printf "%.2f" }}. Responses are sliding into generic managerial advice — review Response Agent prompts and Agile knowledge base.
+
+        - alert: JudgePracticalityDrop
+          expr:
+            avg_over_time(agile_assistant_judge_criterion_score{criterion="practicality"}[1h])
+            < 0.6
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Practicality dropped below 0.6"
+            description: |
+              Practicality requires both a concrete element (ceremony / artifact / tool) AND an explanation of how to apply it. Current 1h average: {{ $value | printf "%.2f" }}. Responses likely list practices as buzzwords without actionable guidance.
+
+        - alert: JudgeLanguageQualityDrop
+          expr:
+            avg_over_time(agile_assistant_judge_criterion_score{criterion="language_quality"}[1h])
+            < 0.6
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Language quality dropped below 0.6"
+            description: |
+              language_quality has a moderate threshold: penalises 3+ unjustified anglicisms or words with obvious Russian equivalents. Current 1h average: {{ $value | printf "%.2f" }}. Check Response Agent generation parameters and the Russian-style prompt.
+
+        - alert: JudgeUnavailable
+          expr: |
+            (
+              sum(rate(agile_assistant_judge_evaluations_total{status="api_error"}[30m]))
+              /
+              clamp_min(sum(rate(agile_assistant_judge_evaluations_total[30m])), 1e-9)
+            ) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "LLM-as-a-Judge API error rate exceeds 50%"
+            description: |
+              More than half of judge evaluations are failing due to upstream API errors. Verify VSELLM_API_KEY validity and api.vsellm.ru availability.
+
+    # Phase 5: data-freshness alerts (Celery Beat scheduled syncs).
+    # Threshold is 2× the schedule period — one missed slot is noise,
+    # two in a row means Beat or the worker is broken.
+    - name: agile_assistant_data_freshness
+      rules:
+        - alert: JiraDataStale
+          expr:
+            (time() -
+            max(agile_assistant_data_sync_timestamp_seconds{source="jira_csv"}))
+            > 12 * 3600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary:
+              "Jira CSV snapshot has not been refreshed in {{ $value |
+              humanizeDuration }}"
+            description: |
+              sync_jira_data was last successful {{ $value | humanizeDuration }} ago. Expected cadence: every 6h. Check celery-beat liveness and recent data_sync_total{source="jira_csv",status="failure"} counter increments.
+
+        - alert: KnowledgeBaseStale
+          expr:
+            (time() -
+            max(agile_assistant_data_sync_timestamp_seconds{source="knowledge_base"}))
+            > 48 * 3600
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary:
+              "Qdrant knowledge base has not been re-ingested in {{ $value |
+              humanizeDuration }}"
+            description: |
+              sync_knowledge_base was last successful {{ $value | humanizeDuration }} ago. Expected cadence: daily at 03:00 UTC. Re-ingestion drops and recreates the Qdrant collection, so a stuck job starves RAG of new documents indefinitely.
+
+        - alert: DataSyncFailing
+          expr:
+            increase(agile_assistant_data_sync_total{status="failure"}[1h]) >= 2
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary:
+              "Data sync ({{ $labels.source }}) has failed {{ $value }} times in
+              the last hour"
+            description: |
+              Repeated failures from the periodic sync task. Each failure increments data_sync_total{status="failure"}; check celery-worker logs for the offending traceback (load_csv S3 error, PG constraint, Qdrant connectivity).
+
+        - alert: CeleryBeatDown
+          expr:
+            (time() - max(agile_assistant_data_sync_timestamp_seconds)) > 30 *
+            3600
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary:
+              "No data sync has succeeded in {{ $value | humanizeDuration }} —
+              celery-beat may be down"

@@ -430,6 +430,58 @@ services:
       - hse-network
 
   # ──────────────────────────────────────────────────────────────
+  # Celery Beat — scheduler for periodic tasks (Phase 5).
+  # Single-instance only: two beats would double-schedule every job
+  # and we'd reload the Jira CSV twice per slot. Hard-coded
+  # container_name + replicas-of-one (k8s) enforces this in both
+  # deployment topologies. No --pool flag because Beat doesn't
+  # process tasks; it only enqueues them. The scheduled
+  # sync_jira_data / sync_knowledge_base run on celery-worker.
+  # No Prometheus port: tasks emit metrics from the worker that
+  # consumes them, not from Beat itself.
+  # ──────────────────────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hse-prom-prog-celery-beat
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    # ``celery beat`` exits 0 immediately if the schedule file is in
+    # an unwritable location (rare) — we route it to /tmp inside the
+    # container, matching beat_schedule_filename in celery_app.py.
+    command:
+      celery -A hse_prom_prog.tasks.celery_app beat --loglevel=info
+      --schedule=/tmp/celerybeat-schedule
+    healthcheck:
+      # Beat has no inspect ping; "is the process up" is the strongest
+      # liveness signal we have without instrumenting it ourselves.
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - hse-network
+
+  # ──────────────────────────────────────────────────────────────
   # Celery worker — judge queue (Phase 4: LLM-as-a-Judge)
   # Same image as celery-worker, separate process listening only on
   # the ``judge`` queue. Isolation matters because a slow GPT-5.2 call

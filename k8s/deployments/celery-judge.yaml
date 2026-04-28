@@ -1,25 +1,30 @@
+# Phase 4: dedicated worker for the ``judge`` queue (LLM-as-a-Judge).
+# Mirrors docker-compose's celery-judge: separate process, separate
+# Prometheus port (9101) so it doesn't collide with celery-worker's
+# 9100 sidecar, and --queues=judge isolates its consumption from
+# user-facing workflow tasks (a slow vsellm call can't starve them).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: celery-worker
+  name: celery-judge
   namespace: agile-assistant
   labels:
-    app: celery-worker
+    app: celery-judge
     app.kubernetes.io/part-of: agile-assistant
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: celery-worker
+      app: celery-judge
   template:
     metadata:
       labels:
-        app: celery-worker
+        app: celery-judge
     spec:
       imagePullSecrets:
         - name: registry-credentials
       containers:
-        - name: celery-worker
+        - name: celery-judge
           image: ghcr.io/akiltrebreg/agile-assistant:latest
           imagePullPolicy: IfNotPresent
           command:
@@ -29,10 +34,19 @@ spec:
             - worker
             - --loglevel=info
             - --pool=threads
-            - --concurrency=4
+            - --concurrency=2
+            - --queues=judge
+            - --hostname=judge@%h
           ports:
             - name: http-metrics
-              containerPort: 9100
+              containerPort: 9101
+          env:
+            # Override default 9100 so the judge worker binds 9101 — the
+            # port the celery-judge ServiceMonitor scrapes.
+            - name: PROMETHEUS_PORT
+              value: "9101"
+            - name: JUDGE_ENABLED
+              value: "true"
           envFrom:
             - configMapRef:
                 name: app-config
@@ -57,8 +71,8 @@ spec:
             timeoutSeconds: 5
           resources:
             requests:
-              cpu: 500m
-              memory: 2Gi
+              cpu: 200m
+              memory: 1Gi
             limits:
-              cpu: "2"
-              memory: 4Gi
+              cpu: "1"
+              memory: 2Gi

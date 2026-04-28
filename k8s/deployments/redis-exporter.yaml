@@ -1,0 +1,50 @@
+# oliver006/redis_exporter — sidecar-style exporter that scrapes the
+# in-cluster Redis and exposes Prometheus metrics on :9121. Mirrors
+# the docker-compose ``redis-exporter`` service so the Prometheus
+# stack has redis_* metrics in k8s as well.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exporter
+  namespace: agile-assistant
+  labels:
+    app: redis-exporter
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-exporter
+  template:
+    metadata:
+      labels:
+        app: redis-exporter
+    spec:
+      containers:
+        - name: redis-exporter
+          image: oliver006/redis_exporter:v1.62.0
+          env:
+            - name: REDIS_ADDR
+              value: "redis://redis:6379"
+          ports:
+            - name: http-metrics
+              containerPort: 9121
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9121
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9121
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

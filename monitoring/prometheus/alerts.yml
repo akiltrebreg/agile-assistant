@@ -190,3 +190,81 @@ groups:
             More than half of judge evaluations are failing due to upstream API
             errors. Verify VSELLM_API_KEY validity and api.vsellm.ru
             availability.
+
+  # Phase 5: data-freshness alerts. Both pipelines must run on the
+  # advertised cadence (CSV every 6h, KB daily). The threshold is 2×
+  # the schedule period: a single missed slot is noise (network blip,
+  # S3 throttle), but two in a row means Beat or the worker is broken
+  # and the system is serving stale data.
+  - name: agile_assistant_data_freshness
+    rules:
+      - alert: JiraDataStale
+        expr:
+          (time() -
+          max(agile_assistant_data_sync_timestamp_seconds{source="jira_csv"})) >
+          12 * 3600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary:
+            "Jira CSV snapshot has not been refreshed in {{ $value |
+            humanizeDuration }}"
+          description: >
+            sync_jira_data was last successful {{ $value | humanizeDuration }}
+            ago. Expected cadence: every 6h. Check celery-beat liveness and
+            recent ``data_sync_total{source="jira_csv",status="failure"}``
+            counter increments.
+
+      - alert: KnowledgeBaseStale
+        expr:
+          (time() -
+          max(agile_assistant_data_sync_timestamp_seconds{source="knowledge_base"}))
+          > 48 * 3600
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary:
+            "Qdrant knowledge base has not been re-ingested in {{ $value |
+            humanizeDuration }}"
+          description: >
+            sync_knowledge_base was last successful {{ $value | humanizeDuration
+            }} ago. Expected cadence: daily at 03:00 UTC. Re-ingestion drops and
+            recreates the Qdrant collection, so a stuck job will starve RAG of
+            new documents indefinitely.
+
+      # Repeated failures fire even when freshness is still within
+      # the staleness window — catches a half-broken pipeline before
+      # it crosses the 12h staleness threshold.
+      - alert: DataSyncFailing
+        expr:
+          increase(agile_assistant_data_sync_total{status="failure"}[1h]) >= 2
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary:
+            "Data sync ({{ $labels.source }}) has failed {{ $value }} times in
+            the last hour"
+          description: >
+            Repeated failures from the periodic sync task. Each failure
+            increments data_sync_total{status="failure"}; check celery-worker
+            logs for the offending traceback (load_csv S3 error, PG constraint,
+            Qdrant connectivity).
+
+      # Beat emits no metrics of its own, so liveness is inferred from
+      # downstream output: if NEITHER source has produced a successful
+      # sync in 30h (more than the longest cadence — daily KB), Beat
+      # itself is the most likely culprit, not S3 or PG.
+      - alert: CeleryBeatDown
+        expr:
+          (time() - max(agile_assistant_data_sync_timestamp_seconds)) > 30 *
+          3600
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary:
+            "No data sync has succeeded in {{ $value | humanizeDuration }} —
+            celery-beat may be down"

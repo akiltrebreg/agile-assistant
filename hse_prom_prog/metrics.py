@@ -373,6 +373,46 @@ JUDGE_EVALUATIONS_TOTAL = Counter(
     namespace=_NAMESPACE,
 )
 
+# ── Data sync (Celery Beat) ───────────────────────────────────
+# Periodic refresh of the Jira CSV snapshot (sync_jira_data) and the
+# RAG knowledge base in Qdrant (sync_knowledge_base). Beat schedules
+# each at a fixed cadence; freshness is enforced by alert on
+# ``time() - data_sync_timestamp_seconds`` so we page when the snapshot
+# falls behind, not when an individual run fails (a single retry is
+# expected on cold S3 / vLLM hiccups).
+#
+# ``source`` label keeps the two pipelines on the same metric name so
+# Grafana panels and alerts compose with `{source="..."}` instead of
+# branching by metric. Values: ``jira_csv``, ``knowledge_base``.
+DATA_SYNC_TIMESTAMP = Gauge(
+    "data_sync_timestamp_seconds",
+    "Unix timestamp of the last successful data sync",
+    labelnames=("source",),
+    namespace=_NAMESPACE,
+)
+DATA_SYNC_TOTAL = Counter(
+    "data_sync_total",
+    "Data sync runs by source and outcome",
+    labelnames=("source", "status"),
+    namespace=_NAMESPACE,
+)
+DATA_SYNC_DURATION = Histogram(
+    "data_sync_duration_seconds",
+    "Data sync run duration",
+    labelnames=("source",),
+    namespace=_NAMESPACE,
+    # CSV COPY is sub-second on local PG, S3 download dominates (5-60s).
+    # Qdrant re-ingest is the long tail: embedding pass on the full KB
+    # can run 5-15 minutes.
+    buckets=(1.0, 5.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0),
+)
+DATA_SYNC_ROWS = Gauge(
+    "data_sync_rows",
+    "Row / chunk count after the last successful sync",
+    labelnames=("source",),
+    namespace=_NAMESPACE,
+)
+
 
 # ── Pre-touch label combinations ──────────────────────────────
 # Without this, Grafana renders "No data" instead of "0" for any
@@ -381,14 +421,12 @@ JUDGE_EVALUATIONS_TOTAL = Counter(
 # without a single block, and the dashboard becomes indistinguishable
 # from a broken scrape. ``inc(0)`` is the canonical idiom — safe on
 # counters and idempotent.
-def initialize_label_combinations() -> None:
-    """Materialize all known counter label combinations at value 0.
-
-    Called once per Prometheus exporter process at worker startup.
-    """
+def _pretouch_pipeline() -> None:
     for status in ("COMPLETED", "FAILED"):
         TASKS_TOTAL.labels(status=status).inc(0)
 
+
+def _pretouch_guardrails() -> None:
     for reason in ("injection_blocked", "whitelist_fast_path", "pass"):
         GUARDRAIL_L1_RESULTS.labels(reason=reason).inc(0)
 
@@ -411,6 +449,8 @@ def initialize_label_combinations() -> None:
     ):
         GUARDRAIL_L3_CHECKS_FAILED.labels(check_name=check_name).inc(0)
 
+
+def _pretouch_sanitizer() -> None:
     for layer in (
         "1_synonym",
         "3_hallucination",
@@ -425,3 +465,24 @@ def initialize_label_combinations() -> None:
 
     for field in ("issue_type", "status", "metric_name"):
         SANITIZER_FALLBACK_EXTRACTIONS.labels(field=field).inc(0)
+
+
+def _pretouch_data_sync() -> None:
+    # Pre-touching ensures freshness panels and the StaleData alert
+    # evaluate correctly from the very first scrape — before Beat has
+    # a chance to fire — so the system is never shown as "no data"
+    # when it is in fact just brand new.
+    for source in ("jira_csv", "knowledge_base"):
+        for status in ("success", "failure"):
+            DATA_SYNC_TOTAL.labels(source=source, status=status).inc(0)
+
+
+def initialize_label_combinations() -> None:
+    """Materialize all known counter label combinations at value 0.
+
+    Called once per Prometheus exporter process at worker startup.
+    """
+    _pretouch_pipeline()
+    _pretouch_guardrails()
+    _pretouch_sanitizer()
+    _pretouch_data_sync()

@@ -1,0 +1,37 @@
+# ServiceMonitor for the FastAPI deployment.
+#
+# Why ServiceMonitor (vs. static_configs in prometheus.yml):
+# Prometheus Operator watches this CRD and rewrites Prometheus's
+# config on every Service / Endpoint change. Pods can be killed,
+# rescheduled, or scaled without touching Prometheus — new pods are
+# discovered via the EndpointSlice of the matching Service.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api
+  namespace: agile-assistant
+  labels:
+    app: api
+    app.kubernetes.io/part-of: agile-assistant
+    # Picked up by kube-prometheus-stack's default Prometheus instance,
+    # which selects ServiceMonitors with this release label.
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      app: api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      # Preserve the historical job label so existing PromQL queries
+      # ({job="fastapi"}) and Grafana dashboards keep working without
+      # rewrites.
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: fastapi

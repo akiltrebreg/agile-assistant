@@ -8,6 +8,7 @@ import os
 import time
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import (
     task_failure,
     task_postrun,
@@ -78,6 +79,11 @@ def create_celery_app() -> Celery:
             # ships in its own queue and we want the import to fail
             # loudly at worker boot if the file is missing.
             "hse_prom_prog.tasks.judge_task",
+            # Phase 5: periodic data refresh (Celery Beat). Beat itself
+            # runs in a separate ``celery-beat`` process and only
+            # schedules — the actual sync_jira_data / sync_knowledge_base
+            # invocations run on this worker.
+            "hse_prom_prog.tasks.sync_tasks",
         ],
     )
 
@@ -110,6 +116,33 @@ def create_celery_app() -> Celery:
         task_routes={
             "evaluate_response": {"queue": "judge"},
         },
+        # ── Beat schedule (Phase 5) ────────────────────────────
+        # Beat schedules the *task* into Redis; the regular default-queue
+        # worker picks it up. We do NOT route sync tasks to a dedicated
+        # queue: at most one of each runs per slot, and the lock in
+        # sync_tasks.py prevents overlap, so co-locating them with
+        # workflow_task is fine. The CSV sync's TRUNCATE+COPY blocks
+        # SQL-Agent reads for ~seconds (Postgres MVCC handles it
+        # transparently) — acceptable at a 6h cadence.
+        beat_schedule={
+            "sync-jira-data-every-6h": {
+                "task": "sync_jira_data",
+                "schedule": crontab(hour="*/6", minute=0),
+            },
+            "sync-knowledge-base-daily": {
+                "task": "sync_knowledge_base",
+                # 03:00 UTC — off-peak relative to typical workday usage
+                # of the assistant, so the brief Qdrant collection
+                # rebuild lands when nobody is asking RAG questions.
+                "schedule": crontab(hour=3, minute=0),
+            },
+        },
+        # Beat persists its "last run" timestamp here. Default is
+        # ``celerybeat-schedule`` in CWD, which lands inside the
+        # container and is lost on restart. Putting it under /tmp
+        # keeps it out of the source tree; for production with a
+        # restart-resilient cadence, mount a volume here.
+        beat_schedule_filename="/tmp/celerybeat-schedule",
     )
 
     logger.info(

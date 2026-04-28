@@ -1,0 +1,78 @@
+# Helm values for kube-prometheus-stack.
+#
+# Install with:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace \
+#     -f k8s/monitoring/kube-prometheus-stack-values.yaml
+#
+# Defaults provision: Prometheus Operator, Prometheus, Alertmanager,
+# node-exporter, kube-state-metrics, and Grafana with built-in
+# k8s-infra dashboards.
+fullnameOverride: kube-prometheus-stack
+
+prometheus:
+  prometheusSpec:
+    # Pick up our CRDs cluster-wide by label, regardless of namespace.
+    # Each ServiceMonitor / PodMonitor / PrometheusRule in
+    # k8s/monitoring/ carries `release: kube-prometheus-stack`, which
+    # the operator-default selectors match out of the box.
+    serviceMonitorSelectorNilUsesHelmValues: true
+    podMonitorSelectorNilUsesHelmValues: true
+    ruleSelectorNilUsesHelmValues: true
+    # Watch every namespace, not only ``monitoring`` — our CRDs live
+    # in ``agile-assistant``.
+    serviceMonitorNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+
+    retention: 15d
+    retentionSize: ""
+
+    # Persistent storage for the TSDB. Without this, all metrics are
+    # lost on every Prometheus pod restart.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 30Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+    # External URL — keep in sync with nginx ingress prefix.
+    # externalUrl: http://195.209.218.21/prometheus/
+    # routePrefix: /prometheus/
+
+grafana:
+  # Project ships its own Grafana via docker-compose for now; disable
+  # the bundled one to avoid two competing UIs. Re-enable when we
+  # migrate the existing dashboards into ConfigMaps.
+  enabled: false
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+# kube-state-metrics + node-exporter ship by default and need no
+# tweaks for our use case.

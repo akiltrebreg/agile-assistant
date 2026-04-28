@@ -1,0 +1,28 @@
+# ServiceMonitor for redis-exporter (oliver006/redis_exporter).
+# Job label ``redis`` matches the historical static_configs job name
+# so {job="redis"} queries continue to work.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: agile-assistant
+  labels:
+    app: redis-exporter
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      app: redis-exporter
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: redis

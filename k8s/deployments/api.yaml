@@ -36,7 +36,8 @@ spec:
             - --access-logfile
             - "-"
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
           envFrom:
             - configMapRef:
                 name: app-config

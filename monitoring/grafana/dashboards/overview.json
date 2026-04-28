@@ -242,6 +242,99 @@
       "targets": [
         { "refId": "A", "expr": "max(agile_assistant_celery_active_tasks)" }
       ]
+    },
+    {
+      "type": "stat",
+      "title": "Jira CSV — Last Sync",
+      "description": "Time since the last successful sync_jira_data run. Cadence: every 6h. Yellow at 6h (one missed slot), red at 12h (matches JiraDataStale alert threshold).",
+      "id": 10,
+      "gridPos": { "x": 0, "y": 24, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Never",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 21600 },
+              { "color": "red", "value": 43200 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - max(agile_assistant_data_sync_timestamp_seconds{source=\"jira_csv\"})"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Knowledge Base — Last Sync",
+      "description": "Time since the last successful sync_knowledge_base run (Qdrant re-ingest). Cadence: daily at 03:00 UTC. Yellow at 24h, red at 48h (matches KnowledgeBaseStale alert).",
+      "id": 11,
+      "gridPos": { "x": 8, "y": 24, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Never",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 86400 },
+              { "color": "red", "value": 172800 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - max(agile_assistant_data_sync_timestamp_seconds{source=\"knowledge_base\"})"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Data Sync Runs (success / failure)",
+      "description": "Step increments per source/status. Successful runs land as small bumps at scheduled slots (jira every 6h, KB daily); a flat green line means Beat fired but the task no-op'd, a flat orange/red line means the worker is failing.",
+      "id": 12,
+      "gridPos": { "x": 16, "y": 24, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (increase(agile_assistant_data_sync_total{status=\"success\"}[15m]))",
+          "legendFormat": "{{source}} success"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (source) (increase(agile_assistant_data_sync_total{status=\"failure\"}[15m]))",
+          "legendFormat": "{{source}} failure"
+        }
+      ]
     }
   ],
   "refresh": "30s",
