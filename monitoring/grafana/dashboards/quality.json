@@ -56,7 +56,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agile_assistant_judge_weighted_total"
+          "expr": "max by () (agile_assistant_judge_weighted_total)",
+          "legendFormat": "Weighted total"
         }
       ]
     },
@@ -92,8 +93,18 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg_over_time(agile_assistant_judge_weighted_total[1h])",
-          "legendFormat": "weighted (1h avg)"
+          "expr": "max by () (avg_over_time(agile_assistant_judge_weighted_total[1h]))",
+          "legendFormat": "Weighted total (1h avg)"
+        },
+        {
+          "refId": "B",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_weighted_total[24h]))",
+          "legendFormat": "Weighted total (24h avg)"
+        },
+        {
+          "refId": "C",
+          "expr": "max by () (agile_assistant_judge_weighted_total)",
+          "legendFormat": "Weighted total (current)"
         }
       ]
     },
@@ -189,32 +200,32 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h]))",
           "legendFormat": "Agile-корректность"
         },
         {
           "refId": "B",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h]))",
           "legendFormat": "Практичность"
         },
         {
           "refId": "C",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h]))",
           "legendFormat": "Контекст"
         },
         {
           "refId": "D",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h]))",
           "legendFormat": "Вежливость"
         },
         {
           "refId": "E",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h]))",
           "legendFormat": "Чистота текста"
         },
         {
           "refId": "F",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h]))",
           "legendFormat": "Качество языка"
         }
       ]
@@ -236,32 +247,32 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h]))",
           "legendFormat": "agile_correctness"
         },
         {
           "refId": "B",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h]))",
           "legendFormat": "practicality"
         },
         {
           "refId": "C",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h]))",
           "legendFormat": "context_handling"
         },
         {
           "refId": "D",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h]))",
           "legendFormat": "politeness"
         },
         {
           "refId": "E",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h]))",
           "legendFormat": "text_cleanliness"
         },
         {
           "refId": "F",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h])",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h]))",
           "legendFormat": "language_quality"
         }
       ]
@@ -280,7 +291,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agile_assistant_judge_weighted_total < 0.5",
+          "expr": "max by () (agile_assistant_judge_weighted_total > 0 < 0.5)",
           "format": "table",
           "instant": false
         }

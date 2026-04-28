@@ -88,6 +88,27 @@ groups:
         annotations:
           summary: "Qdrant is unreachable"
 
+      # Layer 7 (fallback) of the entity sanitizer is the LLM-failure
+      # safety net: it kicks in only when Supervisor's avibe-gptq-8bit
+      # extraction missed an enum field (issue_type, status,
+      # metric_name) that the lemma-based fallback could still recover.
+      # Sustained high rate => prompt is degrading and masking
+      # real Supervisor regressions behind silent recoveries.
+      - alert: SanitizerFallbackHigh
+        expr:
+          rate(agile_assistant_sanitizer_corrections_total{layer="7_fallback"}[5m])
+          > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sanitizer layer 7 (fallback) firing > 0.5/s"
+          description: >
+            Fallback enum extraction is firing at {{ $value | printf "%.2f"
+            }}/s, indicating Supervisor (avibe-gptq-8bit) is failing to extract
+            enum fields ~half of requests. Review Supervisor prompt and few-shot
+            examples — fallback masks the regression behind silent corrections.
+
   # Phase 4: LLM-as-a-Judge quality alerts. ``avg_over_time`` of a
   # 0/1 gauge over 1h gives the share-of-1s — equivalent to the mean
   # of binary observations. ``for: 15m`` filters out single-point

@@ -17,7 +17,6 @@ import time
 from typing import Any
 
 from langchain_core.documents import Document
-from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # Module-level singletons
 _vector_store: QdrantVectorStore | None = None
-_retriever: MultiModeRetriever | VectorStoreRetriever | None = None
+_retriever: MultiModeRetriever | None = None
 
 
 # ── Dense vector store (used by dense & hybrid modes) ────────
@@ -241,13 +240,17 @@ class MultiModeRetriever:
 # ── public factory ───────────────────────────────────────────
 
 
-def get_retriever() -> MultiModeRetriever | VectorStoreRetriever:
+def get_retriever() -> MultiModeRetriever:
     """Return the module-level retriever singleton (lazy init).
 
-    When ``search_type`` is "dense" and reranker is enabled, falls back
-    to the LangChain ``VectorStoreRetriever`` with ``initial_k`` to keep
-    the existing reranker pipeline unchanged.  Otherwise returns a
-    ``MultiModeRetriever``.
+    Always returns ``MultiModeRetriever`` so the retrieval-stage metrics
+    (``rag_retrieval_duration_seconds``, ``rag_top_score``,
+    ``rag_chunks_retrieved``, ``rag_requests``) actually fire — the
+    LangChain ``VectorStoreRetriever`` short-circuit that previously
+    handled the dense+reranker path bypassed all of them.
+    ``_dense_search`` calls ``truncate_vector`` which is a no-op when
+    ``embedding_dimension is None``, so dropping the short-circuit
+    costs nothing.
     """
     global _retriever  # noqa: PLW0603
     if _retriever is not None:
@@ -256,19 +259,7 @@ def get_retriever() -> MultiModeRetriever | VectorStoreRetriever:
     search_type = settings.search_type
     k = settings.retriever_initial_k if settings.reranker_enabled else settings.retriever_top_k
 
-    if (
-        search_type == "dense"
-        and settings.reranker_enabled
-        and settings.embedding_dimension is None
-    ):
-        # LangChain retriever only when no truncation (dim mismatch otherwise)
-        store = get_vector_store()
-        _retriever = store.as_retriever(
-            search_type="similarity",
-            search_kwargs={"k": k},
-        )
-    else:
-        _retriever = MultiModeRetriever(search_type=search_type, k=k)
+    _retriever = MultiModeRetriever(search_type=search_type, k=k)
 
     logger.info(
         "[Retriever] Initialized (mode=%s, k=%d, reranker=%s)",

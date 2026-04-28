@@ -372,3 +372,56 @@ JUDGE_EVALUATIONS_TOTAL = Counter(
     labelnames=("status",),
     namespace=_NAMESPACE,
 )
+
+
+# ── Pre-touch label combinations ──────────────────────────────
+# Without this, Grafana renders "No data" instead of "0" for any
+# counter that hasn't yet recorded an event. Particularly bad on
+# guardrail/sanitizer panels: a healthy system can go a whole shift
+# without a single block, and the dashboard becomes indistinguishable
+# from a broken scrape. ``inc(0)`` is the canonical idiom — safe on
+# counters and idempotent.
+def initialize_label_combinations() -> None:
+    """Materialize all known counter label combinations at value 0.
+
+    Called once per Prometheus exporter process at worker startup.
+    """
+    for status in ("COMPLETED", "FAILED"):
+        TASKS_TOTAL.labels(status=status).inc(0)
+
+    for reason in ("injection_blocked", "whitelist_fast_path", "pass"):
+        GUARDRAIL_L1_RESULTS.labels(reason=reason).inc(0)
+
+    for allowed in ("true", "false"):
+        for layer in ("limits", "regex", "ast", "ok"):
+            GUARDRAIL_L2_RESULTS.labels(allowed=allowed, layer=layer).inc(0)
+
+    GUARDRAIL_L3_RESULTS.labels(passed="true", blocked="false").inc(0)
+    GUARDRAIL_L3_RESULTS.labels(passed="false", blocked="true").inc(0)
+    GUARDRAIL_L3_RESULTS.labels(passed="false", blocked="false").inc(0)
+
+    for check_name in (
+        "length_empty",
+        "length_overflow",
+        "language",
+        "sql_leak",
+        "traceback",
+        "hallucinated_urls",
+        "internal_leak",
+    ):
+        GUARDRAIL_L3_CHECKS_FAILED.labels(check_name=check_name).inc(0)
+
+    for layer in (
+        "1_synonym",
+        "3_hallucination",
+        "4_enum_check",
+        "6_anaphora",
+        "7_fallback",
+    ):
+        SANITIZER_CORRECTIONS.labels(layer=layer).inc(0)
+
+    for entity_type in ("team_name", "sprint_name", "cluster", "assignee"):
+        SANITIZER_ANAPHORA_CARRIES.labels(entity_type=entity_type).inc(0)
+
+    for field in ("issue_type", "status", "metric_name"):
+        SANITIZER_FALLBACK_EXTRACTIONS.labels(field=field).inc(0)

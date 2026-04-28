@@ -226,7 +226,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (field) (increase(agile_assistant_sanitizer_fallback_extractions_total[1h]))",
+          "expr": "round(sum by (field) (increase(agile_assistant_sanitizer_fallback_extractions_total[1h])))",
           "legendFormat": "{{field}}",
           "format": "table",
           "instant": true
@@ -318,12 +318,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(agile_assistant_memory_profile_updates_total[5m])",
+          "expr": "sum(rate(agile_assistant_memory_profile_updates_total[5m]))",
           "legendFormat": "Profile updates"
         },
         {
           "refId": "B",
-          "expr": "rate(agile_assistant_memory_summarizations_total[5m])",
+          "expr": "sum(rate(agile_assistant_memory_summarizations_total[5m]))",
           "legendFormat": "Summarizations"
         }
       ]

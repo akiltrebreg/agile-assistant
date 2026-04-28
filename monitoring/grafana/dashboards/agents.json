@@ -49,6 +49,7 @@
       "type": "piechart",
       "title": "Query Type Distribution (1h)",
       "id": 2,
+      "description": "`error` ≠ Parse Errors panel. Parse Errors counts invalid JSON from the LLM only. `query_type=error` covers any classifier failure: LLM unreachable, network timeout, AND parse failures. If Parse Errors=0 but `error` slice is non-zero, the LLM-call path failed (vLLM down, network, etc.).",
       "gridPos": { "x": 8, "y": 1, "w": 8, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
@@ -92,7 +93,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "increase(agile_assistant_supervisor_parse_errors_total[1h])"
+          "expr": "sum(increase(agile_assistant_supervisor_parse_errors_total[1h]))"
         }
       ]
     },
@@ -116,12 +117,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(agile_assistant_supervisor_fast_path_total[5m])",
+          "expr": "sum(rate(agile_assistant_supervisor_fast_path_total[5m]))",
           "legendFormat": "Fast (regex)"
         },
         {
           "refId": "B",
-          "expr": "rate(agile_assistant_supervisor_llm_calls_total[5m])",
+          "expr": "sum(rate(agile_assistant_supervisor_llm_calls_total[5m]))",
           "legendFormat": "Slow (LLM)"
         }
       ]
@@ -241,7 +242,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(agile_assistant_sql_retries_total[5m])",
+          "expr": "sum(rate(agile_assistant_sql_retries_total[5m]))",
           "legendFormat": "retries/s"
         }
       ]
@@ -434,6 +435,7 @@
       "type": "timeseries",
       "title": "Response Latency by Branch (p95)",
       "id": 18,
+      "description": "Branches: `simple`, `sql_*`, `hybrid` invoke an LLM here. `rag` is a passthrough — the RAG-agent LLM call already happened upstream (see Full RAG Agent Duration); this panel captures only string-formatting + history prefix + final write, so `rag` should be <100ms. If `rag` is high, the bottleneck is upstream (RAG agent) and the metric just inherits the wait. `error`/`simple` paths skip LLM entirely and should be sub-100ms.",
       "gridPos": { "x": 0, "y": 66, "w": 24, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
@@ -493,7 +495,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "increase(agile_assistant_response_llm_timeouts_total[1h])"
+          "expr": "sum(increase(agile_assistant_response_llm_timeouts_total[1h]))"
         }
       ]
     },
@@ -512,7 +514,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "increase(agile_assistant_response_truncated_total[1h])"
+          "expr": "sum(increase(agile_assistant_response_truncated_total[1h]))"
         }
       ]
     }

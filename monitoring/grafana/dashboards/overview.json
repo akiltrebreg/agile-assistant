@@ -16,7 +16,6 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
   "panels": [
     {
       "type": "timeseries",
@@ -111,7 +110,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(agile_assistant_tasks_total{status=\"FAILED\"}[5m])) / clamp_min(sum(rate(agile_assistant_tasks_total[5m])), 1e-9)",
+          "expr": "(sum(rate(agile_assistant_tasks_total{status=\"FAILED\"}[5m])) or vector(0)) / clamp_min(sum(rate(agile_assistant_tasks_total[5m])) or vector(1), 1e-9)",
           "legendFormat": "error rate"
         }
       ]
@@ -141,7 +140,9 @@
         "graphMode": "none",
         "reduceOptions": { "calcs": ["lastNotNull"] }
       },
-      "targets": [{ "refId": "A", "expr": "agile_assistant_tasks_in_progress" }]
+      "targets": [
+        { "refId": "A", "expr": "max(agile_assistant_tasks_in_progress)" }
+      ]
     },
     {
       "type": "stat",
@@ -221,7 +222,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agile_assistant_celery_queue_length",
+          "expr": "max(agile_assistant_celery_queue_length)",
           "legendFormat": "queue length"
         }
       ]
@@ -239,102 +240,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"] }
       },
       "targets": [
-        { "refId": "A", "expr": "agile_assistant_celery_active_tasks" }
-      ]
-    },
-    {
-      "type": "gauge",
-      "title": "Quality Score (1h avg)",
-      "id": 10,
-      "gridPos": { "x": 0, "y": 24, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.7 },
-              { "color": "green", "value": 0.8 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "avg_over_time(agile_assistant_judge_weighted_total[1h])"
-        }
-      ]
-    },
-    {
-      "type": "bargauge",
-      "title": "Quality by Criterion (1h avg)",
-      "id": 11,
-      "gridPos": { "x": 8, "y": 24, "w": 16, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "max": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 0.5 },
-              { "color": "green", "value": 0.8 }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "showUnfilled": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h])",
-          "legendFormat": "agile_correctness"
-        },
-        {
-          "refId": "B",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h])",
-          "legendFormat": "practicality"
-        },
-        {
-          "refId": "C",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h])",
-          "legendFormat": "context_handling"
-        },
-        {
-          "refId": "D",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h])",
-          "legendFormat": "politeness"
-        },
-        {
-          "refId": "E",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h])",
-          "legendFormat": "text_cleanliness"
-        },
-        {
-          "refId": "F",
-          "expr": "avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h])",
-          "legendFormat": "language_quality"
-        }
+        { "refId": "A", "expr": "max(agile_assistant_celery_active_tasks)" }
       ]
     }
   ],
@@ -348,5 +254,16 @@
   "title": "Agile Assistant — Overview",
   "uid": "agile-overview",
   "version": 1,
-  "weekStart": ""
+  "weekStart": "",
+  "links": [
+    {
+      "title": "Quality (LLM-as-a-Judge)",
+      "type": "dashboards",
+      "tags": ["llm-as-judge"],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false
+    }
+  ]
 }

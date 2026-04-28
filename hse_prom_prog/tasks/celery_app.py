@@ -23,6 +23,7 @@ from hse_prom_prog.metrics import (
     CELERY_ACTIVE_TASKS,
     CELERY_TASK_DURATION,
     CELERY_TASKS_TOTAL,
+    initialize_label_combinations,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,12 @@ def _start_metrics_server(**_kwargs) -> None:
 
     Idempotent — repeated calls log and bail out instead of crashing
     the worker (start_http_server raises OSError on port reuse).
+
+    Pre-touches every known counter label combination via
+    ``initialize_label_combinations`` so Grafana renders explicit
+    ``0`` instead of ``No data`` on guardrail/sanitizer panels — a
+    healthy system may go a full shift without a single block, and
+    ``No data`` is indistinguishable from a broken scrape.
     """
     try:
         start_http_server(_METRICS_PORT)
@@ -135,6 +142,8 @@ def _start_metrics_server(**_kwargs) -> None:
     except OSError as exc:
         # Already bound (e.g. worker_ready firing after worker_process_init).
         logger.debug("[Celery] Metrics server already running: %s", exc)
+
+    initialize_label_combinations()
 
 
 worker_process_init.connect(_start_metrics_server)
