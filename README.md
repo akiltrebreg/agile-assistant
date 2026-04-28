@@ -273,24 +273,31 @@ Langfuse получает трейсы каждого запроса с полн
 
 **7. Observability** (Prometheus + Grafana + Langfuse)
 
-- **Prometheus метрики** (`hse_prom_prog/metrics.py`) — единый реестр из ~45
+- **Prometheus метрики** (`hse_prom_prog/metrics.py`) — единый реестр из ~50
   кастомных метрик в неймспейсе `agile_assistant_*`. Покрывают весь pipeline:
   end-to-end latency и queue wait, Celery task lifecycle, per-agent durations,
   guardrails L1/L2/L3 results, entity sanitizer corrections by layer, RAG
-  retrieval/reranker, memory context tokens, session rotations
+  retrieval/reranker, memory context tokens, session rotations, LLM-as-a-Judge
+  scores и periodic data-sync timestamps (Celery Beat)
 - **Эндпоинты `/metrics`**: FastAPI экспонирует метрики через
-  `prometheus-fastapi-instrumentator`, Celery worker — через side-car
-  `start_http_server(9100)`. Prometheus скрейпит 8 целей: api, celery-worker,
-  vllm, vllm-sql, postgresql (через pg-exporter), redis (через redis-exporter),
+  `prometheus-fastapi-instrumentator`, Celery worker и судья — через side-car
+  `start_http_server` (порт 9100 для основного воркера, 9101 для judge).
+  Prometheus скрейпит 9 целей: api, celery-worker, celery-judge, vllm-main,
+  vllm-sql, postgresql (через pg-exporter), redis (через redis-exporter),
   qdrant, prometheus self
-- **Grafana дашборды** (`monitoring/grafana/dashboards/`) — четыре дашборда в
-  папке "Agile Assistant": Overview (e2e latency, throughput, error rate),
-  Infrastructure (PostgreSQL / Redis / Qdrant / vLLM), Agents Deep Dive
-  (per-agent latency, SQL retries, RAG fallbacks, response branches), Guardrails
-  & Safety (L1/L2/L3 blocks, sanitizer corrections, memory rotations)
-- **Алерты Prometheus** (`monitoring/prometheus/alerts.yml`) — 9 правил: high
-  e2e latency, high error rate, Celery queue backlog, vLLM queue overflow,
-  KV-cache exhaustion, PostgreSQL replication lag, Qdrant down
+- **Grafana дашборды** (`monitoring/grafana/dashboards/`) — пять дашбордов в
+  папке "Agile Assistant": Overview (e2e latency, throughput, error rate, data
+  freshness), Infrastructure (PostgreSQL / Redis / Qdrant / vLLM), Agents Deep
+  Dive (per-agent latency, SQL retries, RAG fallbacks, response branches),
+  Guardrails & Safety (L1/L2/L3 blocks, sanitizer corrections, memory
+  rotations), Quality (LLM-as-a-Judge per-criterion scores и weighted total)
+- **Алерты Prometheus** (`monitoring/prometheus/alerts.yml`) — 18 правил в
+  четырёх группах: `agile_assistant_pipeline` (latency / error rate / queue
+  backlog), `infrastructure` (vLLM очереди и KV-cache, PostgreSQL replication
+  lag, Qdrant healthcheck, sanitizer fallback rate), `agile_assistant_quality`
+  (LLM-as-a-Judge weighted/per-criterion drops, judge API availability),
+  `agile_assistant_data_freshness` (Jira CSV / KB stale, sync failures, Celery
+  Beat liveness)
 - **Langfuse трейсинг** (`hse_prom_prog/tracing.py`) — singleton-клиент с
   graceful degradation. На каждый Celery-таск создаётся root trace (`user_id`,
   `session_id`, `input` / `output`), внутри — вложенные spans для каждого агента
@@ -439,7 +446,7 @@ hse-prom-prog/
 │   ├── __init__.py
 │   ├── config.py                      # Pydantic settings
 │   ├── main.py                        # CLI entry point
-│   ├── metrics.py                     # Prometheus реестр (~45 метрик в неймспейсе agile_assistant_*)
+│   ├── metrics.py                     # Prometheus реестр (~50 метрик в неймспейсе agile_assistant_*)
 │   ├── tracing.py                     # Langfuse singleton + @observe реэкспорт + graceful degradation
 │   ├── agents/
 │   │   ├── __init__.py
@@ -506,9 +513,11 @@ hse-prom-prog/
 │   │   └── tokenizer.py               # Deterministic text→SparseVector tokenizer
 │   └── tasks/
 │       ├── __init__.py
-│       ├── celery_app.py              # Celery application factory
+│       ├── celery_app.py              # Celery app factory + Beat schedule (sync_jira_data, sync_knowledge_base)
 │       ├── workflow_task.py           # Celery task (wraps workflow + inactivity rotation)
-│       └── memory_tasks.py            # Celery: summarize_session, update_profile_async, _refresh_rolling_summary
+│       ├── memory_tasks.py            # Celery: summarize_session, update_profile_async, _refresh_rolling_summary
+│       ├── judge_task.py              # Phase 4: LLM-as-a-Judge async scoring (queue=judge, vsellm)
+│       └── sync_tasks.py              # Phase 5: периодический S3→PostgreSQL и S3→Qdrant sync (Beat-планируется)
 ├── knowledge_base/                    # Загружается из S3 (S3_KB_BUCKET)
 │   ├── agile/                         # Agile-практики, дашборды
 │   ├── metrics/                       # Описания метрик
@@ -527,11 +536,11 @@ hse-prom-prog/
 │   └── init-langfuse.sql              # Создаёт langfuse_db рядом с основной БД
 ├── monitoring/
 │   ├── prometheus/
-│   │   ├── prometheus.yml             # 8 scrape targets (api, celery, vllm, vllm-sql, pg, redis, qdrant, self)
-│   │   └── alerts.yml                 # 9 правил (latency, error rate, queue backlog, KV-cache, replication lag)
+│   │   ├── prometheus.yml             # 9 scrape targets (api, celery-worker, celery-judge, vllm-main, vllm-sql, pg, redis, qdrant, self)
+│   │   └── alerts.yml                 # 18 правил в 4 группах (pipeline / infrastructure / quality / data-freshness)
 │   └── grafana/
 │       ├── provisioning/              # Datasource (Prometheus) + dashboard provider
-│       └── dashboards/                # 4 JSON-дашборда: overview, infrastructure, agents, guardrails
+│       └── dashboards/                # 5 JSON-дашбордов: overview, infrastructure, agents, guardrails, quality
 ├── scripts/
 │   └── download_model.sh              # Download avibe-gptq-8bit from S3
 ├── streamlit_app/
@@ -600,7 +609,7 @@ cd hse-prom-prog
 git fetch --all
 
 # Переключитесь на актуальную ветку
-git checkout checkpoint_17
+git checkout checkpoint_18
 
 # Скопируйте файл окружения
 cp .env.example .env
@@ -1313,16 +1322,36 @@ k8s/
 ├── deployments/
 │   ├── qdrant.yaml               # Qdrant v1.13.2
 │   ├── redis.yaml                # Redis 7 (ephemeral)
-│   ├── vllm.yaml                 # vLLM (avibe-gptq-8bit, GPU, S3 init)
+│   ├── redis-exporter.yaml       # oliver006/redis_exporter (порт 9121, для ServiceMonitor)
+│   ├── vllm.yaml                 # vLLM main (avibe-gptq-8bit, GPU, S3 init)
+│   ├── vllm-sql.yaml             # vLLM SQL (Qwen3-8B-AWQ, GPU, S3 init)
 │   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
-│   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
+│   ├── celery-worker.yaml        # Celery main worker (threads, concurrency=4, side-car :9100)
+│   ├── celery-judge.yaml         # Celery judge worker (queue=judge, side-car :9101)
+│   ├── celery-beat.yaml          # Celery Beat scheduler (replicas:1 + Recreate)
 │   └── streamlit.yaml            # Streamlit UI
-└── services/
-    ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
-    ├── redis-svc.yaml            # ClusterIP :6379
-    ├── vllm-svc.yaml             # ClusterIP :8000 (name: vllm-server)
-    ├── api-svc.yaml              # ClusterIP :8080
-    └── streamlit-svc.yaml        # ClusterIP :8501
+├── services/
+│   ├── qdrant-svc.yaml               # ClusterIP :6333, :6334
+│   ├── redis-svc.yaml                # ClusterIP :6379
+│   ├── redis-exporter-svc.yaml       # ClusterIP :9121 (port name: http-metrics)
+│   ├── vllm-svc.yaml                 # ClusterIP :8000 (name: vllm-server)
+│   ├── vllm-sql-svc.yaml             # ClusterIP :8000 (Service: vllm-sql)
+│   ├── api-svc.yaml                  # ClusterIP :8080 (port name: http)
+│   ├── celery-worker-svc.yaml        # Headless (clusterIP: None) — для ServiceMonitor discovery
+│   ├── celery-judge-svc.yaml         # Headless — для ServiceMonitor discovery
+│   └── streamlit-svc.yaml            # ClusterIP :8501
+└── monitoring/                       # Prometheus Operator CRD (заменяют static_configs из docker-compose)
+    ├── kube-prometheus-stack-values.yaml  # Helm values для оператора
+    ├── api-servicemonitor.yaml            # → job=fastapi
+    ├── celery-worker-servicemonitor.yaml  # → job=celery-worker
+    ├── celery-judge-servicemonitor.yaml   # → job=celery-judge
+    ├── vllm-main-servicemonitor.yaml      # → job=vllm-main
+    ├── vllm-sql-servicemonitor.yaml       # → job=vllm-sql
+    ├── qdrant-servicemonitor.yaml         # → job=qdrant
+    ├── postgres-podmonitor.yaml           # PodMonitor по cnpg.io/cluster, job=postgresql
+    ├── redis-exporter-servicemonitor.yaml # → job=redis
+    ├── prometheus-rules.yaml              # PrometheusRule CRD — те же 18 алертов, что в alerts.yml
+    └── README.md                          # Установка оператора + миграция с static_configs
 ```
 
 ### Архитектурные решения
@@ -1453,7 +1482,7 @@ kubectl apply -f k8s/storage/                # PVC для Qdrant (2Gi) и vLLM m
 **3.2. Service-ы** — создают DNS-имена для межсервисного взаимодействия:
 
 ```bash
-kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, streamlit
+kubectl apply -f k8s/services/               # qdrant, redis, redis-exporter, vllm-server, vllm-sql, api, streamlit + headless celery-worker / celery-judge для ServiceMonitor
 ```
 
 > Service-ы применяются до Deployment-ов, чтобы DNS-имена были доступны при
@@ -1466,7 +1495,9 @@ kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, 
 kubectl apply -f k8s/statefulsets/postgres-cluster.yaml   # CloudNativePG: 1 primary + 2 standby
 kubectl apply -f k8s/deployments/qdrant.yaml              # Qdrant v1.13.2
 kubectl apply -f k8s/deployments/redis.yaml               # Redis 7 (брокер Celery)
-kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + avibe-gptq-8bit (GPU, S3 download)
+kubectl apply -f k8s/deployments/redis-exporter.yaml      # Side-car exporter для redis-метрик
+kubectl apply -f k8s/deployments/vllm.yaml                # vLLM main: avibe-gptq-8bit (GPU, S3 download)
+kubectl apply -f k8s/deployments/vllm-sql.yaml            # vLLM SQL: Qwen3-8B-AWQ (GPU, S3 download)
 ```
 
 **3.4. Ожидание готовности инфраструктуры:**
@@ -1509,7 +1540,9 @@ kubectl -n agile-assistant logs job/qdrant-ingest
 
 ```bash
 kubectl apply -f k8s/deployments/api.yaml            # FastAPI (2 реплики, gunicorn + uvicorn)
-kubectl apply -f k8s/deployments/celery-worker.yaml   # Celery worker (embedding-модель, 4Gi RAM)
+kubectl apply -f k8s/deployments/celery-worker.yaml   # Celery main worker (embedding-модель, 4Gi RAM)
+kubectl apply -f k8s/deployments/celery-judge.yaml    # Celery judge worker (queue=judge, vsellm)
+kubectl apply -f k8s/deployments/celery-beat.yaml     # Celery Beat (replicas:1 + Recreate, периодический sync)
 kubectl apply -f k8s/deployments/streamlit.yaml        # Streamlit UI
 ```
 
@@ -1517,6 +1550,18 @@ kubectl apply -f k8s/deployments/streamlit.yaml        # Streamlit UI
 
 ```bash
 kubectl apply -f k8s/ingress.yaml    # 4 Ingress-ресурса: API, static-svg, static-css, UI
+```
+
+**3.8. Monitoring (опционально, Prometheus Operator)** — заменяет
+`static_configs` из `monitoring/prometheus/prometheus.yml` на ServiceMonitor /
+PodMonitor / PrometheusRule CRD. Подробности в
+[k8s/monitoring/README.md](k8s/monitoring/README.md):
+
+```bash
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring --create-namespace \
+  -f k8s/monitoring/kube-prometheus-stack-values.yaml
+kubectl apply -f k8s/monitoring/    # 7 ServiceMonitor + 1 PodMonitor + 1 PrometheusRule
 ```
 
 ### Шаг 4: Проверка
@@ -1818,7 +1863,8 @@ cause.
 ### Метрики Prometheus
 
 Реестр метрик собран в [hse_prom_prog/metrics.py](hse_prom_prog/metrics.py). Все
-имена живут в неймспейсе `agile_assistant_*`. Метрики разделены на 8 секций.
+имена живут в неймспейсе `agile_assistant_*`. ~50 кастомных метрик разделены на
+12 секций.
 
 **Pipeline (workflow_task)**:
 
@@ -1832,12 +1878,12 @@ cause.
 **Celery worker** (через сигналы `task_prerun` / `task_postrun` / `task_failure`
 / `task_retry`):
 
-| Метрика                        | Тип       | Лейблы             | Что показывает                                        |
-| ------------------------------ | --------- | ------------------ | ----------------------------------------------------- |
-| `celery_task_duration_seconds` | Histogram | `task_name`        | Длительность Celery-задачи (включая memory_tasks)     |
-| `celery_tasks_total`           | Counter   | `task_name, state` | success / failure / retry per task                    |
-| `celery_active_tasks`          | Gauge     | —                  | Активные задачи воркера                               |
-| `celery_queue_length`          | Gauge     | —                  | LLEN `celery` в Redis (custom collector с lazy-Redis) |
+| Метрика                        | Тип       | Лейблы              | Что показывает                                        |
+| ------------------------------ | --------- | ------------------- | ----------------------------------------------------- |
+| `celery_task_duration_seconds` | Histogram | `task_name`         | Длительность Celery-задачи (включая memory_tasks)     |
+| `celery_tasks_total`           | Counter   | `task_name, status` | success / failure / retry per task                    |
+| `celery_active_tasks`          | Gauge     | —                   | Активные задачи воркера                               |
+| `celery_queue_length`          | Gauge     | —                   | LLEN `celery` в Redis (custom collector с lazy-Redis) |
 
 **Per-agent durations**:
 
@@ -1896,6 +1942,23 @@ cause.
 | `memory_summarizations_total`    | Counter   | —        | Запуски Celery-таски `summarize_session`                  |
 | `memory_profile_updates_total`   | Counter   | —        | Запуски Celery-таски `update_profile_async`               |
 
+**LLM-as-a-Judge (Phase 4)**:
+
+| Метрика                   | Тип     | Лейблы      | Что показывает                                                                                                                                             |
+| ------------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `judge_criterion_score`   | Gauge   | `criterion` | Score последнего evaluation per criterion (0/1): `practicality`, `language_quality`, `text_cleanliness`, `agile_correctness`, `completeness`, `politeness` |
+| `judge_weighted_total`    | Gauge   | —           | Weighted total score последнего evaluation (0.0–1.0)                                                                                                       |
+| `judge_evaluations_total` | Counter | `status`    | Терминальные исходы судьи: `success` / `parse_error` / `api_error`                                                                                         |
+
+**Data sync (Phase 5, Celery Beat)**:
+
+| Метрика                       | Тип       | Лейблы           | Что показывает                                                              |
+| ----------------------------- | --------- | ---------------- | --------------------------------------------------------------------------- |
+| `data_sync_timestamp_seconds` | Gauge     | `source`         | Unix-timestamp последнего успешного запуска (`jira_csv` / `knowledge_base`) |
+| `data_sync_total`             | Counter   | `source, status` | Запуски по источнику и исходу (`success` / `failure`)                       |
+| `data_sync_duration_seconds`  | Histogram | `source`         | Длительность одного прогона (CSV: секунды, KB: минуты)                      |
+| `data_sync_rows`              | Gauge     | `source`         | Кол-во строк / чанков после успешного sync                                  |
+
 **FastAPI HTTP** (через `prometheus-fastapi-instrumentator`): автоматические
 метрики `http_requests_total`, `http_request_duration_seconds` с лейблами
 `method`, `handler`, `status`. `/metrics` исключён из инструментирования, чтобы
@@ -1903,17 +1966,18 @@ Prometheus сам себя не считал.
 
 ### Дашборды Grafana
 
-Четыре JSON-дашборда в
+Пять JSON-дашбордов в
 [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/), автоматически
 провижионятся при запуске Grafana через `provisioning/dashboards/` (см.
 [monitoring/grafana/provisioning/](monitoring/grafana/provisioning/)).
 
-| Дашборд                        | UID                | Что показывает                                                                                              |
-| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| **Agile Assistant — Overview** | `agile-overview`   | E2E latency p50/p95/p99, throughput RPS, error rate, queue wait, in-progress, query_type breakdown          |
-| **Infrastructure**             | `agile-infra`      | PostgreSQL connections / TPS / replication lag, Redis ops/sec, Qdrant healthcheck, vLLM KV-cache, GPU       |
-| **Agents Deep Dive**           | `agile-agents`     | Per-agent latency, SQL retries / empty results, RAG retrieval / reranker / fallbacks, response branches     |
-| **Guardrails & Safety**        | `agile-guardrails` | L1 injection blocks, L2 layer breakdown, L3 failed checks, sanitizer corrections by layer, memory rotations |
+| Дашборд                                        | UID                    | Что показывает                                                                                                                               |
+| ---------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agile Assistant — Overview**                 | `agile-overview`       | E2E latency p50/p95/p99, throughput RPS, error rate, queue wait, in-progress, query_type breakdown, data freshness (Jira CSV / KB last sync) |
+| **Agile Assistant — Infrastructure**           | `agile-infrastructure` | PostgreSQL connections / TPS / replication lag, Redis ops/sec, Qdrant healthcheck, vLLM KV-cache, GPU                                        |
+| **Agile Assistant — Agents Deep Dive**         | `agile-agents`         | Per-agent latency, SQL retries / empty results, RAG retrieval / reranker / fallbacks, response branches                                      |
+| **Agile Assistant — Guardrails & Safety**      | `agile-guardrails`     | L1 injection blocks, L2 layer breakdown, L3 failed checks, sanitizer corrections by layer, memory rotations                                  |
+| **Agile Assistant — Quality (LLM-as-a-Judge)** | `agile-quality`        | Weighted total quality score, per-criterion scores (1h / 24h avg), judge-evaluation outcomes, API errors                                     |
 
 Все дашборды настроены на datasource `prometheus`. Разворачиваются автоматически
 после `docker compose up -d grafana` — провижионинг провалидирует dashboards и
@@ -1922,24 +1986,53 @@ Prometheus сам себя не считал.
 ### Алерты Prometheus
 
 Все правила в
-[monitoring/prometheus/alerts.yml](monitoring/prometheus/alerts.yml). Группа
-`agile_assistant`. Правил 9 (severity: warning / critical):
+[monitoring/prometheus/alerts.yml](monitoring/prometheus/alerts.yml). 18 правил
+в четырёх группах (severity: warning / critical):
 
-| Alert                      | Условие                                                    | Severity |
-| -------------------------- | ---------------------------------------------------------- | -------- |
-| `HighE2ELatency`           | p95 `pipeline_duration_seconds` > 30s 5 минут подряд       | warning  |
-| `HighErrorRate`            | rate FAILED tasks > 5% от общего за 5 минут                | critical |
-| `CeleryQueueBacklog`       | `celery_queue_length` > 50 5 минут подряд                  | warning  |
-| `VLLMMainQueueOverflow`    | vLLM main: `vllm:num_requests_waiting` > 10 5 минут подряд | warning  |
-| `VLLMSQLQueueOverflow`     | vLLM SQL: `vllm:num_requests_waiting` > 5 5 минут подряд   | warning  |
-| `VLLMKVCacheExhausted`     | KV-cache utilization > 90% 5 минут                         | critical |
-| `PostgreSQLReplicationLag` | Replication lag > 30s (для k8s HA-кластера)                | warning  |
-| `QdrantDown`               | Qdrant healthcheck падает > 2 минут                        | critical |
-| `HighGuardrailBlockRate`   | Доля L1/L2/L3 блоков > 20% от трафика 10 минут             | warning  |
+**`agile_assistant_pipeline`** — общая работоспособность pipeline-а:
+
+| Alert                | Условие                                          | Severity |
+| -------------------- | ------------------------------------------------ | -------- |
+| `HighE2ELatency`     | p95 `pipeline_duration_seconds` > 30s, `for: 5m` | warning  |
+| `HighErrorRate`      | доля FAILED задач > 10% за 5 мин, `for: 5m`      | critical |
+| `CeleryQueueBacklog` | `celery_queue_length` > 20, `for: 5m`            | warning  |
+
+**`infrastructure`** — состояние внешних зависимостей:
+
+| Alert                      | Условие                                                                           | Severity |
+| -------------------------- | --------------------------------------------------------------------------------- | -------- |
+| `VLLMMainQueueOverflow`    | `vllm:num_requests_waiting{job="vllm-main"}` > 5, `for: 3m`                       | warning  |
+| `VLLMSQLQueueOverflow`     | `vllm:num_requests_waiting{job="vllm-sql"}` > 3, `for: 3m`                        | warning  |
+| `VLLMKVCacheExhausted`     | `vllm:gpu_cache_usage_perc` > 0.95, `for: 2m`                                     | critical |
+| `PostgreSQLReplicationLag` | `pg_replication_lag_seconds` > 5 (k8s/CNPG: `cnpg_pg_replication_lag`), `for: 1m` | critical |
+| `QdrantDown`               | `up{job="qdrant"} == 0`, `for: 1m`                                                | critical |
+| `SanitizerFallbackHigh`    | `rate(sanitizer_corrections_total{layer="7_fallback"}[5m])` > 0.5, `for: 10m`     | warning  |
+
+**`agile_assistant_quality`** — LLM-as-a-Judge (Phase 4); 0/1 gauges усредняются
+через `avg_over_time` за час, `for: 15m` глушит одиночные выбросы:
+
+| Alert                       | Условие                                                                         | Severity |
+| --------------------------- | ------------------------------------------------------------------------------- | -------- |
+| `JudgeQualityDrop`          | `avg_over_time(judge_weighted_total[1h])` < 0.7, `for: 15m`                     | warning  |
+| `JudgeAgileCorrectnessDrop` | `avg_over_time(judge_criterion_score{criterion="agile_correctness"}[1h])` < 0.6 | warning  |
+| `JudgePracticalityDrop`     | `avg_over_time(judge_criterion_score{criterion="practicality"}[1h])` < 0.6      | warning  |
+| `JudgeLanguageQualityDrop`  | `avg_over_time(judge_criterion_score{criterion="language_quality"}[1h])` < 0.6  | warning  |
+| `JudgeUnavailable`          | доля `judge_evaluations_total{status="api_error"}` за 30 мин > 50%, `for: 10m`  | warning  |
+
+**`agile_assistant_data_freshness`** — Phase 5, Celery Beat sync:
+
+| Alert                | Условие                                                                                | Severity |
+| -------------------- | -------------------------------------------------------------------------------------- | -------- |
+| `JiraDataStale`      | `time() - max(data_sync_timestamp_seconds{source="jira_csv"})` > 12h, `for: 10m`       | warning  |
+| `KnowledgeBaseStale` | `time() - max(data_sync_timestamp_seconds{source="knowledge_base"})` > 48h, `for: 30m` | warning  |
+| `DataSyncFailing`    | `increase(data_sync_total{status="failure"}[1h])` >= 2                                 | warning  |
+| `CeleryBeatDown`     | `time() - max(data_sync_timestamp_seconds)` > 30h (нет успехов ни по одному источнику) | critical |
 
 Алерты не отправляются в Alertmanager — он не входит в Phase 1 деплой.
 Срабатывания видны на странице `/prometheus/alerts` и могут быть экспортированы
-в Slack/Telegram при подключении Alertmanager.
+в Slack/Telegram при подключении Alertmanager. В k8s те же 18 правил живут как
+PrometheusRule CRD в
+[k8s/monitoring/prometheus-rules.yaml](k8s/monitoring/prometheus-rules.yaml).
 
 ### Трейсинг Langfuse
 
@@ -1992,7 +2085,10 @@ langfuse_context.update_current_trace(trace_id=trace.id)
 
 LLM-вызовы помечены как `as_type="generation"` — Langfuse выделяет их в
 отдельную сущность с usage tokens, model parameters и поддержкой LLM-as-a-judge
-scoring (это будет использоваться в Phase 4).
+scoring. Phase 4 использует это: `judge_task` пишет 6 score'ов (practicality /
+language_quality / text_cleanliness / agile_correctness / completeness /
+politeness) обратно в исходный trace через `langfuse_client.score`, после чего
+они видны и в Langfuse, и в Grafana (дашборд Quality).
 
 **Что не пишется в Langfuse**:
 
