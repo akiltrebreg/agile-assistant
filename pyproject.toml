@@ -68,7 +68,59 @@ dev = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.2",
     "pytest-cov>=6.0.0",
+    "coverage[toml]>=7.6.0",
+    "pytest-xdist>=3.6.0",
+    "pytest-timeout>=2.3.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 30
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "unit: pure unit tests with all I/O mocked (no DB, no LLM, no Qdrant, no Redis)",
+    "contract: contract tests on State shape between LangGraph agent pairs",
+    "integration: tests requiring real services (DB/Qdrant/Redis); excluded from default CI run",
+    "slow: tests >1s — gate behind '-m \"not slow\"' for fast feedback loops",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:langfuse.*",
+    "ignore::DeprecationWarning:pydantic.*",
+]
+
+[tool.coverage.run]
+source = ["hse_prom_prog"]
+branch = true
+omit = [
+    "hse_prom_prog/main.py",
+    "hse_prom_prog/rag/ingest.py",
+    "hse_prom_prog/database/load_csv.py",
+    "hse_prom_prog/tasks/celery_app.py",
+    "hse_prom_prog/api/app.py",
+    "alembic/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [tool.ruff]
 line-length = 100
