@@ -1,5 +1,9 @@
 # Agile AI Assistant
 
+[![Tests](https://github.com/akiltrebreg/hse-prom-prog/actions/workflows/test.yml/badge.svg)](https://github.com/akiltrebreg/hse-prom-prog/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/akiltrebreg/hse-prom-prog/branch/main/graph/badge.svg)](https://codecov.io/gh/akiltrebreg/hse-prom-prog)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
+
 Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM,
 PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
 

@@ -96,11 +96,14 @@ filterwarnings = [
 source = ["hse_prom_prog"]
 branch = true
 omit = [
+    # Entrypoint / glue with no logic worth unit-testing.
     "hse_prom_prog/main.py",
-    "hse_prom_prog/rag/ingest.py",
-    "hse_prom_prog/database/load_csv.py",
-    "hse_prom_prog/tasks/celery_app.py",
     "hse_prom_prog/api/app.py",
+    "hse_prom_prog/tasks/celery_app.py",
+    # Long-running ingestion script — its Celery Beat wrapper
+    # (sync_tasks.sync_knowledge_base) IS unit-tested for locking
+    # and retry; the body itself is sequential I/O glue.
+    "hse_prom_prog/rag/ingest.py",
     "alembic/*",
 ]
 
@@ -108,6 +111,11 @@ omit = [
 show_missing = true
 skip_covered = false
 precision = 2
+# Phase 7 floor: actual coverage on phases 0-6 is ~77.9%. Set 75 so a
+# normal refactor that grazes uncovered modules (Qdrant retriever,
+# DB repos, judge_task) doesn't trip CI, but a >3% drop fails loud.
+# Bump in lockstep when new tests close the gap.
+fail_under = 75
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
