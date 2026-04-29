@@ -413,19 +413,28 @@ services:
       celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
       --pool=threads --concurrency=4
     healthcheck:
+      # ``inspect ping`` was previously used here but the cold Python
+      # import inside the probe (langgraph + qdrant + tokenizers,
+      # ~25s) plus the 20s broker wait blew past Docker's healthcheck
+      # timeout — the worker was functionally healthy but Docker
+      # marked it unhealthy. The Prometheus side-car on :9100 is
+      # bound only after ``worker_process_init`` fires, so a 200 here
+      # proves both that the process is alive AND that signal
+      # handlers (which is what makes the worker actually consume
+      # tasks) are wired up. ~50 ms instead of ~30 s.
       test:
         [
-          "CMD-SHELL",
-          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 20",
+          "CMD",
+          "curl",
+          "-fs",
+          "-o",
+          "/dev/null",
+          "http://localhost:9100/metrics",
         ]
-      # ``inspect ping`` is heavy under --pool=threads (full app import +
-      # broadcast roundtrip). 30s start_period was too aggressive — the
-      # worker is functionally ready in ~5s but the probe takes 15-25s,
-      # so docker flagged it ``unhealthy`` even on a working node.
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 90s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - hse-network
 
@@ -471,11 +480,20 @@ services:
       celery -A hse_prom_prog.tasks.celery_app beat --loglevel=info
       --schedule=/tmp/celerybeat-schedule
     healthcheck:
-      # Beat has no inspect ping; "is the process up" is the strongest
-      # liveness signal we have without instrumenting it ourselves.
-      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' >/dev/null || exit 1"]
+      # Beat has no metrics endpoint and no inspect-ping; the strongest
+      # liveness signal without packaging extras is "PID 1 is alive".
+      # ``pgrep`` would be cleaner but it lives in ``procps`` which
+      # isn't in python:3.12-slim — same /proc-based probe we use for
+      # the k8s liveness check (k8s/deployments/celery-beat.yaml).
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import os; assert os.path.exists('/proc/1/status')",
+        ]
       interval: 60s
-      timeout: 10s
+      timeout: 5s
       retries: 3
       start_period: 30s
     networks:
@@ -533,19 +551,24 @@ services:
       celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
       --pool=threads --concurrency=2 --queues=judge --hostname=judge@%h
     healthcheck:
+      # Same reasoning as celery-worker: probe the Prometheus side-car
+      # (port 9101 here) instead of running ``inspect ping``, which
+      # paid a 25-30 s import tax on every healthcheck. The metrics
+      # server is bound only after worker_process_init fires, so a
+      # 200 here means "process up + signal handlers wired".
       test:
         [
-          "CMD-SHELL",
-          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 20",
+          "CMD",
+          "curl",
+          "-fs",
+          "-o",
+          "/dev/null",
+          "http://localhost:9101/metrics",
         ]
-      # ``inspect ping`` is heavy under --pool=threads (full app import +
-      # broadcast roundtrip). 30s start_period was too aggressive — the
-      # worker is functionally ready in ~5s but the probe takes 15-25s,
-      # so docker flagged it ``unhealthy`` even on a working node.
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 90s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - hse-network
 
