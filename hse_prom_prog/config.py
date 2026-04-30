@@ -132,6 +132,18 @@ class Settings(BaseSettings):
         default="https://storage.yandexcloud.net",
         description="S3 endpoint URL (Yandex Cloud Object Storage)",
     )
+    s3_models_bucket: str | None = Field(
+        default="quant-models-agile",
+        description=(
+            "S3 bucket containing ML model snapshots (embedding, reranker). "
+            "None disables S3 download — embedding model must then be present "
+            "locally under embedding_model_cache_dir or be a HuggingFace ID."
+        ),
+    )
+    s3_models_path: str = Field(
+        default="models",
+        description="Path prefix inside s3_models_bucket (e.g. 'models')",
+    )
 
     # Qdrant Configuration
     qdrant_url: str = Field(
@@ -143,8 +155,22 @@ class Settings(BaseSettings):
         description="Qdrant collection name for RAG documents",
     )
     embedding_model: str = Field(
-        default="intfloat/multilingual-e5-base",
-        description="HuggingFace embedding model for RAG",
+        default="multilingual-e5-base",
+        description=(
+            "Embedding model identifier. When s3_models_bucket is set, this is "
+            "the folder name inside s3://{s3_models_bucket}/{s3_models_path}/ "
+            "and the snapshot is downloaded on first use. When the bucket is "
+            "None (or empty), the value is passed straight to HuggingFace as "
+            "a Hub ID (back-compat fallback)."
+        ),
+    )
+    embedding_model_cache_dir: str = Field(
+        default="/app/models",
+        description=(
+            "Local directory under which S3-downloaded model snapshots are "
+            "cached. The embedding model lands at "
+            "{embedding_model_cache_dir}/{embedding_model}/."
+        ),
     )
     embedding_sparse_model: str | None = Field(
         default=None,

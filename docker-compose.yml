@@ -154,6 +154,38 @@ services:
     networks:
       - hse-network
 
+  # Download embedding model (multilingual-e5-base) from Yandex Cloud S3
+  # into the shared volume that the API and Celery workers mount at
+  # /app/models. Mirrors the download-model / download-sql-model pattern;
+  # ensure_embedding_model_downloaded() in rag/embeddings.py also handles
+  # this at runtime as a safety net for ad-hoc / non-compose runs.
+  download-embedding-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/multilingual-e5-base/config.json ]; then
+          echo "multilingual-e5-base already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading multilingual-e5-base from S3..."
+        aws s3 sync \
+          s3://${S3_MODELS_BUCKET:-quant-models-agile}/${S3_MODELS_PATH:-models}/multilingual-e5-base/ \
+          /models/multilingual-e5-base/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/multilingual-e5-base/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/multilingual-e5-base/
+    volumes:
+      - embedding-models:/models
+    networks:
+      - hse-network
+
   # vLLM for SQL Agent (Qwen3-8B-AWQ, port 8001)
   vllm-sql:
     image: vllm/vllm-openai:v0.9.1
@@ -314,6 +346,8 @@ services:
         condition: service_healthy
       vllm-sql:
         condition: service_healthy
+      download-embedding-model:
+        condition: service_completed_successfully
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
@@ -321,6 +355,7 @@ services:
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
       - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
+      - EMBEDDING_MODEL_CACHE_DIR=/app/models
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -345,6 +380,7 @@ services:
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+      - embedding-models:/app/models
     # Production: gunicorn with uvicorn workers (no --reload)
     command:
       gunicorn hse_prom_prog.api.app:app -k uvicorn.workers.UvicornWorker --bind
@@ -374,6 +410,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+      download-embedding-model:
+        condition: service_completed_successfully
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
@@ -381,6 +419,7 @@ services:
       - VLLM_API_KEY=EMPTY
       - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
       - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
+      - EMBEDDING_MODEL_CACHE_DIR=/app/models
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -404,6 +443,7 @@ services:
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+      - embedding-models:/app/models
     # Prometheus side-car port (metrics exporter started by celery_app.py).
     # Internal-only — Prometheus scrapes celery-worker:9100 over the docker network.
     expose:
@@ -770,6 +810,9 @@ volumes:
   qdrant_data:
   prometheus_data:
   grafana_data:
+  # Shared embedding-model snapshot, populated by download-embedding-model
+  # and consumed by api / celery-worker via /app/models mount.
+  embedding-models:
 
 networks:
   hse-network:
