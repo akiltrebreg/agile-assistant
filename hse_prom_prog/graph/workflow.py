@@ -76,7 +76,7 @@ class AgileWorkflow:
         self.rag_agent = self._build_rag_agent(llm_client, retriever)
         self.validator = ValidatorAgent()
         self.response_agent = ResponseAgent(llm_client)
-        self.topic_guard = self._build_topic_guard(retriever)
+        self.topic_guard = self._build_topic_guard()
         self.response_guard = ResponseGuard()
 
         self.graph = self._build_graph()
@@ -93,12 +93,13 @@ class AgileWorkflow:
         return RAGAgent(llm_client, retriever)
 
     @staticmethod
-    def _build_topic_guard(retriever: Any | None) -> TopicGuard | None:
-        """Build regex-only TopicGuard. No model, no thresholds.
+    def _build_topic_guard() -> TopicGuard | None:
+        """Build the regex-only ``TopicGuard``, or ``None`` when disabled.
 
-        ``retriever`` parameter kept for API compatibility (unused).
+        Returns:
+            ``TopicGuard()`` when ``settings.guardrail_enabled`` is true,
+            otherwise ``None`` so the input-guardrail node short-circuits.
         """
-        del retriever
         if not settings.guardrail_enabled:
             logger.info("[Workflow] TopicGuard disabled via settings")
             return None

@@ -391,5 +391,5 @@ class TestFormatHelpers:
         # The dedicated helper is also exercised via the rag branch tests,
         # but pinning it directly catches a refactor that removes the
         # empty-sources short-circuit.
-        result = agent._generate_rag_response("q", "answer text", rag_sources=[])
+        result = agent._generate_rag_response("answer text", rag_sources=[])
         assert result == "answer text"

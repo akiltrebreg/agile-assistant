@@ -393,7 +393,6 @@ class ResponseAgent:
 
     def _generate_rag_response(
         self,
-        original_query: str,
         rag_response: str,
         rag_sources: list[str],
     ) -> str:
@@ -639,7 +638,7 @@ class ResponseAgent:
         if query_type == "rag" and use_rag:
             logger.info("[Response Agent] RAG-only response")
             try:
-                response = self._generate_rag_response(original_query, rag_response, rag_sources)
+                response = self._generate_rag_response(rag_response, rag_sources)
             except Exception as e:
                 if _is_timeout(e):
                     RESPONSE_LLM_TIMEOUTS.inc()

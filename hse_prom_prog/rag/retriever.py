@@ -17,7 +17,6 @@ import time
 from typing import Any
 
 from langchain_core.documents import Document
-from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 
 from hse_prom_prog.config import settings
@@ -35,53 +34,8 @@ from hse_prom_prog.tracing import langfuse_context, observe
 
 logger = logging.getLogger(__name__)
 
-# Module-level singletons
-_vector_store: QdrantVectorStore | None = None
+# Module-level singleton — reused across calls to ``get_retriever``.
 _retriever: MultiModeRetriever | None = None
-
-
-# ── Dense vector store (used by dense & hybrid modes) ────────
-
-
-def _build_vector_store() -> QdrantVectorStore:
-    """Create a ``QdrantVectorStore`` backed by the existing collection.
-
-    Returns:
-        Vector store wired to the configured Qdrant collection and the
-        shared HuggingFace embedding model.
-    """
-    embeddings = get_embeddings()
-    client = QdrantClient(url=settings.qdrant_url)
-    collection = settings.qdrant_collection_name
-
-    if not client.collection_exists(collection):
-        logger.warning(
-            "[Retriever] Collection '%s' does not exist. "
-            "Run ingestion first: python -m hse_prom_prog.rag.ingest",
-            collection,
-        )
-
-    store = QdrantVectorStore(
-        client=client,
-        collection_name=collection,
-        embedding=embeddings,
-        vector_name=DENSE_VECTOR_NAME,
-        validate_collection_config=False,
-    )
-    logger.info("[Retriever] Vector store initialized (collection=%s)", collection)
-    return store
-
-
-def get_vector_store() -> QdrantVectorStore:
-    """Return the module-level vector store singleton, creating it lazily.
-
-    Returns:
-        Cached ``QdrantVectorStore`` shared across the module.
-    """
-    global _vector_store  # noqa: PLW0603
-    if _vector_store is None:
-        _vector_store = _build_vector_store()
-    return _vector_store
 
 
 # ── Multi-mode retriever ─────────────────────────────────────
