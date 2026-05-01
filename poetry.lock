@@ -5692,24 +5692,6 @@ docs = ["mkdocs (>=1.6.1)", "mkdocs-autorefs", "mkdocs-gen-files", "mkdocs-git-c
 experimental = ["ragas-experimental"]
 
 [[package]]
-name = "rank-bm25"
-version = "0.2.2"
-description = "Various BM25 algorithms for document ranking"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "rank_bm25-0.2.2-py3-none-any.whl", hash = "sha256:7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae"},
-    {file = "rank_bm25-0.2.2.tar.gz", hash = "sha256:096ccef76f8188563419aaf384a02f0ea459503fdf77901378d4fd9d87e5e51d"},
-]
-
-[package.dependencies]
-numpy = "*"
-
-[package.extras]
-dev = ["pytest"]
-
-[[package]]
 name = "redis"
 version = "7.1.1"
 description = "Python client for Redis database and key-value store"
@@ -8223,4 +8205,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "a167ee3f4e8f0e3984d317c621d1b496a2877d44e02a52e96cb3d9948372eefe"
+content-hash = "0249c88426722ffdaeff73f2f8aedd5e26baa72c4c722bfcbdaf8f7c8fd0fde4"

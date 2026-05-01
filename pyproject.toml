@@ -42,7 +42,6 @@ dependencies = [
     "pypdf>=5.0.0",
     "pdfplumber>=0.11.0",
     # BM25 / learned sparse for hybrid search
-    "rank-bm25>=0.2.2",
     "fastembed>=0.4.0",
     "FlagEmbedding>=1.2.0",
     # S3 access for knowledge base

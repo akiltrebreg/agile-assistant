@@ -508,7 +508,6 @@ hse-prom-prog/
 │   │   └── memory.py                  # Conversation / Message / UserProfile / ConversationSummary / ConversationContext
 │   ├── rag/
 │   │   ├── __init__.py
-│   │   ├── bm25_index.py              # BM25 keyword index (rank-bm25)
 │   │   ├── embeddings.py              # Shared embedding utils (truncation, Matryoshka)
 │   │   ├── ingest.py                  # Ingestion pipeline (S3 → pdfplumber → Qdrant)
 │   │   ├── reranker.py                # Cross-encoder reranker (bge-reranker-v2-m3)
