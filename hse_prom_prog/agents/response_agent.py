@@ -391,23 +391,16 @@ class ResponseAgent:
         )
         return self.llm_client.invoke(prompt)
 
-    def _generate_rag_response(
-        self,
-        rag_response: str,
-        rag_sources: list[str],
-    ) -> str:
-        """Format the RAG-agent answer with appended source citations."""
-        sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
-        suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
-        return f"{rag_response}{suffix}"
+    def _generate_rag_response(self, rag_response: str) -> str:
+        """Return the RAG-agent answer as the user-facing response."""
+        return rag_response
 
-    def _generate_hybrid_response(  # noqa: PLR0913
+    def _generate_hybrid_response(
         self,
         original_query: str,
         sql_result: list[dict[str, Any]],
         intent: str,
         rag_response: str,
-        rag_sources: list[str],
         history: str = "",
     ) -> str:
         """Combine DB data and RAG context into a single hybrid answer."""
@@ -434,16 +427,12 @@ class ResponseAgent:
             "Обязательно назови команду, спринт и конкретные числа из БД, "
             "если они есть в данных.\n"
             "2. АНАЛИЗ: дай рекомендации на основе базы знаний. "
-            "Указывай ТОЛЬКО источники из раздела «Контекст из базы знаний». "
-            "НЕ выдумывай ссылки, названия документов или URL. "
+            "НЕ упоминай названия документов, ссылки, URL или источники "
+            "в тексте ответа. "
             "Если контекст из базы знаний пуст — напиши "
             "«Рекомендации из базы знаний недоступны»."
         )
-        answer = self.llm_client.invoke(prompt)
-
-        sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
-        suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
-        return f"{answer}{suffix}"
+        return self.llm_client.invoke(prompt)
 
     # ------------------------------------------------------------------
     # SQL-only response
@@ -562,7 +551,7 @@ class ResponseAgent:
         )
         return update
 
-    def _process_impl(self, state: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915, C901
+    def _process_impl(self, state: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
         """Dispatch on ``query_type`` / ``route`` and generate the response.
 
         Args:
@@ -618,7 +607,6 @@ class ResponseAgent:
 
         sql_result = state.get("sql_result")
         rag_response = state.get("rag_response")
-        rag_sources = state.get("rag_sources", [])
 
         # --- Both failed (only hybrid/rag — sql-only handles empty in _process_sql_response) ---
         if query_type != "sql" and note and not use_sql and not use_rag:
@@ -638,7 +626,7 @@ class ResponseAgent:
         if query_type == "rag" and use_rag:
             logger.info("[Response Agent] RAG-only response")
             try:
-                response = self._generate_rag_response(rag_response, rag_sources)
+                response = self._generate_rag_response(rag_response)
             except Exception as e:
                 if _is_timeout(e):
                     RESPONSE_LLM_TIMEOUTS.inc()
@@ -661,7 +649,6 @@ class ResponseAgent:
                     sql_result or [],
                     intent,
                     rag_response or "",
-                    rag_sources,
                     history=prefix,
                 )
             except Exception as e:

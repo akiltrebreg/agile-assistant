@@ -164,7 +164,7 @@ class TestBothFailBranch:
 
 @pytest.mark.unit
 class TestRagBranch:
-    def test_rag_response_with_sources_renders_block(
+    def test_rag_response_omits_sources_block(
         self, agent: ResponseAgent, mock_llm_client: MagicMock
     ) -> None:
         out = agent.process(
@@ -176,14 +176,13 @@ class TestRagBranch:
             )
         )
         assert "Velocity" in out["final_response"]
-        assert "**Источники:**" in out["final_response"]
-        assert "- agile-guide.pdf" in out["final_response"]
-        assert "- scrum-book.pdf" in out["final_response"]
+        assert "**Источники:**" not in out["final_response"]
+        assert "agile-guide.pdf" not in out["final_response"]
         # RAG passthrough doesn't re-prompt the LLM — pin this so a future
         # change adds a deliberate doc-rewriter, not silent latency.
         mock_llm_client.invoke.assert_not_called()
 
-    def test_rag_response_without_sources_omits_block(self, agent: ResponseAgent) -> None:
+    def test_rag_response_without_sources(self, agent: ResponseAgent) -> None:
         out = agent.process(
             _state(
                 query_type="rag",
@@ -192,7 +191,7 @@ class TestRagBranch:
                 validation_result={"use_sql": False, "use_rag": True, "note": None},
             )
         )
-        assert "**Источники:**" not in out["final_response"]
+        assert out["final_response"] == "some answer"
 
 
 # ===================================================================== #
@@ -216,10 +215,10 @@ class TestHybridBranch:
                 validation_result={"use_sql": True, "use_rag": True, "note": None},
             )
         )
-        # Body comes from the LLM, sources block gets appended verbatim.
+        # Body comes from the LLM; sources are intentionally not surfaced.
         assert "ДАННЫЕ" in out["final_response"]
-        assert "**Источники:**" in out["final_response"]
-        assert "- doc.pdf" in out["final_response"]
+        assert "**Источники:**" not in out["final_response"]
+        assert "doc.pdf" not in out["final_response"]
         assert mock_llm_client.invoke.call_count == 1
 
     def test_hybrid_llm_exception_falls_back(
@@ -387,9 +386,6 @@ class TestFormatHelpers:
         assert "@Иванов" in with_flag
         assert "@Иванов" not in without_flag
 
-    def test_rag_passthrough_with_empty_sources(self, agent: ResponseAgent) -> None:
-        # The dedicated helper is also exercised via the rag branch tests,
-        # but pinning it directly catches a refactor that removes the
-        # empty-sources short-circuit.
-        result = agent._generate_rag_response("answer text", rag_sources=[])
+    def test_rag_passthrough(self, agent: ResponseAgent) -> None:
+        result = agent._generate_rag_response("answer text")
         assert result == "answer text"

@@ -27,7 +27,6 @@ from streamlit_app.auth import (
 from streamlit_app.components.result import (
     render_error,
     render_result,
-    render_task_details,
     render_timeout,
 )
 from streamlit_app.components.sidebar import render_sidebar
@@ -166,7 +165,6 @@ if prompt := st.chat_input("Введите запрос..."):
             if new_conv_id and new_conv_id != st.session_state.conversation_id:
                 st.session_state.conversation_id = new_conv_id
                 pin_conversation_id(new_conv_id)
-            st.write(f"Задача создана: `{task_id}`")
 
             # 2. Poll for result
             st.write("Ожидаю результат...")
@@ -206,7 +204,7 @@ if prompt := st.chat_input("Введите запрос..."):
                     state="error",
                     expanded=False,
                 )
-                timeout_msg = render_timeout(task_id)
+                timeout_msg = render_timeout()
                 st.warning(timeout_msg)
                 st.session_state.messages.append({"role": "assistant", "content": timeout_msg})
                 st.stop()
@@ -224,7 +222,6 @@ if prompt := st.chat_input("Введите запрос..."):
 
                 answer = render_result(task_data)
                 st.markdown(answer)
-                render_task_details(task_data)
             else:
                 answer = render_error(task_data)
                 st.error(answer)

@@ -108,9 +108,10 @@ class TestRagSuccessChain:
         mock_llm_client: MagicMock,
     ) -> None:
         # The RAG branch in Response Agent is a *passthrough* — the RAG
-        # Agent's text becomes the final response (with a sources block
-        # appended). Pin: no LLM call here. A regression that adds an
-        # LLM rewrite step would double cost and risk hallucinations.
+        # Agent's text becomes the final response verbatim. Pin: no LLM
+        # call here. A regression that adds an LLM rewrite step would
+        # double cost and risk hallucinations. Sources are intentionally
+        # not surfaced to the user (UI is for end users, not engineers).
         state = {
             **_supervisor_state(),
             **_rag_success(
@@ -121,11 +122,8 @@ class TestRagSuccessChain:
         v_out = validator.process(state)
         merged = {**state, **v_out}
         out = response.process(merged)
-        # The RAG text is preserved verbatim.
-        assert "Это объяснение из базы знаний." in out["final_response"]
-        # Sources block is appended.
-        assert "docs/sprint.md" in out["final_response"]
-        assert "docs/agile.md" in out["final_response"]
+        # The RAG text is preserved verbatim, with no source citations.
+        assert out["final_response"] == "Это объяснение из базы знаний."
         # No LLM rewrite of the RAG answer.
         mock_llm_client.invoke.assert_not_called()
 
