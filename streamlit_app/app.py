@@ -130,9 +130,6 @@ render_sidebar(
     on_select=_switch_to_conversation,
 )
 
-# ── Chat title ───────────────────────────────────────────────
-st.title("Agile AI Assistant")
-
 # ── Render chat history ──────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
