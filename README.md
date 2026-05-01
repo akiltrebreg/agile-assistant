@@ -512,8 +512,7 @@ hse-prom-prog/
 │   │   ├── ingest.py                  # Ingestion pipeline (S3 → pdfplumber → Qdrant)
 │   │   ├── reranker.py                # Cross-encoder reranker (bge-reranker-v2-m3)
 │   │   ├── retriever.py               # Multi-mode retriever (dense/sparse/hybrid)
-│   │   ├── sparse.py                  # Sparse embeddings (fastembed BM25 / BGE-M3)
-│   │   └── tokenizer.py               # Deterministic text→SparseVector tokenizer
+│   │   └── sparse.py                  # Sparse embeddings (fastembed BM25 / BGE-M3)
 │   └── tasks/
 │       ├── __init__.py
 │       ├── celery_app.py              # Celery app factory + Beat schedule (sync_jira_data, sync_knowledge_base)
