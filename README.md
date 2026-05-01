@@ -597,95 +597,175 @@ hse-prom-prog/
 
 ## Быстрый старт с Docker Compose
 
-Пошаговая инструкция для запуска полного стека (PostgreSQL + Qdrant + vLLM +
-Redis + FastAPI + Celery + Streamlit + Nginx).
+Пошаговая инструкция для подъёма полного стека с нуля: PostgreSQL + Redis +
+Qdrant + vLLM (×2) + FastAPI + Celery (worker / beat / judge) + Streamlit +
+Nginx + Prometheus + Grafana + Langfuse.
 
-### Шаг 0: Клонирование и настройка
+> Проект разворачивается на сервере `195.209.218.21`. Везде, где в командах
+> встречается `localhost`, имеется в виду сам сервер. Все шаги выполняются из
+> корня репозитория и используют `docker compose` v2.
+
+### Шаг 0: Клонирование и `.env`
 
 ```bash
-# Клонируйте репозиторий
-git clone <repository-url>
+git clone <repository-url> hse-prom-prog
 cd hse-prom-prog
+git checkout main
 
-# Скачайте все ветки
-git fetch --all
-
-# Переключитесь на актуальную ветку
-git checkout checkpoint_18
-
-# Скопируйте файл окружения
 cp .env.example .env
 ```
 
-### Шаг 1: Сборка образа приложения
+Обязательные секреты в `.env`:
+
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Yandex Cloud S3 (модели + KB)
+- `VSELLM_API_KEY` — judge / RAGAS
+- При желании `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`
+
+### Шаг 1: Сборка общего образа приложения
 
 ```bash
 docker compose build app
 ```
 
-Один образ используется для нескольких сервисов: `app`, `api`, `celery-worker`,
-`streamlit`, `migrate`.
+Образ `app` шарится между `api`, `celery-worker`, `celery-beat`, `celery-judge`,
+`streamlit`, `migrate` — собираем один раз.
 
-### Шаг 2: Запуск инфраструктуры
-
-```bash
-docker compose up -d postgres qdrant redis vllm
-```
-
-При первом запуске сервис `download-model` автоматически скачает модель
-`avibe-gptq-8bit` (~5GB) из Yandex Cloud S3 в Docker volume. При повторных
-запусках скачивание пропускается (модель уже на диске).
-
-Дождитесь, пока все сервисы станут healthy (vLLM загружает модель — это может
-занять несколько минут):
+### Шаг 2: Инфраструктура
 
 ```bash
-docker compose ps
+docker compose up -d postgres redis qdrant
 ```
 
-Ожидаемый результат — все четыре сервиса в статусе `healthy`.
+Дождитесь `healthy`:
 
-### Шаг 3: Применение миграций
+```bash
+docker compose ps postgres redis qdrant
+```
+
+### Шаг 3: Скачивание моделей из S3
+
+```bash
+docker compose up download-model download-sql-model download-embedding-model
+```
+
+Эти job-контейнеры заливают `avibe-gptq-8bit`, `qwen3-8b-awq-4bit` и
+`multilingual-e5-base` в общие Docker volumes. Каждый job сам проверяет, что
+модель уже на диске, и пропускает скачивание — повторный запуск идемпотентен.
+
+### Шаг 4: vLLM-серверы
+
+```bash
+docker compose up -d vllm vllm-sql
+```
+
+vLLM при старте загружает модель в GPU — это занимает несколько минут.
+Healthcheck опирается на `/v1/models`. Прогресс старта:
+
+```bash
+docker compose logs -f vllm | grep -E "Application startup|Uvicorn running"
+```
+
+### Шаг 5: Миграции
 
 ```bash
 docker compose run --rm migrate
 ```
 
-Создаёт таблицу `tasks` в PostgreSQL для хранения статусов и результатов
-асинхронных запросов.
-
-### Шаг 4: Загрузка данных
+Накатывает Alembic 001–005: `tasks`, `conversations`, `messages`,
+`user_profiles`, `conversation_summaries`. Быстрый sanity:
 
 ```bash
-# 4a. Загрузить CSV-данные из S3 в PostgreSQL
-docker compose run --rm load-data
+docker compose exec postgres psql -U hse_user -d hse_jira_db -c "\dt"
+```
 
-# 4b. Загрузить базу знаний из S3 в Qdrant
+Должны быть все пять таблиц.
+
+### Шаг 6: Загрузка данных
+
+```bash
+# 6a. CSV из S3 → PostgreSQL (Jira-задачи, метрики)
+docker compose up load-data
+
+# 6b. PDF / Markdown из S3 → Qdrant (база знаний для RAG)
 docker compose run --rm app python -m hse_prom_prog.rag.ingest
 ```
 
-`load-data` скачивает CSV из S3 (`S3_DATA_BUCKET`) и загружает в PostgreSQL.
-`ingest` скачивает PDF/Markdown из S3 (`S3_KB_BUCKET`) и индексирует в Qdrant.
-Без этих шагов SQL-запросы и RAG-запросы не будут работать.
+`load-data` скачивает CSV из `S3_DATA_BUCKET` и загружает в PostgreSQL. `ingest`
+скачивает документы из `S3_KB_BUCKET` и индексирует в Qdrant. Без этих шагов
+SQL-запросы и RAG-запросы не будут работать.
 
-### Шаг 5: Запуск сервисов приложения
+### Шаг 7: API + воркеры + UI
 
 ```bash
-docker compose up -d api celery-worker streamlit nginx
+docker compose up -d api celery-worker celery-beat celery-judge streamlit
 ```
 
-### Шаг 6: Проверка и использование
+### Шаг 8: Nginx и мониторинг
 
 ```bash
-# Проверьте, что все сервисы запущены
+docker compose up -d nginx prometheus grafana pg-exporter redis-exporter langfuse
+```
+
+### Шаг 9: Smoke-проверка
+
+```bash
 docker compose ps
+# все сервисы в Up / healthy
 
-# Откройте в браузере
-open http://localhost
+curl -fsS http://localhost/health
+# {"status":"ok"}
 ```
 
-Streamlit UI доступен по адресу **http://localhost/** — это чат-интерфейс для
-общения с Agile AI Assistant.
+В браузере:
+
+- Streamlit UI — `http://195.209.218.21/`
+- Grafana — `http://195.209.218.21/grafana/`
+- Swagger API — `http://195.209.218.21/api/docs`
+
+### Проверка слоя памяти
+
+После того как стек поднят, end-to-end-проверка conversation window, профиля
+пользователя и rotation запускается одной командой:
+
+```bash
+./scripts/verify_memory.sh                # Levels 1–3 (~2 мин)
+./scripts/verify_memory.sh --regression   # + 4 baseline-евала, ~10 мин на RTX 4090
+```
+
+Скрипт сам проверяет healthcheck-и сервисов, прогоняет unit-тесты, multi-turn
+eval и серию E2E-сценариев (anaphora carry-forward, profile gate / injection,
+inactivity rotation, session restore) и печатает агрегированный PASS / FAIL.
+
+### Структура БД
+
+После применения миграций (Шаг 5) в схеме `public` появляются шесть таблиц.
+Назначение каждой:
+
+| Таблица                  | Миграция  | Назначение                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alembic_version`        | служебная | Текущая ревизия Alembic. Гарантирует, что миграции не накатятся повторно.                                                                                                                                                                                                                                                                                                                                                              |
+| `tasks`                  | 001 + 005 | Аудит-журнал асинхронных запросов: `task_id` (UUID), `query`, `status` (`PENDING` / `PROCESSING` / `COMPLETED` / `FAILED`), `result` (JSONB с финальным ответом), `error`, `celery_task_id`, тайминги (`created_at` / `started_at` / `completed_at`), `workflow_state` для отладки и `conversation_id` (FK на `conversations`, `ON DELETE SET NULL`) для связи с диалогом. На неё опирается API `POST /tasks` + `GET /tasks/{id}`.     |
+| `conversations`          | 003       | **Сессия чата** (short-term memory). Хранит `id`, `user_id` (FK → `user_profiles`, добавляется в 004), `title`, `summary` + `summary_turn_index` (rolling-summary для истории длиннее окна), `is_active`, `created_at` / `updated_at`. Триггер `set_updated_at()` обновляет `updated_at` на любом `UPDATE` — на этом построена inactivity rotation (диалог старше 30 мин закрывается автоматически).                                   |
+| `messages`               | 003       | **Окно диалога**: реплики пользователя и ассистента. `conversation_id` (FK CASCADE), `turn_index` (UNIQUE на пару conversation+turn), `role` (`user` / `assistant`), `content` (полный, до 50 000 символов) + `content_truncated` (~150 токенов для быстрой пересборки промпта), `metadata` JSONB (Supervisor сохраняет туда `entities` — отсюда тянется анафора между ходами).                                                        |
+| `user_profiles`          | 004       | **Долговременная память** пользователя. `external_id` (стабильный UUID из cookie / `?uid=`), `display_name`, `preferences` JSONB (например, `default_team` — подставляется Supervisor'ом, когда в запросе нет команды), `context_summary` (текстовая выжимка по всем сессиям), счётчики `total_conversations` / `total_messages`. Гейт: профиль наполняется не раньше, чем пользователь отправил минимум 6 сообщений с одной командой. |
+| `conversation_summaries` | 004       | Архив завершённых диалогов: при `POST /conversations/{id}/close` Celery-задача `summarize_session` пишет сюда `summary`, `topics[]`, `turn_count`. Используется для `context_summary` в `user_profiles` и для восстановления long-term-контекста при возврате пользователя. FK на `conversations` и `user_profiles` — оба `ON DELETE CASCADE`.                                                                                         |
+
+Связи между таблицами:
+
+```
+user_profiles.id ──┐
+                   ├─◄ conversations.user_id      (ON DELETE SET NULL)
+                   └─◄ conversation_summaries.user_id (CASCADE)
+
+conversations.id ──┐
+                   ├─◄ messages.conversation_id      (CASCADE)
+                   ├─◄ conversation_summaries.conversation_id (CASCADE)
+                   └─◄ tasks.conversation_id        (SET NULL)
+```
+
+`tasks` намеренно живёт сбоку: задача — это аудит-запись, она переживает
+удаление диалога (FK `SET NULL`), чтобы остаться в Grafana-метриках и отладочных
+дампах.
 
 ### Примеры запросов в Streamlit UI
 
