@@ -42,16 +42,13 @@ logger = logging.getLogger(__name__)
 # guard.
 #
 # Sized against the Supervisor classifier (the tightest prompt budget
-# in the pipeline): avibe vLLM caps at max_model_len=4096 real tokens,
-# which is ~4340 estimate-tokens after the estimator's ~16% over-
-# estimate. The static rubric is ~3500 estimate-tokens, leaving ~800
-# for history+profile combined. Supervisor's guard
-# (:data:`_PROMPT_MAX_TOKENS` in agents/supervisor.py) drops history
-# first and profile second when even that is too much.
-#
-# Bumping this back up requires raising max_model_len on vLLM or
-# trimming the supervisor rubric — see budget arithmetic at the top
-# of agents/supervisor.py.
+# in the pipeline): avibe vLLM runs with --max-model-len=6144, which
+# maps to ~5400 estimate-tokens after the safety factor that covers
+# the estimator's undershoot on Cyrillic-heavy prompts. The static
+# rubric is ~3500 estimate-tokens, so 800 here leaves ~1100 of
+# headroom for the profile and safety margin. Supervisor's guard
+# (:data:`_PROMPT_MAX_TOKENS` in agents/supervisor.py) still drops
+# history first and profile second on the rare second-turn overflow.
 HISTORY_TOKEN_BUDGET = 800
 
 # Any message-bearing conversation idle for longer than this gets closed

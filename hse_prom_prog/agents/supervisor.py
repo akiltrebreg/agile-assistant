@@ -52,18 +52,24 @@ _VALID_QUERY_TYPES = frozenset({"sql", "rag", "hybrid", "simple", "off_topic"})
 
 # Hard token budget for the Supervisor classifier prompt, expressed
 # in *estimate-tokens* (what ``estimate_tokens`` returns), not real
-# tokens. The two scales differ because the estimator uses
-# CHARS_PER_TOKEN=3 while the avibe Qwen-BPE tokenizer compresses at
-# ~3.49 chars/token — i.e. the estimator overestimates by ~16%.
+# tokens. The estimator uses CHARS_PER_TOKEN=3, but actual chars/token
+# varies with content: ~3.49 on a mixed corpus, but ~2.5 on Cyrillic-
+# heavy classification prompts. So the estimator can UNDERshoot real
+# tokens by up to ~8% on second-turn prompts that pull in conversation
+# history full of Russian text — exactly the case that crashed the
+# workflow with vLLM 400 ("requested 4264 > 4096 max_model_len").
 #
-# Real budget:
-#   4096 (max_model_len) - 256 (completion) - 100 (chat template) = 3740
-# Estimate-budget (what we compare against in this module):
-#   3740 * 1.16 ~= 4340  (rounded down to leave a small safety margin)
+# Real budget (vllm --max-model-len=6144):
+#   6144 - 256 (completion) - 100 (chat template) = 5788 real tokens
+# Estimate-budget with 0.93 safety factor (covers ~7% undershoot):
+#   5788 * 0.93 ~= 5383  →  rounded to 5400 with a small extra cushion
 #
-# If the estimator is later replaced with a real BPE call, drop the
-# 1.16 factor and use 3740 directly.
-_PROMPT_MAX_TOKENS = 4340
+# The cascade in :meth:`_build_prompt_within_budget` will drop history
+# and then profile when this budget is exceeded, preserving the static
+# rubric. If the estimator is later replaced with a real BPE call, the
+# safety factor can go away and the real budget (5788) can be used
+# directly.
+_PROMPT_MAX_TOKENS = 5400
 
 # Token estimation is delegated to the shared ``estimate_tokens`` helper
 # (memory.token_estimator, CHARS_PER_TOKEN=3). Calibrated against actual
@@ -545,11 +551,11 @@ class SupervisorAgent:
     ) -> str:
         """Render the prompt and progressively drop optional blocks until it fits.
 
-        vLLM's avibe model has ``max-model-len=4096``; the static rubric
-        already eats ~3500 tokens. When a long conversation + a populated
-        profile push the prompt past :data:`_PROMPT_MAX_TOKENS`, the LLM
-        returns HTTP 400 ("maximum context length is 4096 tokens") and
-        Supervisor crashes the workflow. We'd rather degrade gracefully:
+        vLLM's avibe model runs with ``--max-model-len=6144``; the static
+        rubric already eats ~3500 tokens. When a long conversation + a
+        populated profile push the prompt past :data:`_PROMPT_MAX_TOKENS`,
+        the LLM returns HTTP 400 ("maximum context length is N tokens")
+        and Supervisor crashes the workflow. We'd rather degrade gracefully:
 
           1. Try the full prompt (history + profile).
           2. If too long, drop the conversation history and rebuild
