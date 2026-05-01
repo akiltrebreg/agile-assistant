@@ -24,6 +24,18 @@ class Conversation:
         updated_at: datetime,
         is_active: bool,
     ) -> None:
+        """Initialize Conversation.
+
+        Args:
+            id: Conversation identifier.
+            user_id: Owner user id, or ``None`` for anonymous sessions.
+            title: Display title, or ``None`` until derived from a turn.
+            summary: Rolling summary text covering older turns.
+            summary_turn_index: Highest ``turn_index`` covered by ``summary``.
+            created_at: Creation timestamp.
+            updated_at: Last activity timestamp.
+            is_active: Whether the conversation is still open.
+        """
         self.id = id
         self.user_id = user_id
         self.title = title
@@ -34,6 +46,7 @@ class Conversation:
         self.is_active = is_active
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable representation of the conversation."""
         return {
             "id": str(self.id),
             "user_id": str(self.user_id) if self.user_id else None,
@@ -46,6 +59,7 @@ class Conversation:
         }
 
     def __repr__(self) -> str:
+        """Return a developer-friendly summary string."""
         return f"Conversation(id={self.id}, title={self.title!r}, active={self.is_active})"
 
 
@@ -63,6 +77,18 @@ class Message:
         metadata: dict[str, Any],
         created_at: datetime,
     ) -> None:
+        """Initialize Message.
+
+        Args:
+            id: Message identifier.
+            conversation_id: Owning conversation id.
+            turn_index: Position of the message within the conversation.
+            role: Author role (``user`` or ``assistant``).
+            content: Full message body.
+            content_truncated: Optional pre-truncated body for replay budgets.
+            metadata: JSONB metadata bag.
+            created_at: Creation timestamp.
+        """
         self.id = id
         self.conversation_id = conversation_id
         self.turn_index = turn_index
@@ -73,6 +99,7 @@ class Message:
         self.created_at = created_at
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable representation of the message."""
         return {
             "id": str(self.id),
             "conversation_id": str(self.conversation_id),
@@ -85,6 +112,7 @@ class Message:
         }
 
     def __repr__(self) -> str:
+        """Return a developer-friendly summary string."""
         return f"Message(turn={self.turn_index}, role={self.role}, len={len(self.content)})"
 
 
@@ -103,6 +131,19 @@ class UserProfile:
         created_at: datetime,
         updated_at: datetime,
     ) -> None:
+        """Initialize UserProfile.
+
+        Args:
+            id: Internal user identifier.
+            external_id: External (cookie / SSO) identifier.
+            display_name: Optional display name.
+            preferences: Derived preferences (teams, metrics, detail level).
+            context_summary: Rolling summary across recent conversations.
+            total_conversations: Lifetime conversation counter.
+            total_messages: Lifetime message counter.
+            created_at: Creation timestamp.
+            updated_at: Last update timestamp.
+        """
         self.id = id
         self.external_id = external_id
         self.display_name = display_name
@@ -114,6 +155,7 @@ class UserProfile:
         self.updated_at = updated_at
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable representation of the profile."""
         return {
             "id": str(self.id),
             "external_id": self.external_id,
@@ -127,6 +169,7 @@ class UserProfile:
         }
 
     def __repr__(self) -> str:
+        """Return a developer-friendly summary string."""
         return (
             f"UserProfile(id={self.id}, external_id={self.external_id!r}, "
             f"conversations={self.total_conversations})"
@@ -146,6 +189,17 @@ class ConversationSummary:
         turn_count: int | None,
         created_at: datetime,
     ) -> None:
+        """Initialize ConversationSummary.
+
+        Args:
+            id: Summary identifier.
+            conversation_id: Source conversation id.
+            user_id: Owner user id.
+            summary: Summary text.
+            topics: Extracted topic names.
+            turn_count: Total turns covered by the summary.
+            created_at: Creation timestamp.
+        """
         self.id = id
         self.conversation_id = conversation_id
         self.user_id = user_id
@@ -155,6 +209,7 @@ class ConversationSummary:
         self.created_at = created_at
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable representation of the summary."""
         return {
             "id": str(self.id),
             "conversation_id": str(self.conversation_id),
@@ -166,6 +221,7 @@ class ConversationSummary:
         }
 
     def __repr__(self) -> str:
+        """Return a developer-friendly summary string."""
         return f"ConversationSummary(conv={self.conversation_id}, topics={self.topics})"
 
 

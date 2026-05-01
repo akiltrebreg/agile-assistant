@@ -32,12 +32,21 @@ _db: DatabaseConnection | None = None
 
 
 def set_db(db: DatabaseConnection) -> None:
-    """Set the database connection for tools to use."""
+    """Register the module-level database connection used by SQL tools.
+
+    Args:
+        db: Connection that subsequent tool invocations will use.
+    """
     global _db  # noqa: PLW0603
     _db = db
 
 
 def _get_db() -> DatabaseConnection:
+    """Return the registered database connection.
+
+    Raises:
+        RuntimeError: When :func:`set_db` has not been called yet.
+    """
     if _db is None:
         msg = "Database connection not set. Call set_db() first."
         raise RuntimeError(msg)

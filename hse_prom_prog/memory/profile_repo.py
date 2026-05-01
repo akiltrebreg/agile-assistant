@@ -18,6 +18,11 @@ class ProfileRepository:
     """CRUD for ``user_profiles`` table (raw SQL)."""
 
     def __init__(self, db: DatabaseConnection) -> None:
+        """Initialize ProfileRepository.
+
+        Args:
+            db: Database connection used to acquire sessions.
+        """
         self.db = db
 
     def get_or_create(self, external_id: str) -> UserProfile:
@@ -25,6 +30,15 @@ class ProfileRepository:
 
         Uses ``ON CONFLICT`` so two concurrent workers can't create a
         duplicate — one wins the insert, the other receives the existing row.
+
+        Args:
+            external_id: External (cookie / SSO) identifier.
+
+        Returns:
+            The resolved ``UserProfile``.
+
+        Raises:
+            SQLAlchemyError: When the upsert fails.
         """
         sql = """
             INSERT INTO user_profiles (external_id)
@@ -49,7 +63,17 @@ class ProfileRepository:
             raise
 
     def get(self, user_id: UUID) -> UserProfile | None:
-        """Fetch a profile by id, or ``None`` if not found."""
+        """Fetch a profile by id, or ``None`` if not found.
+
+        Args:
+            user_id: Internal user identifier.
+
+        Returns:
+            ``UserProfile`` if found, otherwise ``None``.
+
+        Raises:
+            SQLAlchemyError: When the SELECT fails.
+        """
         sql = """
             SELECT id, external_id, display_name, preferences, context_summary,
                    total_conversations, total_messages, created_at, updated_at
@@ -66,7 +90,15 @@ class ProfileRepository:
             raise
 
     def update_preferences(self, user_id: UUID, preferences: dict[str, Any]) -> None:
-        """Replace the ``preferences`` JSONB blob."""
+        """Replace the ``preferences`` JSONB blob.
+
+        Args:
+            user_id: Internal user identifier.
+            preferences: Fully-formed preferences dict to persist.
+
+        Raises:
+            SQLAlchemyError: When the UPDATE fails.
+        """
         sql = """
             UPDATE user_profiles
             SET preferences = CAST(:preferences AS JSONB)
@@ -86,7 +118,15 @@ class ProfileRepository:
             raise
 
     def update_context_summary(self, user_id: UUID, summary: str) -> None:
-        """Replace the rolling ``context_summary`` text."""
+        """Replace the rolling ``context_summary`` text.
+
+        Args:
+            user_id: Internal user identifier.
+            summary: New rolling summary text.
+
+        Raises:
+            SQLAlchemyError: When the UPDATE fails.
+        """
         sql = "UPDATE user_profiles SET context_summary = :summary WHERE id = :id"
         try:
             with self.db.get_session() as session:
@@ -101,7 +141,16 @@ class ProfileRepository:
         conversations_delta: int = 0,
         messages_delta: int = 0,
     ) -> None:
-        """Atomically increment usage counters."""
+        """Atomically increment usage counters.
+
+        Args:
+            user_id: Internal user identifier.
+            conversations_delta: Delta applied to ``total_conversations``.
+            messages_delta: Delta applied to ``total_messages``.
+
+        Raises:
+            SQLAlchemyError: When the UPDATE fails.
+        """
         sql = """
             UPDATE user_profiles
             SET total_conversations = total_conversations + :conv_delta,
@@ -123,6 +172,7 @@ class ProfileRepository:
             raise
 
     def _row_to_profile(self, row: Any) -> UserProfile:
+        """Project a SQLAlchemy row into a ``UserProfile`` domain model."""
         return UserProfile(
             id=row.id,
             external_id=row.external_id,

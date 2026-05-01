@@ -42,7 +42,12 @@ _SQL_INTENT_BRANCHES: dict[str, str] = {
 
 
 def _resolve_branch(state: dict[str, Any]) -> str:
-    """Return the branch label that process() will land in."""
+    """Return the branch label that :meth:`ResponseAgent.process` will land in.
+
+    Mirrors the routing if-chain so Prometheus labels on
+    ``RESPONSE_DURATION`` / ``RESPONSE_LENGTH_TOKENS`` reflect the actual
+    generator that ran.
+    """
     query_type = state.get("query_type", "sql")
     intent = state.get("intent", "general")
     route = state.get("route", "db_query")
@@ -69,7 +74,11 @@ def _resolve_branch(state: dict[str, Any]) -> str:
 
 
 def _is_timeout(exc: BaseException) -> bool:
-    """Heuristic: any TimeoutError-ish exception, including httpx/openai variants."""
+    """Return ``True`` for any ``TimeoutError``-ish exception.
+
+    Covers ``httpx`` / ``openai`` variants whose class names merely contain
+    ``timeout`` (case-insensitive).
+    """
     if isinstance(exc, TimeoutError):
         return True
     return "timeout" in type(exc).__name__.lower()
@@ -108,6 +117,11 @@ class ResponseAgent:
     """
 
     def __init__(self, llm_client: LLMClient) -> None:
+        """Initialize the response agent.
+
+        Args:
+            llm_client: LLM client used by every response generator.
+        """
         self.llm_client = llm_client
         logger.info("[Response Agent] Initialized with LLM client")
 
@@ -116,6 +130,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _format_value(self, value: Any) -> str:
+        """Render a single field value as a human-readable Russian string."""
         if value is None:
             return "не указано"
         if isinstance(value, datetime):
@@ -133,7 +148,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _prepare_single_task(self, row: dict[str, Any]) -> str:
-        """Format a single task row with Russian labels."""
+        """Format a single task row with Russian labels as JSON."""
         labels = {
             "issue_key": "Ключ задачи",
             "issue_project": "Проект",
@@ -166,10 +181,19 @@ class ResponseAgent:
         return json.dumps(formatted, ensure_ascii=False, indent=2)
 
     def _prepare_task_list(self, rows: list[dict[str, Any]], include_assignee: bool = False) -> str:
-        """Format a list of tasks as a compact summary.
+        """Format a list of tasks as a compact one-line-per-task summary.
 
-        If `include_assignee` is True, adds assignee_name column — useful
-        when the user filter is by assignee, so the model can confirm.
+        Truncates to ``_MAX_ROWS_IN_PROMPT`` rows and appends a "и ещё N
+        задач" tail when more rows exist; bumps ``RESPONSE_TRUNCATED`` in
+        that case.
+
+        Args:
+            rows: SQL result rows to summarize.
+            include_assignee: When ``True``, adds the ``assignee_name``
+                column so the model can confirm an assignee filter.
+
+        Returns:
+            Multi-line summary string.
         """
         total = len(rows)
         shown = rows[:_MAX_ROWS_IN_PROMPT]
@@ -193,7 +217,7 @@ class ResponseAgent:
         return result
 
     def _prepare_metrics(self, rows: list[dict[str, Any]]) -> str:
-        """Format metric rows as JSON."""
+        """Format metric rows as a JSON list, dropping ``None`` columns."""
         shown = rows[:_MAX_ROWS_IN_PROMPT]
         formatted = []
         for row in shown:
@@ -272,7 +296,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _generate_direct_response(self, original_query: str, history: str = "") -> str:
-        """Generate a direct LLM response without external context."""
+        """Generate a direct LLM response without external SQL/RAG context."""
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
             f"{history}"
@@ -292,7 +316,7 @@ class ResponseAgent:
         data: dict[str, Any],
         history: str = "",
     ) -> str:
-        """Generate response for a single task lookup."""
+        """Generate the response for a single-task lookup."""
         structured = self._prepare_single_task(data)
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
@@ -322,7 +346,7 @@ class ResponseAgent:
         entities: dict[str, Any] | None = None,
         history: str = "",
     ) -> str:
-        """Generate response for a filtered task list."""
+        """Generate the response for a filtered task list."""
         entities = entities or {}
         include_assignee = bool(entities.get("assignee"))
         task_list = self._prepare_task_list(rows, include_assignee=include_assignee)
@@ -350,7 +374,7 @@ class ResponseAgent:
         rows: list[dict[str, Any]],
         history: str = "",
     ) -> str:
-        """Generate response for metric queries."""
+        """Generate the response for a metric query."""
         metrics_data = self._prepare_metrics(rows)
         prompt = (
             f"{_SYSTEM_ROLE}\n\n"
@@ -373,7 +397,7 @@ class ResponseAgent:
         rag_response: str,
         rag_sources: list[str],
     ) -> str:
-        """Format RAG-agent answer with source citations."""
+        """Format the RAG-agent answer with appended source citations."""
         sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
         suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
         return f"{rag_response}{suffix}"
@@ -387,7 +411,7 @@ class ResponseAgent:
         rag_sources: list[str],
         history: str = "",
     ) -> str:
-        """Combine DB data + RAG context into one answer."""
+        """Combine DB data and RAG context into a single hybrid answer."""
         # Prepare SQL data section
         if intent == "task" and sql_result:
             sql_section = self._prepare_single_task(sql_result[0])
@@ -427,7 +451,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _process_sql_response(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Handle SQL-only response generation."""
+        """Handle SQL-only response generation, including error and empty cases."""
         error = state.get("error")
         sql_result = state.get("sql_result")
         intent = state.get("intent", "general")
@@ -497,9 +521,19 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Generate natural language response. Thin wrapper that records
-        latency and length per branch — the routing logic itself lives in
-        ``_process_impl`` so the metrics here stay declarative."""
+        """Generate the natural-language response.
+
+        Thin wrapper that records latency and length per branch — the
+        routing logic itself lives in :meth:`_process_impl` so the metrics
+        here stay declarative.
+
+        Args:
+            state: Workflow state with ``query_type``, ``intent``,
+                ``sql_result``, ``rag_response``, etc.
+
+        Returns:
+            State update with ``final_response``.
+        """
         branch = _resolve_branch(state)
         langfuse_context.update_current_observation(
             input={
@@ -530,14 +564,14 @@ class ResponseAgent:
         return update
 
     def _process_impl(self, state: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915, C901
-        """Generate natural language response based on query_type and data.
+        """Dispatch on ``query_type`` / ``route`` and generate the response.
 
         Args:
             state: Workflow state with intent, entities, sql_result,
-                   rag_response, validation_result, error, etc.
+                rag_response, validation_result, error, etc.
 
         Returns:
-            State update with final_response.
+            State update with ``final_response``.
         """
         logger.info("[Response Agent] Generating response...")
 

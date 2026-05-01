@@ -1,7 +1,8 @@
-"""Task domain models and enums.
+"""Define task domain models and enums.
 
-This module defines the business entities for task execution tracking.
-No SQLAlchemy ORM models - we use raw SQL consistent with existing codebase patterns.
+This module exposes the business entities for task execution tracking.
+No SQLAlchemy ORM models — we use raw SQL consistent with existing
+codebase patterns.
 """
 
 from datetime import datetime
@@ -11,13 +12,13 @@ from uuid import UUID
 
 
 class TaskStatus(StrEnum):
-    """Task execution status enumeration.
+    """Enumerate task execution lifecycle states.
 
     Represents the lifecycle stages of an async task:
-    - PENDING: Task created and queued, waiting for processing
-    - PROCESSING: Task actively being executed by a worker
-    - COMPLETED: Task finished successfully with results
-    - FAILED: Task encountered an error during execution
+    - ``PENDING``: Task created and queued, waiting for processing.
+    - ``PROCESSING``: Task actively being executed by a worker.
+    - ``COMPLETED``: Task finished successfully with results.
+    - ``FAILED``: Task encountered an error during execution.
     """
 
     PENDING = "PENDING"
@@ -30,7 +31,8 @@ class Task:
     """Domain model for task execution tracking.
 
     This is NOT a SQLAlchemy ORM model. It represents the business entity
-    for task execution, consistent with the repository pattern using raw SQL.
+    for task execution, consistent with the repository pattern using raw
+    SQL.
 
     Attributes:
         task_id: Unique task identifier (UUID).
@@ -87,7 +89,7 @@ class Task:
         self.conversation_id = conversation_id
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert Task to dictionary for JSON serialization.
+        """Return a JSON-serialisable representation of the task.
 
         Returns:
             Dictionary representation with ISO-formatted timestamps.
@@ -105,10 +107,10 @@ class Task:
         }
 
     def __repr__(self) -> str:
-        """String representation of Task.
+        """Return a developer-friendly summary string.
 
         Returns:
-            String showing task ID and status.
+            String showing task ID, status and a query preview.
         """
         return (
             f"Task(task_id={self.task_id}, status={self.status.value}, query={self.query[:50]}...)"

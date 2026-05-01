@@ -17,6 +17,11 @@ class SummaryRepository:
     """CRUD for ``conversation_summaries`` table (raw SQL)."""
 
     def __init__(self, db: DatabaseConnection) -> None:
+        """Initialize SummaryRepository.
+
+        Args:
+            db: Database connection used to acquire sessions.
+        """
         self.db = db
 
     def create(
@@ -27,7 +32,21 @@ class SummaryRepository:
         topics: list[str],
         turn_count: int | None = None,
     ) -> ConversationSummary:
-        """Persist a conversation summary and return it."""
+        """Persist a conversation summary and return it.
+
+        Args:
+            conversation_id: Conversation that produced the summary.
+            user_id: Internal user owning the conversation.
+            summary: Summary text.
+            topics: Extracted topic names.
+            turn_count: Total number of turns covered by the summary.
+
+        Returns:
+            The persisted ``ConversationSummary`` row.
+
+        Raises:
+            SQLAlchemyError: When the INSERT fails.
+        """
         sql = """
             INSERT INTO conversation_summaries
                 (conversation_id, user_id, summary, topics, turn_count)
@@ -57,7 +76,18 @@ class SummaryRepository:
             raise
 
     def get_recent(self, user_id: UUID, limit: int = 10) -> list[ConversationSummary]:
-        """Return the user's most recent summaries, newest first."""
+        """Return the user's most recent summaries, newest first.
+
+        Args:
+            user_id: Internal user identifier.
+            limit: Maximum number of summaries to return. Defaults to 10.
+
+        Returns:
+            Summaries ordered by ``created_at`` descending.
+
+        Raises:
+            SQLAlchemyError: When the SELECT fails.
+        """
         sql = """
             SELECT id, conversation_id, user_id, summary, topics,
                    turn_count, created_at
@@ -75,6 +105,7 @@ class SummaryRepository:
             raise
 
     def _row_to_summary(self, row: Any) -> ConversationSummary:
+        """Project a SQLAlchemy row into a ``ConversationSummary`` model."""
         return ConversationSummary(
             id=row.id,
             conversation_id=row.conversation_id,

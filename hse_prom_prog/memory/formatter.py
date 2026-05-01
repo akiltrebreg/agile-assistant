@@ -13,8 +13,14 @@ _ROLE_LABEL = {"user": "User", "assistant": "Assistant"}
 def format_history(ctx: ConversationContext | None) -> str:
     """Render ``ctx`` as a ``<conversation_history>`` block.
 
-    Returns ``""`` if ``ctx`` is ``None`` or has no recent turns. Skips the
-    ``<summary>`` sub-block when the rolling summary is empty.
+    Skips the ``<summary>`` sub-block when the rolling summary is empty.
+
+    Args:
+        ctx: Conversation context to render, or ``None``.
+
+    Returns:
+        XML-tagged history block, or ``""`` when ``ctx`` is ``None`` or
+        has no recent turns.
     """
     if ctx is None:
         return ""

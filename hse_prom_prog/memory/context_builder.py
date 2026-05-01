@@ -20,9 +20,14 @@ SUMMARY_RESERVE_TOKENS = 150
 
 
 class ContextBuilder:
-    """Builds a ``ConversationContext`` from persisted messages."""
+    """Build a ``ConversationContext`` from persisted messages."""
 
     def __init__(self, repo: ConversationRepository) -> None:
+        """Initialize ContextBuilder.
+
+        Args:
+            repo: Repository used to load conversations and their messages.
+        """
         self.repo = repo
 
     @observe(name="memory_context_build")
@@ -36,6 +41,14 @@ class ContextBuilder:
           3. If messages older than the kept window are not covered by the
              existing summary, flag ``needs_summarization=True`` — the
              summariser runs as a separate async job.
+
+        Args:
+            conversation_id: Identifier of the conversation to assemble.
+            token_budget: Maximum estimated tokens the context may occupy.
+
+        Returns:
+            ``ConversationContext`` with rolling summary, recent turns,
+            estimated token cost, and a ``needs_summarization`` flag.
         """
         langfuse_context.update_current_observation(
             input={
@@ -125,10 +138,16 @@ class ContextBuilder:
 
     @staticmethod
     def _message_token_cost(msg: Message) -> int:
-        """Token cost of a message when injected into a prompt.
+        """Return the token cost of a message when injected into a prompt.
 
         Prefer ``content_truncated`` (always ≤ 150 tok) over the full body so
         long assistant replies don't blow the budget during replay.
+
+        Args:
+            msg: Message whose token cost to estimate.
+
+        Returns:
+            Estimated token count including the role label and separator.
         """
         body = msg.content_truncated or msg.content
         # +2 tokens for the role label and a separator, stable across turns.
@@ -136,6 +155,14 @@ class ContextBuilder:
 
     @staticmethod
     def _message_to_turn(msg: Message) -> dict:
+        """Render a ``Message`` as the dict shape used by ``ConversationContext``.
+
+        Args:
+            msg: Message to project into the turn dict.
+
+        Returns:
+            Dict with ``role``, ``content``, ``turn_index`` and ``metadata``.
+        """
         body = msg.content_truncated or msg.content
         return {
             "role": msg.role,

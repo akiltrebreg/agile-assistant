@@ -32,32 +32,46 @@ logger = logging.getLogger(__name__)
 class _NoopContext:
     """Drop-in stand-in for ``langfuse.decorators.langfuse_context``.
 
-    Every method is a no-op so call sites don't need ``if`` guards.
-    Returning ``None`` matches what the real SDK returns from these
-    methods, so callers can chain safely.
+    Every method is a no-op so call sites don't need ``if`` guards. The
+    real SDK returns ``None`` from these methods, so callers can chain
+    safely against either implementation.
     """
 
     def update_current_observation(self, **_kwargs: Any) -> None:
-        return None
+        """No-op replacement for ``langfuse_context.update_current_observation``."""
 
     def update_current_trace(self, **_kwargs: Any) -> None:
-        return None
+        """No-op replacement for ``langfuse_context.update_current_trace``."""
 
     def get_current_trace_id(self) -> str | None:
+        """Return ``None`` — there is no active trace when tracing is disabled."""
         return None
 
     def get_current_observation_id(self) -> str | None:
+        """Return ``None`` — there is no active observation when tracing is disabled."""
         return None
 
     def flush(self) -> None:
-        return None
+        """No-op replacement for ``langfuse_context.flush``."""
 
 
 def _noop_observe(*args: Any, **kwargs: Any) -> Any:
-    """No-op replacement for ``@observe``.
+    """No-op replacement for the ``@observe`` decorator.
 
-    Supports both ``@observe`` and ``@observe(name="x", as_type="generation")``
-    invocation forms.
+    Supports both ``@observe`` (bare) and ``@observe(name="x",
+    as_type="generation")`` invocation forms by sniffing ``args``: if
+    the first positional argument is a callable and no kwargs were
+    given, the decorator was applied directly; otherwise the helper
+    returns an inner decorator that simply returns the wrapped function.
+
+    Args:
+        *args: Either ``(fn,)`` for bare ``@observe`` or empty for the
+            parenthesised form.
+        **kwargs: Decorator options accepted by the real SDK; ignored.
+
+    Returns:
+        The original function (bare form) or an identity decorator
+        (parenthesised form).
     """
     if args and callable(args[0]) and not kwargs:
         # Used as @observe without parentheses.
@@ -70,10 +84,20 @@ def _noop_observe(*args: Any, **kwargs: Any) -> Any:
 
 
 def _initialize() -> tuple[Any, Callable[..., Any], Any]:
-    """Build the (client, observe, langfuse_context) triple.
+    """Build the ``(client, observe, langfuse_context)`` triple.
 
-    Returns no-op stand-ins if the SDK is unavailable or disabled so the
-    rest of the codebase can import these names unconditionally.
+    Returns no-op stand-ins when ``settings.langfuse_enabled`` is False
+    or the SDK is unavailable so the rest of the codebase can import
+    these names unconditionally. When the SDK loads successfully, the
+    Pydantic settings are mirrored into ``os.environ`` via
+    ``setdefault`` so that explicit shell / docker env values still win.
+
+    Returns:
+        Tuple of ``(client, observe, langfuse_context)``:
+
+        * ``client`` — ``Langfuse`` instance or ``None`` if disabled.
+        * ``observe`` — real or no-op ``@observe`` decorator.
+        * ``langfuse_context`` — real SDK module or :class:`_NoopContext`.
     """
     if not settings.langfuse_enabled:
         logger.info("[Tracing] Langfuse disabled via settings — using no-op decorators")

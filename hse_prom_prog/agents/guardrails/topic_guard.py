@@ -54,12 +54,16 @@ _HARD_DENY_PATTERNS: list[re.Pattern[str]] = [
 
 @dataclass
 class GuardResult:
-    """Result of an input guardrail check.
+    """Result of the level-1 input guardrail check.
 
-    Outcomes:
-      * `blocked:prompt_injection` → hard-deny regex fired
-      * `whitelist`                → known-safe pattern (issue key, greeting)
-      * `pass`                     → regex nothing to say, Supervisor decides
+    Outcomes signalled via ``reason``:
+      * ``blocked:prompt_injection`` — a hard-deny regex fired.
+      * ``whitelist`` — a known-safe pattern matched (issue key, greeting).
+      * ``pass`` — no regex matched; Supervisor decides downstream.
+
+    Attributes:
+        passed: ``True`` when the query may proceed to Supervisor.
+        reason: One of the outcome labels above.
     """
 
     passed: bool
@@ -81,9 +85,16 @@ class TopicGuard:
         """Classify the query via two regex stages.
 
         Order:
-          1. Hard-deny → block with reason='blocked:prompt_injection'
-          2. Whitelist → pass with reason='whitelist'
-          3. Default   → pass with reason='pass' (Supervisor will classify)
+          1. Hard-deny — block with ``reason='blocked:prompt_injection'``.
+          2. Whitelist — pass with ``reason='whitelist'``.
+          3. Default — pass with ``reason='pass'`` (Supervisor will
+             classify).
+
+        Args:
+            query: Raw user query.
+
+        Returns:
+            :class:`GuardResult` describing the outcome.
         """
         langfuse_context.update_current_observation(input={"query": query})
         for pattern in _HARD_DENY_PATTERNS:

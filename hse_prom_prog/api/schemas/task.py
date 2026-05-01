@@ -8,15 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskCreateRequest(BaseModel):
-    """Request schema for creating a new task.
-
-    Attributes:
-        query: User query to process (1-10000 characters).
-        conversation_id: Optional existing conversation id. If omitted,
-            a new conversation is created and returned in the response.
-        user_id: Optional stable external user id (e.g. cookie UUID).
-            ``None`` means anonymous — no profile is loaded or updated.
-    """
+    """Request schema for creating a new task."""
 
     query: str = Field(
         ...,
@@ -37,14 +29,7 @@ class TaskCreateRequest(BaseModel):
 
 
 class TaskCreateResponse(BaseModel):
-    """Response schema after creating a task.
-
-    Attributes:
-        task_id: Unique task identifier (UUID).
-        conversation_id: Conversation the task is bound to (existing or new).
-        status: Initial task status (always PENDING).
-        message: Human-readable status message.
-    """
+    """Response schema returned immediately after queuing a task."""
 
     task_id: UUID = Field(..., description="Unique task identifier")
     conversation_id: UUID = Field(
@@ -67,18 +52,7 @@ class TaskCreateResponse(BaseModel):
 
 
 class TaskResponse(BaseModel):
-    """Response schema for task status and result.
-
-    Attributes:
-        task_id: Unique task identifier.
-        query: Original user query.
-        status: Current task status (PENDING/PROCESSING/COMPLETED/FAILED).
-        result: Task result data (available when COMPLETED).
-        error: Error message (available when FAILED).
-        created_at: Timestamp when task was created.
-        started_at: Timestamp when task execution started.
-        completed_at: Timestamp when task finished.
-    """
+    """Response schema for task status and result polling."""
 
     task_id: UUID = Field(..., description="Unique task identifier")
     query: str = Field(..., description="Original user query")

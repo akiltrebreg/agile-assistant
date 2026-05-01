@@ -1,6 +1,8 @@
-"""Celery application factory.
+"""Create and configure the Celery application.
 
-This module creates and configures the Celery application for async task processing.
+Centralises broker, beat and signal wiring so worker processes receive a
+fully observable task runtime — Prometheus metrics, JSON-only payloads,
+beat schedules for periodic syncs and a dedicated ``judge`` queue.
 """
 
 import logging
@@ -48,6 +50,12 @@ def _short_name(task_name: str | None) -> str:
 
     ``hse_prom_prog.tasks.execute_workflow`` -> ``execute_workflow``.
     Keeps Prometheus label cardinality readable.
+
+    Args:
+        task_name: Fully qualified Celery task name, or ``None``.
+
+    Returns:
+        Trailing component of ``task_name``, or ``"unknown"`` when missing.
     """
     if not task_name:
         return "unknown"
@@ -55,7 +63,7 @@ def _short_name(task_name: str | None) -> str:
 
 
 def create_celery_app() -> Celery:
-    """Create and configure Celery application.
+    """Build and configure the Celery application.
 
     Configures Celery with:
     - Redis as message broker
@@ -161,7 +169,7 @@ def _start_metrics_server(**_kwargs) -> None:
     """Start the Prometheus exporter HTTP server inside the worker.
 
     Idempotent — repeated calls log and bail out instead of crashing
-    the worker (start_http_server raises OSError on port reuse).
+    the worker (``start_http_server`` raises ``OSError`` on port reuse).
 
     Pre-touches every known counter label combination via
     ``initialize_label_combinations`` so Grafana renders explicit
@@ -186,6 +194,7 @@ worker_ready.connect(_start_metrics_server)
 # ── Celery signals → Prometheus ───────────────────────────────
 @task_prerun.connect
 def _on_task_prerun(task_id=None, task=None, **_kwargs) -> None:
+    """Record task start time and bump the in-flight gauge."""
     if task_id is not None:
         _task_starts[task_id] = time.time()
     CELERY_ACTIVE_TASKS.inc()
@@ -193,6 +202,7 @@ def _on_task_prerun(task_id=None, task=None, **_kwargs) -> None:
 
 @task_postrun.connect
 def _on_task_postrun(task_id=None, task=None, state=None, **_kwargs) -> None:
+    """Observe task duration and emit success counters when applicable."""
     CELERY_ACTIVE_TASKS.dec()
     started = _task_starts.pop(task_id, None) if task_id else None
     short = _short_name(getattr(task, "name", None))
@@ -206,12 +216,14 @@ def _on_task_postrun(task_id=None, task=None, state=None, **_kwargs) -> None:
 
 @task_failure.connect
 def _on_task_failure(sender=None, **_kwargs) -> None:
+    """Increment the per-task failure counter on terminal failures."""
     short = _short_name(getattr(sender, "name", None))
     CELERY_TASKS_TOTAL.labels(task_name=short, status="failure").inc()
 
 
 @task_retry.connect
 def _on_task_retry(sender=None, **_kwargs) -> None:
+    """Increment the per-task retry counter when Celery re-queues a task."""
     short = _short_name(getattr(sender, "name", None))
     CELERY_TASKS_TOTAL.labels(task_name=short, status="retry").inc()
 

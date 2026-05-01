@@ -1,8 +1,9 @@
-"""Celery task for executing AgileWorkflow.
+"""Execute the AgileWorkflow as a Celery task.
 
-This module wraps the existing LangGraph workflow in a Celery task,
-managing status updates in PostgreSQL throughout execution.
-Includes retry logic with exponential backoff for transient failures.
+Wraps the existing LangGraph workflow in a Celery task, managing status
+updates in PostgreSQL throughout execution. Implements retry logic with
+exponential backoff for transient failures and integrates short-term /
+long-term memory plus Langfuse tracing and the LLM-as-a-Judge fan-out.
 """
 
 import logging
@@ -64,15 +65,15 @@ class WorkflowTask(CeleryTask):
     """Custom Celery task class with lifecycle hooks."""
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        """Called when task fails after all retries exhausted."""
+        """Log the permanent failure when retries are exhausted."""
         logger.error(f"[Celery] Task {task_id} failed permanently: {exc}")
 
     def on_retry(self, exc, task_id, args, kwargs, einfo):
-        """Called when task is being retried."""
+        """Log the retry decision when Celery re-queues the task."""
         logger.warning(f"[Celery] Task {task_id} retrying due to: {exc}")
 
     def on_success(self, retval, task_id, args, kwargs):
-        """Called when task succeeds."""
+        """Log a one-line success line for the completed task."""
         logger.info(f"[Celery] Task {task_id} completed successfully")
 
 
@@ -96,18 +97,25 @@ def execute_workflow(  # noqa: PLR0913, PLR0915, PLR0912, C901
     user_id: str | None = None,
     created_at_ts: float | None = None,
 ) -> None:
-    """Execute AgileWorkflow for a given task.
+    """Execute ``AgileWorkflow`` for a given task.
 
-    Status flow: PENDING -> PROCESSING -> COMPLETED / FAILED.
+    Status flow: ``PENDING`` -> ``PROCESSING`` -> ``COMPLETED`` /
+    ``FAILED``.
 
     Memory integration: if ``conversation_id`` is set, the task loads the
     short-term context and (when a user is present) the long-term profile,
     passes them through the workflow, and persists the resulting turn on
     success.
 
+    Retry semantics: ``ConnectionError`` / ``OSError`` / ``TimeoutError``
+    are auto-retried with exponential backoff (capped at 60s) up to three
+    times. ``SoftTimeLimitExceeded`` and any other exception are terminal
+    and immediately mark the task ``FAILED``. Queue-wait is recorded only
+    on the first attempt to avoid inflating p95 with retry latency.
+
     Args:
-        self: Celery task instance (injected by bind=True).
-        task_id: Application task UUID (from tasks table).
+        self: Celery task instance (injected by ``bind=True``).
+        task_id: Application task UUID (from the ``tasks`` table).
         query: User query to process.
         conversation_id: Memory-layer conversation id (pre-created by API).
         user_external_id: External (cookie / SSO) user id.
@@ -296,7 +304,14 @@ def _mark_processing_if_first(
     task_uuid: UUID,
     task_id: str,
 ) -> None:
-    """Flip the task to PROCESSING on attempt 0; log retries otherwise."""
+    """Flip the task to ``PROCESSING`` on attempt 0; log retries otherwise.
+
+    Args:
+        task: Bound Celery task (used to read ``request.retries``).
+        repo: Task repository for the status update.
+        task_uuid: Task UUID to update.
+        task_id: Task id string used in log lines.
+    """
     if task.request.retries == 0:
         logger.info(f"[WorkflowTask {task_id}] Starting workflow execution")
         repo.update_task_status(task_uuid, TaskStatus.PROCESSING)
@@ -316,14 +331,24 @@ def _resolve_memory_ids(
 ) -> tuple[UUID | None, UUID | None]:
     """Resolve request identifiers to internal UUIDs for the memory layer.
 
-    Returns ``(conversation_uuid, internal_user_uuid)``; either may be
-    ``None`` (anonymous session / no conversation). Also rotates
-    conversations idle for more than :data:`INACTIVITY_THRESHOLD` so
-    long breaks start a fresh session with a summarised predecessor.
+    Also rotates conversations idle for more than
+    :data:`INACTIVITY_THRESHOLD` so long breaks start a fresh session
+    with a summarised predecessor. ``task_uuid`` + ``task_repo`` are
+    optional: when both are present and a rotation happens, the audit
+    row in ``tasks`` is repointed at the freshly created conversation
+    so debugging stays honest.
 
-    ``task_uuid`` + ``task_repo`` are optional: when both are present
-    and a rotation happens, the audit row in ``tasks`` is repointed at
-    the freshly created conversation so debugging stays honest.
+    Args:
+        memory: Memory manager used for repo access.
+        conversation_id: Caller-provided conversation id (string), or
+            ``None`` to skip short-term memory.
+        external_id: External (cookie / SSO) user id, or ``None``.
+        task_uuid: Optional audit task uuid for repointing on rotation.
+        task_repo: Optional task repository used for the audit update.
+
+    Returns:
+        ``(conversation_uuid, internal_user_uuid)``; either may be
+        ``None`` for anonymous sessions or when no conversation exists.
     """
     internal_user_uuid: UUID | None = None
     if external_id:
@@ -364,9 +389,20 @@ def _maybe_rotate_stale_conversation(
     failures at either step degrade gracefully — the new conversation
     is still returned so the user's current request is never blocked.
 
-    When ``task_uuid`` and ``task_repo`` are provided, ``tasks.conversation_id``
-    is updated to the new conversation so the audit trail reflects where
-    the request was actually processed.
+    When ``task_uuid`` and ``task_repo`` are provided,
+    ``tasks.conversation_id`` is updated to the new conversation so the
+    audit trail reflects where the request was actually processed.
+
+    Args:
+        memory: Memory manager exposing the conversation repository.
+        conv: Current conversation candidate for rotation.
+        user_uuid: Internal user uuid; ``None`` short-circuits rotation.
+        task_uuid: Optional audit task uuid for repointing.
+        task_repo: Optional task repository used for the audit update.
+
+    Returns:
+        ``conv`` itself when no rotation is needed, otherwise the
+        freshly created conversation.
     """
     if user_uuid is None or not conv.is_active or conv.updated_at is None:
         return conv
@@ -418,7 +454,17 @@ def _load_memory_payloads(
     conv_uuid: UUID | None,
     user_uuid: UUID | None,
 ) -> tuple[ConversationContext | None, dict[str, Any] | None]:
-    """Load short-term context and long-term profile dict for the workflow."""
+    """Load short-term context and long-term profile dict for the workflow.
+
+    Args:
+        memory: Memory manager used for context and profile retrieval.
+        conv_uuid: Conversation uuid, or ``None`` to skip context.
+        user_uuid: Internal user uuid, or ``None`` to skip profile.
+
+    Returns:
+        ``(conversation_context, profile_dict)`` — either side may be
+        ``None`` when the corresponding identifier is missing.
+    """
     ctx: ConversationContext | None = None
     if conv_uuid is not None:
         ctx = memory.get_context(conv_uuid, token_budget=HISTORY_TOKEN_BUDGET)
@@ -433,8 +479,18 @@ def _persist_turn_safe(
     result: dict[str, Any],
     task_id: str,
 ) -> None:
-    """Save the user + assistant turn. Logs and swallows failures — a
-    persistence error must not hide the answer from the user."""
+    """Save the user + assistant turn, logging and swallowing failures.
+
+    A persistence error must not hide the answer from the user, so any
+    exception is logged and absorbed.
+
+    Args:
+        memory: Memory manager exposing ``save_turn``.
+        conv_uuid: Conversation that owns the turn.
+        query: User-side message body.
+        result: Workflow result dict (final response and metadata).
+        task_id: Task id string used in log lines.
+    """
     metadata: dict[str, Any] = {
         "query_type": result.get("query_type"),
         "intent": result.get("intent"),
@@ -463,6 +519,10 @@ def _enqueue_profile_refresh(user_id: UUID, conversation_id: UUID) -> None:
 
     Uses a late import to avoid a circular dependency between
     ``workflow_task`` and ``memory_tasks`` at module load time.
+
+    Args:
+        user_id: Internal user uuid whose profile to refresh.
+        conversation_id: Conversation feeding the refresh.
     """
     try:
         # Lazy import to break the workflow_task <-> memory_tasks cycle.
@@ -474,7 +534,7 @@ def _enqueue_profile_refresh(user_id: UUID, conversation_id: UUID) -> None:
 
 
 def _get_retriever_safe():
-    """Try to get the Qdrant retriever; return None if unavailable."""
+    """Return the Qdrant retriever, or ``None`` if it cannot be acquired."""
     try:
         return get_retriever()
     except Exception as e:
@@ -483,10 +543,10 @@ def _get_retriever_safe():
 
 
 def _update_task_failed(db, task_uuid: UUID, task_id: str, error_msg: str) -> None:
-    """Update task status to FAILED in database.
+    """Update task status to ``FAILED`` in the database.
 
     Args:
-        db: Database connection (may be None).
+        db: Database connection (may be ``None``).
         task_uuid: Task UUID.
         task_id: Task ID string (for logging).
         error_msg: Error message to store.

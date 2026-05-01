@@ -39,6 +39,12 @@ class RAGAgent:
         llm_client: LLMClient,
         retriever: Any,
     ) -> None:
+        """Initialize the RAG agent.
+
+        Args:
+            llm_client: LLM client used to generate the final answer.
+            retriever: Qdrant retriever returning top-k candidate documents.
+        """
         self.llm_client = llm_client
         self.retriever = retriever
         self.reranker = get_reranker() if settings.reranker_enabled else None
@@ -49,7 +55,15 @@ class RAGAgent:
     # ------------------------------------------------------------------
 
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Retrieve context and generate RAG-based answer."""
+        """Retrieve context and generate the RAG-based answer.
+
+        Args:
+            state: Workflow state with ``original_query``.
+
+        Returns:
+            State update with ``rag_response`` and ``rag_sources``. Both
+            are empty / ``None`` when no documents were retrieved.
+        """
         original_query = state.get("original_query", "")
         logger.info("[RAG Agent] Processing query: %s", original_query[:80])
         langfuse_context.update_current_observation(input={"query": original_query})
@@ -89,7 +103,7 @@ class RAGAgent:
     # ------------------------------------------------------------------
 
     def _retrieve_and_rerank(self, query: str) -> list[Document]:
-        """Retrieve candidates and optionally rerank."""
+        """Retrieve candidate documents and optionally rerank them."""
         try:
             docs = self.retriever.invoke(query)
         except Exception as e:
@@ -109,7 +123,11 @@ class RAGAgent:
 
     @staticmethod
     def _build_context(docs: list[Document]) -> tuple[str, list[str]]:
-        """Build context string and source labels from documents."""
+        """Build the context string and unique source labels from documents.
+
+        Truncates concatenated chunks at ``_MAX_CONTEXT_CHARS`` so the LLM
+        prompt stays bounded.
+        """
         parts: list[str] = []
         total = 0
         for doc in docs:
@@ -133,7 +151,7 @@ class RAGAgent:
         return "\n\n".join(parts), sources
 
     def _generate_answer(self, question: str, context: str) -> str:
-        """Send context + question to LLM and return the answer."""
+        """Send context plus question to the LLM and return its answer."""
         prompt = (
             f"Ответь на вопрос на основе контекста.\n\nКонтекст:\n{context}\n\nВопрос: {question}"
         )

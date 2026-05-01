@@ -45,7 +45,18 @@ def summarize_session(conversation_id: str, user_id: str) -> dict[str, Any] | No
 
     Runs when a conversation is closed. On failure at any step we log and
     return ``None`` — memory maintenance is best-effort and must never
-    break the user flow.
+    break the user flow. Idempotency is best-effort: repeated runs append
+    new ``conversation_summaries`` rows rather than mutating an existing
+    one, but the task is rarely re-fired (called once on rotation/close).
+
+    Args:
+        conversation_id: UUID string of the conversation to summarise.
+        user_id: UUID string of the owning internal user.
+
+    Returns:
+        Diagnostic dict with ``conversation_id``, ``summary``, ``topics``
+        and ``turn_count`` on success; ``None`` when the conversation was
+        too short or any step failed.
     """
     conv_uuid = UUID(conversation_id)
     user_uuid = UUID(user_id)
@@ -120,8 +131,17 @@ def update_profile_async(user_id: str, conversation_id: str) -> dict[str, Any] |
     """Recompute preferences for ``user_id`` from the given conversation.
 
     Fired from ``workflow_task`` after each turn — deliberately cheap
-    (rule-based, no LLM call) so it can run on every save_turn without
-    hammering the GPU.
+    (rule-based, no LLM call) so it can run on every ``save_turn`` without
+    hammering the GPU. Idempotent: re-runs simply replace the persisted
+    preferences blob with the freshly computed value.
+
+    Args:
+        user_id: UUID string of the internal user whose profile to refresh.
+        conversation_id: UUID string of the conversation feeding the recompute.
+
+    Returns:
+        New preferences dict on success, otherwise ``None`` (errors are
+        logged and swallowed — profile updates are best-effort).
     """
     user_uuid = UUID(user_id)
     conv_uuid = UUID(conversation_id)
@@ -157,6 +177,13 @@ def _format_dialog_compact(messages: list, max_chars: int) -> str:
     Truncates the *middle* rather than the tail so both opening context and
     resolution are preserved — the opening usually carries user intent and
     the tail carries the answer.
+
+    Args:
+        messages: Ordered list of ``Message`` domain models.
+        max_chars: Maximum number of characters in the rendered transcript.
+
+    Returns:
+        A character-bounded transcript suitable for an LLM prompt.
     """
     lines = [f"{m.role.capitalize()}: {m.content}" for m in messages]
     full = "\n".join(lines)
@@ -168,10 +195,16 @@ def _format_dialog_compact(messages: list, max_chars: int) -> str:
 
 
 def _extract_topics(messages: list) -> list[str]:
-    """Rule-based topic extraction from message metadata.
+    """Extract topic strings from message metadata via simple rules.
 
     Collects unique values of ``team_name`` / ``metric_name`` /
     ``sprint_name`` across all messages in order of first occurrence.
+
+    Args:
+        messages: Ordered list of ``Message`` domain models.
+
+    Returns:
+        Topic strings in first-seen order, deduplicated.
     """
     topics: list[str] = []
     seen: set[str] = set()
@@ -193,6 +226,7 @@ def _refresh_preferences(
     user_id: UUID,
     conversation_id: UUID,
 ) -> None:
+    """Recompute profile preferences without propagating failures."""
     try:
         memory.update_profile(user_id, conversation_id)
     except Exception as e:
@@ -205,6 +239,11 @@ def _refresh_rolling_summary(memory: MemoryManager, user_id: UUID, llm: Any) -> 
     When there are enough prior summaries we ask the LLM for a meta-summary
     (3-4 sentences); otherwise we just concatenate the existing ones so
     the profile still reflects recent activity.
+
+    Args:
+        memory: Memory manager exposing the summary and profile repos.
+        user_id: Internal user identifier.
+        llm: LLM client used to compose the meta-summary.
     """
     try:
         recent = memory.summary_repo.get_recent(user_id, limit=_RECENT_SUMMARIES_WINDOW)

@@ -21,12 +21,31 @@ _TOKEN_RE = re.compile(r"[a-zA-Zа-яА-ЯёЁ0-9_]+")
 
 
 def _tokenize(text: str) -> list[str]:
-    """Lowercase and split text into tokens (Latin + Cyrillic)."""
+    """Lowercase and split text into tokens (Latin + Cyrillic).
+
+    Args:
+        text: Raw input text.
+
+    Returns:
+        List of lowercase tokens — runs of Latin or Cyrillic letters,
+        digits, or underscores (see ``_TOKEN_RE``).
+    """
     return _TOKEN_RE.findall(text.lower())
 
 
 def _token_hash(token: str) -> int:
-    """Deterministic non-negative hash for a token via CRC32."""
+    """Compute a deterministic non-negative 32-bit hash for ``token``.
+
+    Uses ``zlib.crc32`` so the mapping is stable across processes,
+    Python versions, and platforms — required because the same token
+    must collide to the same sparse-vector index in every ingest run.
+
+    Args:
+        token: Token string to hash.
+
+    Returns:
+        Non-negative 32-bit integer hash.
+    """
     return zlib.crc32(token.encode("utf-8")) & 0xFFFFFFFF
 
 
@@ -56,5 +75,12 @@ def tokenize_to_sparse_vector(text: str) -> SparseVector:
 
 
 def tokenize_batch(texts: list[str]) -> list[SparseVector]:
-    """Tokenize a batch of texts into SparseVectors."""
+    """Tokenize a batch of texts into ``SparseVector`` objects.
+
+    Args:
+        texts: Texts to tokenize.
+
+    Returns:
+        Sparse vectors aligned with the input order.
+    """
     return [tokenize_to_sparse_vector(t) for t in texts]

@@ -54,13 +54,14 @@ _DEFAULT_KB_DIR = Path(__file__).resolve().parents[2] / "knowledge_base"
 
 
 def _download_kb_from_s3() -> Path:
-    """Download knowledge base from S3 to a temp directory.
+    """Download the knowledge base from S3 into a temporary directory.
 
     Uses ``S3_KB_BUCKET`` and ``S3_KB_PATH`` settings plus standard
     AWS env vars (``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``).
 
     Returns:
-        Path to the local directory containing downloaded files.
+        Path to the local directory containing the downloaded files,
+        preserving the original S3 sub-directory layout.
     """
     import boto3  # noqa: PLC0415
 
@@ -126,6 +127,17 @@ def _denormalize_table(
 
     For the jira_status_mapping table this produces documents like:
     ``Jira Status Mapping. TO DO: Open, To Do, Planned, Queued, ...``
+
+    Args:
+        headers: Header cells from the first row of the table.
+        rows: Remaining data rows of the table.
+        doc_title: Human-readable document title to prepend.
+        source: Source file path used to populate metadata.
+        page: Zero-based page number used to populate metadata.
+
+    Returns:
+        One ``Document`` per non-empty header column with metadata
+        ``element_type="table_denormalized"``.
     """
     docs: list[Document] = []
     clean_headers = [(h or "").replace("\n", " ").strip() for h in headers]
@@ -159,11 +171,15 @@ def _denormalize_table(
 
 
 def _load_pdf_pdfplumber(pdf_path: Path, kb_dir: Path) -> tuple[list[Document], list[Document]]:
-    """Load a single PDF via pdfplumber.
+    """Load a single PDF via pdfplumber in two-mode (text + tables).
+
+    Args:
+        pdf_path: Path to the PDF file to read.
+        kb_dir: Knowledge-base root, used to derive metadata category.
 
     Returns:
-        (text_docs, table_docs) — text docs will be chunked later;
-        table docs are already self-contained and skip chunking.
+        Tuple ``(text_docs, table_docs)`` — text docs will be chunked
+        later; table docs are already self-contained and skip chunking.
     """
     text_docs: list[Document] = []
     table_docs: list[Document] = []
@@ -214,11 +230,14 @@ def _load_pdf_pdfplumber(pdf_path: Path, kb_dir: Path) -> tuple[list[Document], 
 
 
 def _load_documents(kb_dir: Path) -> tuple[list[Document], list[Document]]:
-    """Load .md and .pdf documents from *kb_dir*.
+    """Load ``.md`` and ``.pdf`` documents from ``kb_dir``.
+
+    Args:
+        kb_dir: Root directory of the knowledge base.
 
     Returns:
-        (text_docs, table_docs) — text_docs go through chunking,
-        table_docs are already self-contained.
+        Tuple ``(text_docs, table_docs)`` — ``text_docs`` go through
+        chunking, ``table_docs`` are already self-contained.
     """
     text_docs: list[Document] = []
     table_docs: list[Document] = []
@@ -265,7 +284,12 @@ def _load_documents(kb_dir: Path) -> tuple[list[Document], list[Document]]:
 
 
 def _enrich_metadata(doc: Document, kb_dir: Path) -> None:
-    """Add category (sub-folder name) and ingestion timestamp."""
+    """Add category (sub-folder name) and ingestion timestamp in place.
+
+    Args:
+        doc: Document whose ``metadata`` dict is mutated.
+        kb_dir: Knowledge-base root, used to compute the category.
+    """
     source = doc.metadata.get("source", "")
     try:
         rel = Path(source).relative_to(kb_dir)
@@ -277,10 +301,17 @@ def _enrich_metadata(doc: Document, kb_dir: Path) -> None:
 
 
 def _doc_title_from_source(source: str) -> str:
-    """Extract human-readable title from file path.
+    """Extract a human-readable title from a file path.
 
-    ``done_total.pdf`` → ``Done Total``
-    ``team_lead_time.pdf`` → ``Team Lead Time``
+    Examples:
+        ``done_total.pdf`` becomes ``Done Total`` and
+        ``team_lead_time.pdf`` becomes ``Team Lead Time``.
+
+    Args:
+        source: File path or stem to convert.
+
+    Returns:
+        Title-cased label with underscores replaced by spaces.
     """
     stem = Path(source).stem
     return stem.replace("_", " ").title()
@@ -296,7 +327,14 @@ _SECTION_RE = re.compile(
 
 
 def _find_last_section(text: str) -> str | None:
-    """Find the last section-like heading that appears in *text*."""
+    """Find the last section-like heading that appears in ``text``.
+
+    Args:
+        text: Chunk content to scan for headings.
+
+    Returns:
+        Trimmed heading text, or ``None`` when no heading was matched.
+    """
     matches = list(_SECTION_RE.finditer(text))
     if not matches:
         return None
@@ -305,10 +343,17 @@ def _find_last_section(text: str) -> str | None:
 
 
 def _prepend_metadata(chunks: list[Document]) -> list[Document]:
-    """Add document title (and section if found) to the start of each chunk.
+    """Prepend document title (and section if found) to each chunk.
 
-    Skips table_denormalized docs — they already have the title prepended
-    during denormalization.
+    Skips ``table_denormalized`` docs — they already have the title
+    prepended during denormalization.
+
+    Args:
+        chunks: Chunks to enrich; mutated in place.
+
+    Returns:
+        The same list, with each text chunk's ``page_content`` updated
+        and ``doc_title`` / ``section`` populated in metadata.
     """
     for chunk in chunks:
         if chunk.metadata.get("element_type") == "table_denormalized":
@@ -335,7 +380,15 @@ def _prepend_metadata(chunks: list[Document]) -> list[Document]:
 
 
 def _split_documents(docs: list[Document]) -> list[Document]:
-    """Split text documents into chunks using RecursiveCharacterTextSplitter."""
+    """Split text documents into chunks via ``RecursiveCharacterTextSplitter``.
+
+    Args:
+        docs: Text documents to chunk (table docs must be excluded).
+
+    Returns:
+        New list of chunked documents using ``CHUNK_SIZE`` /
+        ``CHUNK_OVERLAP`` from settings.
+    """
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
@@ -349,7 +402,15 @@ def _split_documents(docs: list[Document]) -> list[Document]:
 
 
 def run_ingestion(kb_dir: Path | None = None) -> int:
-    """Run the full ingestion pipeline.
+    """Run the full ingestion pipeline (load, chunk, embed, upload).
+
+    When ``kb_dir`` is ``None`` the function pulls the knowledge base
+    from S3 if ``s3_kb_bucket`` is configured, otherwise it falls back
+    to ``_DEFAULT_KB_DIR``. The Qdrant collection is dropped and
+    re-created so re-runs are idempotent.
+
+    Args:
+        kb_dir: Optional override of the knowledge-base directory.
 
     Returns:
         Number of chunks uploaded to Qdrant.

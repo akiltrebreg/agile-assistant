@@ -28,6 +28,11 @@ class BM25Index:
     """
 
     def __init__(self, documents: list[Document]) -> None:
+        """Initialize the BM25 index from a list of documents.
+
+        Args:
+            documents: Documents to tokenize and index.
+        """
         self._documents = documents
         tokenized = [self._tokenize(doc.page_content) for doc in documents]
         self._bm25 = BM25Okapi(tokenized)
@@ -35,7 +40,14 @@ class BM25Index:
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:
-        """Tokenize text: lowercase + split on non-alphanumeric (keeps Russian)."""
+        """Lowercase and split text on non-alphanumeric (keeps Russian).
+
+        Args:
+            text: Raw text to tokenize.
+
+        Returns:
+            Token list containing Latin, Cyrillic, digits and underscores.
+        """
         return re.findall(r"[a-zA-Zа-яА-ЯёЁ0-9_]+", text.lower())
 
     def search(
@@ -66,7 +78,14 @@ class BM25Index:
 
 
 def _build_bm25_index() -> BM25Index:
-    """Build BM25 index by scrolling all documents from Qdrant."""
+    """Build a BM25 index by scrolling all documents from Qdrant.
+
+    Returns:
+        Newly built ``BM25Index`` populated from the current collection.
+
+    Raises:
+        RuntimeError: If the configured Qdrant collection does not exist.
+    """
     client = QdrantClient(url=settings.qdrant_url)
     collection = settings.qdrant_collection_name
 
@@ -101,7 +120,11 @@ def _build_bm25_index() -> BM25Index:
 
 
 def get_bm25_index() -> BM25Index:
-    """Return the module-level BM25 index singleton (lazy init)."""
+    """Return the module-level BM25 index singleton, initializing on first call.
+
+    Returns:
+        The cached ``BM25Index`` instance shared across the module.
+    """
     global _bm25_index  # noqa: PLW0603
     if _bm25_index is None:
         _bm25_index = _build_bm25_index()

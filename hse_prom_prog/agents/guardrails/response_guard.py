@@ -44,14 +44,15 @@ class OutputGuardResult:
 
 
 class ResponseGuard:
-    """Rule-based guardrail for the final response.
+    """Rule-based guardrail applied to the final response.
 
-    Args:
+    Attributes:
         max_response_length: Hard upper bound on response length.
         min_response_length: Anything shorter is treated as empty.
-        min_cyrillic_ratio: Min fraction of Cyrillic letters to consider the
-            response Russian (lowered from 0.3 used in eval because user
-            messages may legitimately quote English terms like "In Progress").
+        min_cyrillic_ratio: Minimum fraction of Cyrillic letters required
+            to consider the response Russian. Lowered from the 0.3 used in
+            eval because user messages may legitimately quote English
+            terms like ``"In Progress"``.
     """
 
     # Hallucinated URLs / emails
@@ -111,6 +112,16 @@ class ResponseGuard:
         min_response_length: int = 10,
         min_cyrillic_ratio: float = 0.25,
     ) -> None:
+        """Initialize the guard with response-length and language thresholds.
+
+        Args:
+            max_response_length: Hard upper bound on response length.
+                Defaults to ``5000``.
+            min_response_length: Anything shorter is treated as empty.
+                Defaults to ``10``.
+            min_cyrillic_ratio: Minimum Cyrillic-letter fraction.
+                Defaults to ``0.25``.
+        """
         self.max_response_length = max_response_length
         self.min_response_length = min_response_length
         self.min_cyrillic_ratio = min_cyrillic_ratio
@@ -125,7 +136,18 @@ class ResponseGuard:
         query_type: str = "",
         context_urls: list[str] | None = None,
     ) -> OutputGuardResult:
-        """Run all output checks and produce a single aggregated result."""
+        """Run every output check and aggregate the result.
+
+        Args:
+            response: Raw response from the response agent.
+            query_type: Routing label used for tracing only.
+            context_urls: URLs supplied by the RAG layer that should be
+                allowed through the URL-hallucination filter.
+
+        Returns:
+            Aggregated :class:`OutputGuardResult` with the sanitized
+            response, the per-check breakdown, and a ``blocked`` flag.
+        """
         langfuse_context.update_current_observation(
             input={"response_length": len(response), "query_type": query_type},
         )
@@ -177,6 +199,7 @@ class ResponseGuard:
     # ------------------------------------------------------------------
 
     def _check_length(self, response: str) -> OutputCheckResult:
+        """Verify the response length lies within the configured bounds."""
         length = len(response.strip())
         if length < self.min_response_length:
             return OutputCheckResult("length_empty", False, f"len={length}")
@@ -185,6 +208,7 @@ class ResponseGuard:
         return OutputCheckResult("length", True, f"len={length}")
 
     def _check_language(self, response: str) -> OutputCheckResult:
+        """Check the Cyrillic-letter ratio against ``min_cyrillic_ratio``."""
         letters = [c for c in response if c.isalpha()]
         if not letters:
             return OutputCheckResult("language", True, "no_letters")
@@ -195,6 +219,7 @@ class ResponseGuard:
         return OutputCheckResult("language", True, f"cyrillic_ratio={ratio:.2f}")
 
     def _check_sql_leak(self, response: str) -> tuple[OutputCheckResult, str]:
+        """Detect raw SQL referencing project tables and redact each match."""
         matches = self._SQL_LEAK_PATTERN.findall(response)
         if matches:
             sanitized = self._SQL_LEAK_PATTERN.sub("[SQL запрос скрыт]", response)
@@ -205,6 +230,7 @@ class ResponseGuard:
         return OutputCheckResult("sql_leak", True), response
 
     def _check_traceback(self, response: str) -> tuple[OutputCheckResult, str]:
+        """Detect Python traceback fragments and replace them with a placeholder."""
         if self._TRACEBACK_PATTERN.search(response):
             sanitized = re.sub(
                 r"Traceback.*?(?=\n[^\s]|\Z)",
@@ -218,6 +244,7 @@ class ResponseGuard:
     def _check_hallucinated_urls(
         self, response: str, context_urls: list[str]
     ) -> tuple[OutputCheckResult, str]:
+        """Strip URLs and emails not grounded in ``context_urls``."""
         found_urls = self._URL_PATTERN.findall(response)
         found_emails = self._EMAIL_PATTERN.findall(response)
 
@@ -242,6 +269,7 @@ class ResponseGuard:
         return OutputCheckResult("hallucinated_urls", True), response
 
     def _check_internal_leak(self, response: str) -> tuple[OutputCheckResult, str]:
+        """Redact internal identifiers (table names, env vars, URIs) from the response."""
         found: list[str] = []
         sanitized = response
         for pattern in self._INTERNAL_LEAK_PATTERNS:

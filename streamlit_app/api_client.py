@@ -18,6 +18,12 @@ class APIClient:
     """Thin wrapper around requests for calling FastAPI endpoints."""
 
     def __init__(self, base_url: str = API_BASE_URL) -> None:
+        """Initialize the API client.
+
+        Args:
+            base_url: FastAPI root URL; trailing slash is stripped.
+                Defaults to the value of ``API_BASE_URL``.
+        """
         self.base_url = base_url.rstrip("/")
 
     def health(self) -> bool:
@@ -101,10 +107,19 @@ class APIClient:
         limit: int = 20,
         offset: int = 0,
     ) -> list[dict]:
-        """GET /conversations — sidebar list for a user.
+        """Fetch the conversation list for a user (``GET /conversations``).
 
         Returns an empty list on network error so the sidebar never
         crashes the whole page — the rest of the chat still works.
+
+        Args:
+            user_id: External user id whose conversations to list.
+            limit: Maximum number of conversations to return.
+            offset: Pagination offset.
+
+        Returns:
+            List of conversation dicts ordered by most-recent activity,
+            or ``[]`` on network failure.
         """
         try:
             resp = requests.get(
@@ -119,9 +134,17 @@ class APIClient:
             return []
 
     def get_messages(self, conversation_id: str, limit: int = 200) -> list[dict]:
-        """GET /conversations/{id}/messages — full transcript, ascending turn.
+        """Fetch the full transcript for a conversation in ascending turn order.
 
-        Returns ``[]`` if the conversation doesn't exist or the API is down.
+        Calls ``GET /conversations/{id}/messages``.
+
+        Args:
+            conversation_id: Conversation whose messages to load.
+            limit: Maximum number of messages to return.
+
+        Returns:
+            Ordered list of message dicts, or ``[]`` if the conversation
+            does not exist or the API is unreachable.
         """
         try:
             resp = requests.get(
@@ -138,7 +161,17 @@ class APIClient:
             return []
 
     def close_conversation(self, conversation_id: str) -> dict | None:
-        """POST /conversations/{id}/close — mark closed, schedule summary."""
+        """Close a conversation and schedule its summary job.
+
+        Calls ``POST /conversations/{id}/close``.
+
+        Args:
+            conversation_id: Conversation to close.
+
+        Returns:
+            Backend response dict on success, or ``None`` on network
+            failure so the UI can keep going.
+        """
         try:
             resp = requests.post(
                 f"{self.base_url}/conversations/{conversation_id}/close",

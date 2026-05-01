@@ -30,6 +30,16 @@ _cache: dict[str, tuple[float, str]] = {}
 
 @dataclass
 class ColumnInfo:
+    """Schema metadata for a single PostgreSQL column.
+
+    Attributes:
+        name: Column name.
+        data_type: Simplified data type (see ``_TYPE_MAP``).
+        is_nullable: ``True`` when the column allows ``NULL``.
+        is_pk: ``True`` when the column participates in the primary key.
+        comment: ``COMMENT ON COLUMN`` text, or ``None`` if missing.
+    """
+
     name: str
     data_type: str
     is_nullable: bool
@@ -39,6 +49,14 @@ class ColumnInfo:
 
 @dataclass
 class TableInfo:
+    """Schema metadata for a single PostgreSQL table.
+
+    Attributes:
+        name: Table name.
+        comment: ``COMMENT ON TABLE`` text, or ``None`` if missing.
+        columns: Ordered column metadata.
+    """
+
     name: str
     comment: str | None = None
     columns: list[ColumnInfo] = field(default_factory=list)
@@ -59,11 +77,12 @@ _TYPE_MAP: dict[str, str] = {
 
 
 def _simplify_type(pg_type: str) -> str:
+    """Map a PostgreSQL data type to its short alias from ``_TYPE_MAP``."""
     return _TYPE_MAP.get(pg_type, pg_type)
 
 
 def _load_tables(engine: Engine) -> list[TableInfo]:
-    """Read table structure from information_schema + pg_catalog."""
+    """Read table and column structure from ``information_schema`` and ``pg_catalog``."""
     with engine.connect() as conn:
         rows = conn.execute(
             text("""
@@ -125,7 +144,7 @@ def _load_tables(engine: Engine) -> list[TableInfo]:
 
 
 def render_schema(tables: list[TableInfo]) -> str:
-    """Render schema as CREATE TABLE DDL for the LLM prompt."""
+    """Render the schema as ``CREATE TABLE`` DDL for the LLM prompt."""
     parts: list[str] = []
     for t in tables:
         desc = f" -- {t.comment}" if t.comment else ""
@@ -140,7 +159,14 @@ def render_schema(tables: list[TableInfo]) -> str:
 
 
 def get_schema_compact(engine: Engine) -> str:
-    """Return DDL schema text (CREATE TABLE format, cached for 10 min)."""
+    """Return the DDL schema text, cached for 10 minutes.
+
+    Args:
+        engine: SQLAlchemy engine used on cache miss.
+
+    Returns:
+        ``CREATE TABLE`` DDL covering every whitelisted table.
+    """
     now = time.time()
     key = "schema_compact"
     if key in _cache:

@@ -124,7 +124,19 @@ _DB_ENUM_TTL: float = 3600.0  # 1 hour
 
 
 def _load_enum_values(engine: Any, queries: dict[str, str]) -> dict[str, set[str]]:
-    """Run DISTINCT queries, collect enum values. Empty dict if DB fails."""
+    """Run ``DISTINCT`` queries and collect enum values.
+
+    Returns an empty dict if the database call fails so callers can fall
+    back to synonym-only normalization without crashing.
+
+    Args:
+        engine: SQLAlchemy engine.
+        queries: Mapping from field name to the SQL string returning its
+            distinct values in column 0.
+
+    Returns:
+        Mapping from field name to a set of distinct DB values.
+    """
     from sqlalchemy import text  # noqa: PLC0415
 
     out: dict[str, set[str]] = {}
@@ -145,7 +157,15 @@ def _load_enum_values(engine: Any, queries: dict[str, str]) -> dict[str, set[str
 
 
 def _load_metric_columns(engine: Any) -> set[str]:
-    """Load metric column names from information_schema."""
+    """Load numeric metric column names from ``information_schema``.
+
+    Args:
+        engine: SQLAlchemy engine.
+
+    Returns:
+        Set of column names from ``report_agile_dashboard_metrics`` whose
+        data type is numeric. Empty set on failure.
+    """
     from sqlalchemy import text  # noqa: PLC0415
 
     try:
@@ -166,7 +186,17 @@ def _load_metric_columns(engine: Any) -> set[str]:
 
 
 def load_db_enums(engine: Any) -> dict[str, set[str]]:
-    """Load distinct enum values from DB for issue_type, status, metric_name."""
+    """Load distinct enum values from the DB for sanitizer validation.
+
+    Loads ``issue_type``, ``status`` (as ``issue_status_act``), and
+    ``metric_name`` (as numeric metric column names) in one pass.
+
+    Args:
+        engine: SQLAlchemy engine.
+
+    Returns:
+        Mapping from field name to the set of allowed DB values.
+    """
     enums = _load_enum_values(
         engine,
         {
@@ -187,7 +217,15 @@ def load_db_enums(engine: Any) -> dict[str, set[str]]:
 
 
 def _get_db_enums(engine: Any | None) -> dict[str, set[str]]:
-    """Get DB enums with TTL cache."""
+    """Return cached DB enums, refreshing past ``_DB_ENUM_TTL``.
+
+    Args:
+        engine: SQLAlchemy engine, or ``None`` to disable DB validation.
+
+    Returns:
+        Cached mapping of field name to allowed values, or ``{}`` when
+        ``engine`` is ``None``.
+    """
     global _db_enums_cache, _db_enums_loaded_at  # noqa: PLW0603
 
     if engine is None:
@@ -205,7 +243,19 @@ def _get_db_enums(engine: Any | None) -> dict[str, set[str]]:
 
 
 def normalize_enum_value(field: str, value: str | None) -> str | None:
-    """Map raw value to canonical enum using synonyms. None if unknown."""
+    """Map a raw value to the canonical enum using synonym tables.
+
+    Non-enum fields pass through unchanged. Identity hits (LLM already
+    returned the canonical) do not bump the corrections metric — only
+    real synonym substitutions do.
+
+    Args:
+        field: Field name (``issue_type`` / ``status`` / ``metric_name``).
+        value: Raw value from the LLM, or ``None``.
+
+    Returns:
+        Canonical enum value, or ``None`` when ``value`` is unknown.
+    """
     if not value or not isinstance(value, str):
         return None
 
@@ -238,7 +288,22 @@ def validate_against_db(
     value: str | None,
     db_enums: dict[str, set[str]],
 ) -> str | None:
-    """Case-insensitive DB-existence check. Returns DB-canonical casing."""
+    """Verify ``value`` exists in the DB and return its canonical casing.
+
+    When ``db_enums`` does not list the field (DB unavailable or column
+    missing), the value passes through unchanged. When the value is
+    missing from the allowed set the original is kept too — DB enum
+    coverage is best-effort, not authoritative.
+
+    Args:
+        field: Field name being validated.
+        value: Already-normalized canonical value, or ``None``.
+        db_enums: Mapping from field name to set of allowed DB values.
+
+    Returns:
+        DB-canonical casing of ``value``, or ``None`` when ``value`` is
+        ``None``.
+    """
     if value is None:
         return None
     allowed = db_enums.get(field)
@@ -300,7 +365,7 @@ _FIELD_MARKERS: dict[str, list[str]] = {
 
 
 def _has_contextual_marker(field: str, user_query: str) -> bool:
-    """True if a field-specific marker word appears in the query."""
+    """Return ``True`` if a field-specific marker word appears in the query."""
     markers = _FIELD_MARKERS.get(field)
     if markers is None:
         return True
@@ -309,7 +374,12 @@ def _has_contextual_marker(field: str, user_query: str) -> bool:
 
 
 def _word_prefix_match(value: str, query: str, min_prefix: int = 4) -> bool:
-    """Russian-morphology-safe word match via prefix."""
+    """Match ``value`` words against ``query`` words via shared prefix.
+
+    Tolerant of Russian inflection: short tokens (under ``min_prefix``)
+    must match exactly, longer tokens match by their first ``min_prefix``
+    characters.
+    """
     query_words = set(query.lower().split())
     for vw in value.lower().split():
         if len(vw) < min_prefix:
@@ -323,7 +393,10 @@ def _word_prefix_match(value: str, query: str, min_prefix: int = 4) -> bool:
 
 
 def _is_generic_hallucination(value: str, user_query: str) -> bool:
-    """Placeholder/template check — applies to all free-text fields."""
+    """Detect placeholder / template values that the LLM may echo back.
+
+    Applies to all free-text fields before any field-specific check.
+    """
     ql = user_query.lower()
     if value in _KNOWN_PLACEHOLDERS and value.lower() not in ql:
         return True
@@ -334,29 +407,42 @@ _FIELD_HALLUC_CHECKS: dict[str, Any] = {}
 
 
 def _check_issue_key(value: str, user_query: str) -> bool:
+    """Flag an issue key that does not match the format or is absent from the query."""
     if not _ISSUE_KEY_FORMAT_RE.match(value):
         return True
     return value.lower() not in user_query.lower()
 
 
 def _check_assignee(value: str, user_query: str) -> bool:
+    """Flag an assignee value when no marker word is present or the value is absent."""
     if not _has_contextual_marker("assignee", user_query):
         return True
     return value.lower() not in user_query.lower()
 
 
 def _check_sprint_or_cluster(field: str, value: str, user_query: str) -> bool:
+    """Flag a sprint / cluster value missing the marker or query word match."""
     if not _has_contextual_marker(field, user_query):
         return True
     return not _word_prefix_match(value, user_query)
 
 
 def _check_team_name(value: str, user_query: str) -> bool:
+    """Flag a team name that does not appear (case-insensitive) in the query."""
     return value.lower() not in user_query.lower()
 
 
 def is_hallucination(field: str, value: str, user_query: str) -> bool:
-    """Detect likely hallucinated values in free-text fields."""
+    """Detect likely hallucinated values in free-text entity fields.
+
+    Args:
+        field: Entity field name.
+        value: Value extracted by the LLM.
+        user_query: Original user query, checked for grounding.
+
+    Returns:
+        ``True`` when the value should be dropped as hallucinated.
+    """
     if _is_generic_hallucination(value, user_query):
         SANITIZER_CORRECTIONS.labels(layer="3_hallucination").inc()
         return True
@@ -385,7 +471,7 @@ def _enum_mentioned_in_query(
     canonical_value: str,
     user_query: str,
 ) -> bool:
-    """True if canonical value or any of its synonyms appear in query."""
+    """Return ``True`` if the canonical value or a synonym appears in the query."""
     ql = user_query.lower()
     forms: set[str] = {canonical_value.lower()}
     if "_" in canonical_value:
@@ -412,7 +498,11 @@ _FREE_TEXT_FIELDS = frozenset({"issue_key", "assignee", "sprint_name", "cluster"
 
 
 def _sanitize_team_name(value: Any, user_query: str) -> str | list[str] | None:
-    """Handle team_name: string or list of strings, drop hallucinated."""
+    """Sanitize ``team_name``: accepts a string or list, drops hallucinations.
+
+    Returns a single string when only one value survives, a list when more
+    than one survives, and ``None`` when nothing valid is left.
+    """
     if isinstance(value, list):
         cleaned = [
             v
@@ -435,7 +525,11 @@ def _sanitize_enum_field(
     user_query: str,
     db_enums: dict[str, set[str]],
 ) -> str | None:
-    """Normalize + DB-validate + query-presence check for enum field."""
+    """Run normalization, DB validation, and query-presence check for an enum.
+
+    Returns the validated canonical value, or ``None`` if any layer rejects
+    it.
+    """
     normalized = normalize_enum_value(field, value)
     if normalized is None:
         return None
@@ -454,6 +548,7 @@ def _sanitize_enum_field(
 
 
 def _sanitize_free_text(field: str, value: Any, user_query: str) -> str | None:
+    """Trim a free-text value and drop it when flagged as hallucinated."""
     if not isinstance(value, str) or not value.strip():
         return None
     v = value.strip()
@@ -461,6 +556,7 @@ def _sanitize_free_text(field: str, value: Any, user_query: str) -> str | None:
 
 
 def _sanitize_passthrough(value: Any) -> str | None:
+    """Return ``value`` as-is when it is a non-empty string, else ``None``."""
     if isinstance(value, str) and value.strip():
         return value
     return None
@@ -472,7 +568,11 @@ def _sanitize_field(
     user_query: str,
     db_enums: dict[str, set[str]],
 ) -> Any | None:
-    """Sanitize a single field. Returns cleaned value or None to drop."""
+    """Dispatch to the field-specific sanitizer.
+
+    Returns the cleaned value or ``None`` to drop the field from the
+    sanitized output.
+    """
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
     if field == "team_name":
@@ -497,7 +597,7 @@ _morph_analyzer: pymorphy3.MorphAnalyzer | None = None
 
 
 def _get_morph() -> pymorphy3.MorphAnalyzer:
-    """Return the singleton MorphAnalyzer, loading dictionaries on first use."""
+    """Return the singleton ``MorphAnalyzer``, loading dictionaries on first use."""
     global _morph_analyzer  # noqa: PLW0603
     if _morph_analyzer is None:
         _morph_analyzer = pymorphy3.MorphAnalyzer()
@@ -506,12 +606,12 @@ def _get_morph() -> pymorphy3.MorphAnalyzer:
 
 @functools.lru_cache(maxsize=4096)
 def _lemma(word: str) -> str:
-    """Lemma of a single (lowercased) word. Cached because queries repeat."""
+    """Return the lemma of a single (lowercased) word. Cached: queries repeat."""
     return _get_morph().parse(word)[0].normal_form
 
 
 def _query_lemmas(query: str) -> frozenset[str]:
-    """Lemmatize every alphanumeric token of the query (lowercased)."""
+    """Return the lemma set of all alphanumeric tokens in ``query`` (lowercased)."""
     return frozenset(_lemma(t.lower()) for t in _TOKEN_RE.findall(query))
 
 
@@ -554,7 +654,7 @@ _CARRY_FORWARD_FIELDS: tuple[str, ...] = (
 
 
 def _has_anaphora(user_query: str) -> bool:
-    """Return True if any token of the query lemmatizes to an anaphora marker."""
+    """Return ``True`` if any query token lemmatizes to an anaphora marker."""
     return bool(_query_lemmas(user_query) & _ANAPHORA_LEMMAS)
 
 
@@ -593,7 +693,7 @@ def _carry_forward_entities(
 
 @functools.lru_cache(maxsize=512)
 def _synonym_lemmas(syn_key: str) -> frozenset[str]:
-    """Lemmatized token set of a synonym key."""
+    """Return the lemmatized token set of a synonym key. Cached per key."""
     return frozenset(_lemma(t.lower()) for t in _TOKEN_RE.findall(syn_key))
 
 
@@ -629,13 +729,13 @@ def _fill_missing_enums_from_query(
     user_query: str,
     db_enums: dict[str, set[str]],
 ) -> dict[str, Any]:
-    """Layer 7: fill empty enum fields by matching synonym keys against
-    lemmatized query tokens.
+    """Fill empty enum fields by matching synonym keys against query lemmas.
 
-    Reuses ``_SYNONYM_MAPS`` as a single source of truth — the same
-    dictionary that normalizes LLM-supplied values in layer 1 acts as
-    a fallback extractor here. Only fields the LLM left empty are touched,
-    so explicit extraction always wins.
+    Layer 7 of the sanitizer pipeline. Reuses ``_SYNONYM_MAPS`` as a
+    single source of truth — the same dictionary that normalizes
+    LLM-supplied values in layer 1 acts as a fallback extractor here.
+    Only fields the LLM left empty are touched, so explicit extraction
+    always wins.
     """
     out: dict[str, Any] = dict(entities)
     missing = [f for f in _ENUM_FIELDS if not out.get(f)]

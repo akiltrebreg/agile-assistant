@@ -9,7 +9,15 @@ CHARS_PER_TOKEN = 3
 
 
 def estimate_tokens(text: str) -> int:
-    """Return a conservative upper-bound estimate of tokens in ``text``."""
+    """Return a conservative upper-bound estimate of tokens in ``text``.
+
+    Args:
+        text: Input text to measure.
+
+    Returns:
+        Estimated token count, ``0`` for empty input and at least ``1``
+        for any non-empty string.
+    """
     if not text:
         return 0
     return max(1, len(text) // CHARS_PER_TOKEN)

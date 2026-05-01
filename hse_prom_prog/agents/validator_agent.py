@@ -14,11 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 def _record(use_sql: bool, use_rag: bool) -> None:
-    """Record the (use_sql, use_rag) pair as Prometheus labels.
+    """Record the ``(use_sql, use_rag)`` pair on ``VALIDATOR_RESULTS``.
 
-    Bool→str cast is required: Prometheus labels must be strings, and
-    relying on `str(True)` produces "True"/"False" — explicit lower()
-    matches the convention used elsewhere in the codebase.
+    Bool-to-str cast is required: Prometheus labels must be strings, and
+    relying on ``str(True)`` produces ``"True"`` / ``"False"`` — explicit
+    ``lower()`` matches the convention used elsewhere in the codebase.
     """
     VALIDATOR_RESULTS.labels(
         use_sql=str(use_sql).lower(),
@@ -34,13 +34,15 @@ class ValidatorAgent:
     """
 
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Validate agent outputs and produce a validation_result.
+        """Validate agent outputs and produce a ``validation_result``.
 
         Args:
-            state: Workflow state with sql_result, rag_response, error, etc.
+            state: Workflow state with ``sql_result``, ``rag_response``,
+                ``error``, etc.
 
         Returns:
-            State update with validation_result dict.
+            State update with the ``validation_result`` dict (keys
+            ``use_sql``, ``use_rag``, ``note``).
         """
         query_type = state.get("query_type", "sql")
         sql_result = state.get("sql_result")

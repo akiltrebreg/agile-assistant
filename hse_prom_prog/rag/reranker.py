@@ -43,6 +43,14 @@ class Reranker:
         threshold: float,
         top_n: int,
     ) -> None:
+        """Initialize the cross-encoder reranker.
+
+        Args:
+            model_name: HuggingFace model id or local path of the
+                CrossEncoder used for relevance scoring.
+            threshold: Minimum score below which documents are dropped.
+            top_n: Maximum number of documents kept after sorting.
+        """
         self._model = CrossEncoder(model_name)
         self._threshold = threshold
         self._top_n = top_n
@@ -164,7 +172,12 @@ class Reranker:
 
 
 def _build_reranker() -> Reranker:
-    """Build Reranker from application settings."""
+    """Build a ``Reranker`` from application settings.
+
+    Returns:
+        Reranker configured with ``settings.reranker_model``,
+        ``settings.reranker_threshold`` and ``settings.reranker_top_n``.
+    """
     return Reranker(
         model_name=settings.reranker_model,
         threshold=settings.reranker_threshold,
@@ -173,7 +186,11 @@ def _build_reranker() -> Reranker:
 
 
 def get_reranker() -> Reranker:
-    """Return the module-level Reranker singleton (lazy init)."""
+    """Return the module-level ``Reranker`` singleton, creating it lazily.
+
+    Returns:
+        Cached ``Reranker`` shared across the module.
+    """
     global _reranker  # noqa: PLW0603
     if _reranker is None:
         _reranker = _build_reranker()

@@ -15,6 +15,14 @@ def truncate_message(text: str, max_tokens: int) -> str:
     Cuts at the last whitespace before the budget to avoid breaking a word,
     then appends ``[...]`` as a visual marker. If the text already fits,
     it is returned unchanged.
+
+    Args:
+        text: Input text to truncate.
+        max_tokens: Hard upper bound on the resulting token count.
+
+    Returns:
+        Truncated text, possibly the original ``text`` when it already
+        fits, or ``""`` when ``max_tokens`` is non-positive.
     """
     if max_tokens <= 0:
         return ""

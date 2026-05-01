@@ -61,11 +61,21 @@ def _redis_client() -> redis.Redis:
 
 
 def _try_acquire(client: redis.Redis, source: str, ttl: int) -> bool:
-    """SET NX + EX — returns True if we got the lock, False if someone else holds it."""
+    """Acquire a Redis ``SET NX EX`` lock for ``source``.
+
+    Args:
+        client: Redis client.
+        source: Logical lock name (used as a key suffix).
+        ttl: Lock TTL in seconds.
+
+    Returns:
+        ``True`` when the lock was acquired, ``False`` otherwise.
+    """
     return bool(client.set(name=_LOCK_KEY_PREFIX + source, value="1", nx=True, ex=ttl))
 
 
 def _release(client: redis.Redis, source: str) -> None:
+    """Release the lock held for ``source`` (lock TTL is the safety net)."""
     try:
         client.delete(_LOCK_KEY_PREFIX + source)
     except redis.RedisError:
@@ -74,7 +84,14 @@ def _release(client: redis.Redis, source: str) -> None:
 
 
 def _record_outcome(source: str, status: str, started: float, rows: int | None = None) -> None:
-    """Emit Prometheus metrics for one sync attempt."""
+    """Emit Prometheus metrics for one sync attempt.
+
+    Args:
+        source: Sync pipeline label (``jira_csv`` or ``knowledge_base``).
+        status: Outcome label (``success``, ``failure``, ``skipped``).
+        started: ``time.time()`` value captured when the attempt began.
+        rows: Number of rows / chunks processed on success, if known.
+    """
     DATA_SYNC_DURATION.labels(source=source).observe(time.time() - started)
     DATA_SYNC_TOTAL.labels(source=source, status=status).inc()
     if status == "success":
@@ -97,9 +114,15 @@ def _record_outcome(source: str, status: str, started: float, rows: int | None =
 def sync_jira_data(self) -> dict[str, int | str]:
     """Reload Jira CSVs from S3 into PostgreSQL.
 
-    Returns a small dict so Flower / Langfuse trace shows actual numbers
-    instead of just ``None``. Result backend is disabled in celery_app,
-    so the dict is observability-only — workflow_task does not consume it.
+    Concurrency: a Redis SETNX lock keyed on ``jira_csv`` prevents
+    overlapping runs; the task no-ops with status ``skipped`` if a
+    previous run is still active. Beat re-fires every six hours, so the
+    autoretry policy is intentionally a single attempt.
+
+    Returns:
+        Diagnostic dict with ``source``, ``status`` and (on success)
+        ``rows``. Result backend is disabled, so the dict is purely
+        observability-facing — ``workflow_task`` does not consume it.
     """
     source = "jira_csv"
     client = _redis_client()
@@ -154,7 +177,16 @@ def sync_knowledge_base(self) -> dict[str, int | str]:
     Qdrant collection. There is a brief window (seconds) where the
     collection has a partial document set; RAG fallbacks (dense → no
     results → vector store warning) handle this gracefully and the
-    next /metrics scrape will reflect the new chunk count.
+    next ``/metrics`` scrape will reflect the new chunk count.
+
+    Concurrency: a Redis SETNX lock keyed on ``knowledge_base``
+    serialises runs; overlapping invocations no-op with status
+    ``skipped``.
+
+    Returns:
+        Diagnostic dict with ``source``, ``status`` and (on success)
+        ``rows`` (chunk count). Observability-only — not consumed
+        downstream.
     """
     source = "knowledge_base"
     client = _redis_client()

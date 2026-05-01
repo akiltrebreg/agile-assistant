@@ -29,7 +29,7 @@ class _Tally:
 
 
 class ProfileExtractor:
-    """Computes a ``preferences`` dict from message metadata."""
+    """Compute a ``preferences`` dict from message metadata."""
 
     def extract(
         self,
@@ -47,6 +47,15 @@ class ProfileExtractor:
         a guard against premature commitment (e.g. user's first two
         queries happen to mention the same team, leading the supervisor
         to inject ``default_team`` thereafter on shaky evidence).
+
+        Args:
+            messages_metadata: List of message metadata dicts to fold.
+            min_messages: Minimum number of entity-bearing messages required
+                before any preference is emitted. Defaults to
+                ``MIN_MESSAGES_FOR_PROFILE``.
+
+        Returns:
+            Preferences dict (possibly empty) suitable for persistence.
         """
         if self._entity_message_count(messages_metadata) < min_messages:
             return {}
@@ -66,7 +75,14 @@ class ProfileExtractor:
 
     @staticmethod
     def _entity_message_count(messages_metadata: list[dict[str, Any]]) -> int:
-        """Count messages whose ``entities`` payload is a non-empty dict."""
+        """Count messages whose ``entities`` payload is a non-empty dict.
+
+        Args:
+            messages_metadata: Metadata dicts to scan.
+
+        Returns:
+            Number of dicts containing a truthy ``entities`` mapping.
+        """
         count = 0
         for meta in messages_metadata:
             if not isinstance(meta, dict):
@@ -78,6 +94,7 @@ class ProfileExtractor:
 
     @staticmethod
     def _tally(messages_metadata: list[dict[str, Any]]) -> _Tally:
+        """Aggregate counters of teams, metrics, sprints and query types."""
         tally = _Tally()
         for meta in messages_metadata:
             if not isinstance(meta, dict):
@@ -96,6 +113,7 @@ class ProfileExtractor:
 
     @staticmethod
     def _dominant_team(teams: Counter[str]) -> str | None:
+        """Return the team that dominates above ``DEFAULT_TEAM_SHARE_THRESHOLD``."""
         if not teams:
             return None
         top_team, top_count = teams.most_common(1)[0]
@@ -106,10 +124,12 @@ class ProfileExtractor:
 
     @staticmethod
     def _top_n(counter: Counter[str]) -> list[str]:
+        """Return the ``FREQUENT_METRICS_TOP_N`` most common items."""
         return [item for item, _ in counter.most_common(FREQUENT_METRICS_TOP_N)]
 
     @staticmethod
     def _detail_level(query_types: Counter[str]) -> str | None:
+        """Pick ``"brief"`` vs ``"detailed"`` based on observed query types."""
         # SQL-heavy users want brief numeric answers; RAG/hybrid users want
         # explanations. Tie → detailed (safer default).
         brief_score = query_types.get("sql", 0)

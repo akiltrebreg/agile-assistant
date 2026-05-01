@@ -55,6 +55,17 @@ class AgileWorkflow:
         db_connection: DatabaseConnection | None = None,
         retriever: Any | None = None,
     ) -> None:
+        """Initialize agents, guardrails, and compile the LangGraph graph.
+
+        Args:
+            llm_client: Shared LLM client passed to every agent that
+                needs generation.
+            db_connection: Optional database connection for the SQL
+                agent and supervisor; when ``None`` the SQL path is
+                still wired but executes against an empty engine.
+            retriever: Optional vector retriever; when ``None`` the RAG
+                agent is disabled and hybrid queries degrade to SQL-only.
+        """
         logger.info("[Workflow] Initializing AgileWorkflow...")
 
         self.db = db_connection
@@ -76,7 +87,7 @@ class AgileWorkflow:
         llm_client: LLMClient,
         retriever: Any | None,
     ) -> RAGAgent | None:
-        """Build RAGAgent with a retriever."""
+        """Return a ``RAGAgent`` bound to ``retriever``, or ``None``."""
         if retriever is None:
             return None
         return RAGAgent(llm_client, retriever)
@@ -126,6 +137,7 @@ class AgileWorkflow:
         return {"final_response": OFF_TOPIC_RESPONSE}
 
     def _supervisor_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Run the Supervisor agent to classify the query and extract entities."""
         logger.info("[Workflow] Entering Supervisor node")
         return self.supervisor.process(
             state["original_query"],
@@ -134,10 +146,12 @@ class AgileWorkflow:
         )
 
     def _sql_agent_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Run the SQL agent to translate the query and execute it."""
         logger.info("[Workflow] Entering SQL Agent node")
         return self.sql_agent.process(state)
 
     def _rag_agent_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Run the RAG agent, or return an empty result when disabled."""
         logger.info("[Workflow] Entering RAG Agent node")
         if self.rag_agent is None:
             logger.warning("[Workflow] RAG Agent not available (no retriever)")
@@ -159,10 +173,12 @@ class AgileWorkflow:
         return {**sql_result, **rag_result}
 
     def _validator_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Run the Validator agent over the agent outputs in ``state``."""
         logger.info("[Workflow] Entering Validator node")
         return self.validator.process(state)
 
     def _response_agent_node(self, state: WorkflowState) -> dict[str, Any]:
+        """Run the Response agent to compose the final user-facing reply."""
         logger.info("[Workflow] Entering Response Agent node")
         return self.response_agent.process(state)
 
@@ -229,6 +245,7 @@ class AgileWorkflow:
     # ------------------------------------------------------------------
 
     def _build_graph(self) -> Any:
+        """Wire the LangGraph nodes and edges and return the compiled graph."""
         workflow = StateGraph(WorkflowState)
 
         workflow.add_node("input_guardrail", self._input_guardrail_node)

@@ -422,11 +422,19 @@ DATA_SYNC_ROWS = Gauge(
 # from a broken scrape. ``inc(0)`` is the canonical idiom — safe on
 # counters and idempotent.
 def _pretouch_pipeline() -> None:
+    """Materialize ``TASKS_TOTAL`` series for every terminal status at value 0."""
     for status in ("COMPLETED", "FAILED"):
         TASKS_TOTAL.labels(status=status).inc(0)
 
 
 def _pretouch_guardrails() -> None:
+    """Materialize all known L1/L2/L3 guardrail label combinations at 0.
+
+    Covers every TopicGuard reason, every SQLGuard ``(allowed, layer)``
+    pair, every ResponseGuard outcome, and every individual L3 check
+    that may report failure — so dashboards never render "No data" for
+    a healthy system that simply hasn't blocked anything yet.
+    """
     for reason in ("injection_blocked", "whitelist_fast_path", "pass"):
         GUARDRAIL_L1_RESULTS.labels(reason=reason).inc(0)
 
@@ -451,6 +459,12 @@ def _pretouch_guardrails() -> None:
 
 
 def _pretouch_sanitizer() -> None:
+    """Materialize entity-sanitizer counter combinations at 0.
+
+    Touches every known correction layer, every anaphora-carry entity
+    type, and every fallback-extraction field so the sanitizer panel
+    plots a flat zero instead of "No data" until the first hit.
+    """
     for layer in (
         "1_synonym",
         "3_hallucination",
@@ -468,10 +482,13 @@ def _pretouch_sanitizer() -> None:
 
 
 def _pretouch_data_sync() -> None:
-    # Pre-touching ensures freshness panels and the StaleData alert
-    # evaluate correctly from the very first scrape — before Beat has
-    # a chance to fire — so the system is never shown as "no data"
-    # when it is in fact just brand new.
+    """Materialize ``DATA_SYNC_TOTAL`` for every (source, status) pair.
+
+    Required so the StaleData alert and freshness panels evaluate
+    correctly from the very first Prometheus scrape — before Beat has
+    a chance to fire — instead of reporting the system as "no data"
+    when it is in fact brand new and healthy.
+    """
     for source in ("jira_csv", "knowledge_base"):
         for status in ("success", "failure"):
             DATA_SYNC_TOTAL.labels(source=source, status=status).inc(0)
@@ -480,7 +497,11 @@ def _pretouch_data_sync() -> None:
 def initialize_label_combinations() -> None:
     """Materialize all known counter label combinations at value 0.
 
-    Called once per Prometheus exporter process at worker startup.
+    Called exactly once per Prometheus exporter process at worker
+    startup. Without this, Grafana renders "No data" for any counter
+    that has never recorded an event — making a quiet healthy system
+    indistinguishable from a broken scrape. Uses ``inc(0)`` because it
+    is safe on Counter and idempotent across calls.
     """
     _pretouch_pipeline()
     _pretouch_guardrails()

@@ -85,9 +85,10 @@ _ALLOWED_TABLES: set[str] = {
 
 
 def _forbidden_node_classes() -> set[type]:
-    """Collect mutation node classes via getattr (sqlglot renames across versions).
+    """Collect mutation node classes via ``getattr``, tolerating sqlglot renames.
 
-    E.g. sqlglot 26.x renamed ``AlterTable`` to ``Alter``, so we try both.
+    For example, sqlglot 26.x renamed ``AlterTable`` to ``Alter``, so we
+    try both names and keep whichever the installed version exposes.
     """
     if not _SQLGLOT_AVAILABLE:
         return set()
@@ -107,7 +108,13 @@ def _forbidden_node_classes() -> set[type]:
 
 
 def _parse_statement(sql: str) -> tuple[object | None, str]:
-    """Parse SQL, return (stmt, '') on success, (None, reason) on failure."""
+    """Parse SQL into a single ``SELECT`` statement.
+
+    Returns:
+        ``(stmt, "")`` on success, or ``(None, reason)`` when parsing
+        fails, the input contains multiple statements, or the root node
+        is not a ``SELECT``.
+    """
     try:
         statements = sqlglot.parse(sql, dialect="postgres")
     except Exception as e:
@@ -123,7 +130,7 @@ def _parse_statement(sql: str) -> tuple[object | None, str]:
 
 
 def _find_forbidden_subexpression(stmt: object) -> str | None:
-    """Return the name of the first mutation node found in the tree, or None."""
+    """Return the class name of the first mutation node in the tree, or ``None``."""
     forbidden = tuple(_forbidden_node_classes())
     if not forbidden:
         return None
@@ -134,7 +141,7 @@ def _find_forbidden_subexpression(stmt: object) -> str | None:
 
 
 def _find_forbidden_tables(stmt: object) -> list[str]:
-    """Return tables referenced in the query that are not in the whitelist."""
+    """Return tables referenced by the statement that are not whitelisted."""
     referenced: set[str] = set()
     for table in stmt.find_all(exp.Table):  # type: ignore[attr-defined]
         name = (table.name or "").lower()
@@ -145,7 +152,12 @@ def _find_forbidden_tables(stmt: object) -> list[str]:
 
 
 def _check_ast(sql: str) -> tuple[bool, str]:
-    """Parse SQL, assert root is SELECT, walk for mutations, verify tables."""
+    """Run the AST layer: parse, assert root is ``SELECT``, walk for mutations.
+
+    Returns:
+        ``(True, "ok")`` when the AST is acceptable, otherwise
+        ``(False, reason)`` describing the first violation found.
+    """
     if not _SQLGLOT_AVAILABLE:
         return True, "sqlglot_unavailable"
 
@@ -172,7 +184,14 @@ _MAX_JOIN_COUNT = 5
 
 @dataclass
 class SQLGuardResult:
-    """Result of a SQL guardrail check."""
+    """Outcome of the SQL guardrail check.
+
+    Attributes:
+        allowed: ``True`` when every layer passed.
+        reason: Short machine-friendly cause; ``"ok"`` on pass.
+        layer: Which check produced the result —
+            ``"limits"`` / ``"regex"`` / ``"ast"`` / ``"ok"``.
+    """
 
     allowed: bool
     reason: str
@@ -180,7 +199,7 @@ class SQLGuardResult:
 
 
 def _record_l2(result: SQLGuardResult) -> SQLGuardResult:
-    """Forward the result through Prometheus + Langfuse before returning."""
+    """Emit the result to Prometheus and Langfuse, then return it unchanged."""
     GUARDRAIL_L2_RESULTS.labels(
         allowed=str(result.allowed).lower(),
         layer=result.layer,
@@ -197,11 +216,15 @@ def _record_l2(result: SQLGuardResult) -> SQLGuardResult:
 
 @observe(name="guardrail_l2")
 def check_sql(sql: str) -> SQLGuardResult:
-    """Three-layer SQL validation. Called from ``run_query`` before execution.
+    """Run the three-layer SQL validation, called by ``run_query`` before execution.
+
+    Args:
+        sql: Candidate SQL string supplied by the LLM.
 
     Returns:
-        SQLGuardResult(allowed=True, reason="ok", layer="ok") on pass,
-        otherwise (False, reason, layer) where `layer` tells which check blocked.
+        :class:`SQLGuardResult` with ``allowed=True`` and ``layer="ok"``
+        on pass, otherwise ``allowed=False`` plus the first failing
+        layer's name and reason.
     """
     sql_stripped = sql.strip()
     langfuse_context.update_current_observation(input={"sql": sql_stripped})

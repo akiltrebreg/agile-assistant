@@ -272,7 +272,14 @@ _JUDGE_RETRY_COUNTDOWN_SECONDS = 15
 
 
 def _strip_markdown_fences(raw: str) -> str:
-    """Remove ```json ... ``` fences if the LLM wrapped its JSON."""
+    """Remove ```json ... ``` fences if the LLM wrapped its JSON.
+
+    Args:
+        raw: Raw assistant text returned by the judge LLM.
+
+    Returns:
+        The body without surrounding triple-backtick fences.
+    """
     text = raw.strip()
     if text.startswith("```"):
         # Drop the opening fence (```json or just ```), keep the body.
@@ -284,7 +291,15 @@ def _strip_markdown_fences(raw: str) -> str:
 
 
 def _validate_scores(parsed: Any) -> dict[str, int] | None:
-    """Return the scores dict if it has all 6 keys with int 0/1 values; else None."""
+    """Validate that ``parsed`` carries six binary criterion scores.
+
+    Args:
+        parsed: Decoded JSON payload returned by the judge.
+
+    Returns:
+        Scores dict when every criterion has an ``int`` value in ``{0, 1}``,
+        otherwise ``None``.
+    """
     if not isinstance(parsed, dict):
         return None
     scores: dict[str, int] = {}
@@ -301,7 +316,12 @@ def _validate_scores(parsed: Any) -> dict[str, int] | None:
 
 
 def _record_prometheus(scores: dict[str, int], weighted_total: float) -> None:
-    """Push the per-criterion gauges, the weighted total, and a success counter."""
+    """Push per-criterion gauges, the weighted total and a success counter.
+
+    Args:
+        scores: Validated per-criterion 0/1 scores.
+        weighted_total: Equal-weighted aggregate score in ``[0, 1]``.
+    """
     for criterion, value in scores.items():
         JUDGE_CRITERION_SCORES.labels(criterion=criterion).set(value)
     JUDGE_WEIGHTED_TOTAL.set(weighted_total)
@@ -313,11 +333,16 @@ def _record_langfuse_scores(
     scores: dict[str, int],
     weighted_total: float,
 ) -> None:
-    """Attach per-criterion + weighted total scores to the originating trace.
+    """Attach per-criterion and weighted scores to the originating trace.
 
-    Uses the imperative client (not @observe / contextvars) because the
+    Uses the imperative client (not ``@observe`` / contextvars) because the
     workflow's root trace is already finalised by the time the judge task
-    runs. ``trace_id`` is required — pass an empty string to skip Langfuse.
+    runs. Pass an empty ``trace_id`` to skip Langfuse entirely.
+
+    Args:
+        trace_id: Langfuse trace id from the workflow, or ``""`` to skip.
+        scores: Validated per-criterion 0/1 scores.
+        weighted_total: Equal-weighted aggregate score in ``[0, 1]``.
     """
     if not trace_id or langfuse_client is None:
         return
@@ -342,11 +367,18 @@ def _record_langfuse_scores(
 
 
 def _call_judge_llm(query: str, response: str) -> str:
-    """Single GPT-5.2 chat completion. Returns raw assistant text.
+    """Run a single GPT-5.2 chat completion and return raw assistant text.
 
     Lazy import of ``openai`` so the module loads cleanly when the SDK
     is absent (judge disabled, dev environment). Caller decides whether
     to retry on the OpenAI-shaped exceptions raised here.
+
+    Args:
+        query: Original user question.
+        response: Final assistant response to evaluate.
+
+    Returns:
+        Raw text returned by the judge LLM (may include markdown fences).
     """
     from openai import OpenAI  # noqa: PLC0415 — lazy import, see docstring
 
@@ -385,22 +417,33 @@ def evaluate_response_async(
     response: str,
     query_type: str = "",
 ) -> dict[str, Any]:
-    """Score *response* against *query* on six criteria via GPT-5.2.
+    """Score ``response`` against ``query`` on six criteria via GPT-5.2.
 
     Records results into Prometheus (always, when judging happens) and
     Langfuse (only when ``trace_id`` is non-empty and the SDK is live).
     Returns a small status dict for Celery logging — judge results are
     *not* a result-backend concern, the dict is purely diagnostic.
 
+    Retry semantics: API-level errors retry up to ``max_retries`` with a
+    fixed 15s countdown; parse errors and soft-time-limit hits do not
+    retry (the same prompt typically produces the same broken output).
+
     Args:
-        trace_id: Langfuse trace id from workflow_task. Empty string when
-            Langfuse is disabled — judge still runs and writes Prometheus.
+        trace_id: Langfuse trace id from ``workflow_task``. Empty string
+            when Langfuse is disabled — judge still runs and writes
+            Prometheus metrics.
         query: Original user question.
         response: Final assistant response (post-guardrails).
-        query_type: Workflow classification (sql/rag/hybrid/simple).
-            Currently unused by the judge prompt itself but kept in the
-            signature so old in-flight Celery messages don't crash after
-            deploy and the field is available for future routing rules.
+        query_type: Workflow classification (``sql``/``rag``/``hybrid``/
+            ``simple``). Currently unused by the judge prompt itself but
+            kept in the signature so old in-flight Celery messages don't
+            crash after deploy and the field is available for future
+            routing rules.
+
+    Returns:
+        Diagnostic status dict with ``status`` (one of ``success``,
+        ``skipped``, ``parse_error``, ``api_error``) plus ``trace_id``
+        and, on success, ``scores`` and ``weighted_total``.
     """
     # Step A — kill switch. Settings re-read on each call so a docker
     # env flip is picked up without restarting the worker.

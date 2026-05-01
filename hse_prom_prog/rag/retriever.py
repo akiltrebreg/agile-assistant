@@ -44,7 +44,12 @@ _retriever: MultiModeRetriever | None = None
 
 
 def _build_vector_store() -> QdrantVectorStore:
-    """Create a QdrantVectorStore backed by the existing collection."""
+    """Create a ``QdrantVectorStore`` backed by the existing collection.
+
+    Returns:
+        Vector store wired to the configured Qdrant collection and the
+        shared HuggingFace embedding model.
+    """
     embeddings = get_embeddings()
     client = QdrantClient(url=settings.qdrant_url)
     collection = settings.qdrant_collection_name
@@ -68,7 +73,11 @@ def _build_vector_store() -> QdrantVectorStore:
 
 
 def get_vector_store() -> QdrantVectorStore:
-    """Return the module-level vector store singleton (lazy init)."""
+    """Return the module-level vector store singleton, creating it lazily.
+
+    Returns:
+        Cached ``QdrantVectorStore`` shared across the module.
+    """
     global _vector_store  # noqa: PLW0603
     if _vector_store is None:
         _vector_store = _build_vector_store()
@@ -79,7 +88,15 @@ def get_vector_store() -> QdrantVectorStore:
 
 
 def _point_to_document(point: models.ScoredPoint) -> Document:
-    """Convert a Qdrant ScoredPoint to a LangChain Document."""
+    """Convert a Qdrant ``ScoredPoint`` into a LangChain ``Document``.
+
+    Args:
+        point: Scored point returned by ``query_points``.
+
+    Returns:
+        ``Document`` with ``page_content`` and ``metadata`` taken from
+        the point payload (defaulting to empty values when missing).
+    """
     payload = point.payload or {}
     return Document(
         page_content=payload.get("page_content", ""),
@@ -98,6 +115,12 @@ class MultiModeRetriever:
     """
 
     def __init__(self, search_type: str, k: int) -> None:
+        """Initialize the multi-mode retriever.
+
+        Args:
+            search_type: One of ``"dense"``, ``"sparse"`` or ``"hybrid"``.
+            k: Number of points to request from Qdrant per call.
+        """
         self.search_type = search_type
         self.k = k
         self._client = QdrantClient(url=settings.qdrant_url)
@@ -110,6 +133,20 @@ class MultiModeRetriever:
 
     @observe(name="retrieval")
     def invoke(self, query: str, **_kwargs: Any) -> list[Document]:
+        """Run retrieval for ``query`` using the configured search mode.
+
+        Args:
+            query: User query to embed / tokenize.
+            **_kwargs: Ignored; accepted for LangChain ``Retriever``
+                interface compatibility.
+
+        Returns:
+            Up to ``self.k`` documents ranked by the active mode.
+
+        Raises:
+            ValueError: If ``self.search_type`` is not one of
+                ``"dense"``, ``"sparse"`` or ``"hybrid"``.
+        """
         langfuse_context.update_current_observation(
             input={"query": query, "search_type": self.search_type, "k": self.k},
         )
@@ -135,6 +172,15 @@ class MultiModeRetriever:
     # ── dense ────────────────────────────────────────────────
 
     def _dense_search(self, query: str) -> list[Document]:
+        """Run cosine-similarity search on the dense vector field.
+
+        Args:
+            query: User query text.
+
+        Returns:
+            Up to ``self.k`` documents ranked by dense similarity, with
+            retrieval metrics emitted as a side effect.
+        """
         vector = self._embeddings.embed_query(query)
         vector = truncate_vector(vector, self._target_dim, self._full_dim)
         start = time.time()
@@ -157,6 +203,18 @@ class MultiModeRetriever:
     # ── sparse (BM25) ───────────────────────────────────────
 
     def _sparse_search(self, query: str) -> list[Document]:
+        """Run BM25 search on the sparse vector field.
+
+        Falls back to ``_dense_search`` if the collection lacks the
+        sparse vector (older ingestions).
+
+        Args:
+            query: User query text.
+
+        Returns:
+            Up to ``self.k`` documents ranked by sparse score, or the
+            dense fallback when sparse vectors are unavailable.
+        """
         sparse_vec = embed_sparse(query)
         start = time.time()
         try:
@@ -187,13 +245,20 @@ class MultiModeRetriever:
     # ── hybrid (native Qdrant RRF fusion via prefetch) ──────
 
     def _hybrid_search(self, query: str) -> list[Document]:
-        """Dense + sparse search fused with Qdrant-native RRF.
+        """Run dense + sparse search fused with Qdrant-native RRF.
 
         Uses the ``prefetch`` API (Qdrant >= 1.7): two prefetch queries
         (dense and sparse) are executed server-side and merged via
         Reciprocal Rank Fusion before returning top-k results.
 
         Falls back to dense-only if sparse vectors are unavailable.
+
+        Args:
+            query: User query text.
+
+        Returns:
+            Up to ``self.k`` documents ranked by RRF, or the dense
+            fallback when the sparse field is missing.
         """
         dense_vector = self._embeddings.embed_query(query)
         dense_vector = truncate_vector(dense_vector, self._target_dim, self._full_dim)

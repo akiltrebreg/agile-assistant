@@ -45,6 +45,10 @@ def get_embeddings() -> HuggingFaceEmbeddings:
     Ensures the model snapshot is present locally (downloads from S3 if
     missing) and passes the local path to ``HuggingFaceEmbeddings`` so
     no Hub lookup happens at runtime.
+
+    Returns:
+        Configured ``HuggingFaceEmbeddings`` running on CPU with
+        normalized output vectors.
     """
     model_name_or_path = ensure_embedding_model_downloaded()
     return HuggingFaceEmbeddings(
@@ -62,6 +66,11 @@ def ensure_embedding_model_downloaded() -> str:
         configured. Falls back to ``settings.embedding_model`` (treated
         as a HuggingFace Hub ID) when ``s3_models_bucket`` is unset —
         useful for ad-hoc local runs without S3 credentials.
+
+    Raises:
+        RuntimeError: If the S3 download finishes without producing the
+            ``config.json`` snapshot marker, indicating an incomplete
+            model upload at the configured prefix.
     """
     bucket = settings.s3_models_bucket
     if not bucket:
@@ -104,6 +113,14 @@ def _download_model_from_s3(*, bucket: str, prefix: str, local_dir: Path) -> Non
     Mirrors the boto3-Yandex-Cloud convention used by ``database.load_csv``
     (creds from env, region default ``ru-central1``, custom endpoint).
     Streams files one at a time to keep memory flat for large snapshots.
+
+    Args:
+        bucket: S3 bucket holding the model snapshot.
+        prefix: Key prefix for the snapshot directory inside the bucket.
+        local_dir: Local destination directory (created if missing).
+
+    Raises:
+        RuntimeError: If no objects are found under the given prefix.
     """
     import boto3  # noqa: PLC0415  — heavy import, defer until first use
 
@@ -143,10 +160,18 @@ def _download_model_from_s3(*, bucket: str, prefix: str, local_dir: Path) -> Non
 
 
 def truncate_and_normalize(vector: list[float], dim: int) -> list[float]:
-    """Truncate *vector* to *dim* dimensions and L2-renormalize.
+    """Truncate ``vector`` to ``dim`` dimensions and L2-renormalize.
 
     After truncation the vector norm changes, so renormalization is
     critical for cosine similarity to remain meaningful.
+
+    Args:
+        vector: Source embedding to truncate.
+        dim: Target dimensionality (must be ``<= len(vector)``).
+
+    Returns:
+        New list of floats of length ``dim`` with unit L2 norm
+        (or all zeros if the truncated prefix had zero norm).
     """
     v = np.array(vector[:dim], dtype=np.float32)
     norm = np.linalg.norm(v)
@@ -159,7 +184,13 @@ def get_target_dim(full_dim: int) -> int:
     """Return the effective embedding dimension.
 
     If ``EMBEDDING_DIMENSION`` is configured, return that value;
-    otherwise return the model's native *full_dim*.
+    otherwise return the model's native ``full_dim``.
+
+    Args:
+        full_dim: The model's native embedding dimensionality.
+
+    Returns:
+        Effective dimensionality to use for indexing and querying.
     """
     if settings.embedding_dimension is not None:
         return settings.embedding_dimension
@@ -169,9 +200,18 @@ def get_target_dim(full_dim: int) -> int:
 def truncate_vectors(
     vectors: list[list[float]], target_dim: int, full_dim: int
 ) -> list[list[float]]:
-    """Truncate a batch of vectors if *target_dim* < *full_dim*.
+    """Truncate a batch of vectors when ``target_dim < full_dim``.
 
     Returns the original list unchanged when no truncation is needed.
+
+    Args:
+        vectors: Embeddings produced by the model.
+        target_dim: Effective dimensionality after truncation.
+        full_dim: Native dimensionality of the model output.
+
+    Returns:
+        Either the original list (when no truncation is required) or a
+        new list of truncated, L2-renormalized vectors.
     """
     if target_dim >= full_dim:
         return vectors
@@ -179,7 +219,17 @@ def truncate_vectors(
 
 
 def truncate_vector(vector: list[float], target_dim: int, full_dim: int) -> list[float]:
-    """Truncate a single vector if *target_dim* < *full_dim*."""
+    """Truncate a single vector when ``target_dim < full_dim``.
+
+    Args:
+        vector: Single embedding produced by the model.
+        target_dim: Effective dimensionality after truncation.
+        full_dim: Native dimensionality of the model output.
+
+    Returns:
+        The original ``vector`` unchanged, or a truncated and
+        L2-renormalized copy when truncation applies.
+    """
     if target_dim >= full_dim:
         return vector
     return truncate_and_normalize(vector, target_dim)

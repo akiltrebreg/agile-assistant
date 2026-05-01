@@ -19,11 +19,20 @@ def render_sidebar(
     on_new_chat: Callable[[], None] | None = None,
     on_select: Callable[[str], None] | None = None,
 ) -> None:
-    """Render the sidebar.
+    """Render the chat sidebar (logo, new-chat button, history list).
 
     Backwards-compatible: when the memory-layer kwargs are omitted the
     sidebar still shows the logo + "Clear chat" and nothing else — useful
     for tests or a stripped-down anonymous mode.
+
+    Args:
+        client: API client used to fetch the conversation list.
+        user_id: External user id; ``None`` enables legacy mode.
+        current_conversation_id: Active conversation, highlighted in the
+            list. ``None`` means no conversation is currently selected.
+        on_new_chat: Callback invoked when "Новый диалог" is clicked.
+        on_select: Callback invoked with the conversation id when an
+            entry in the history list is clicked.
     """
     with st.sidebar:
         _render_header()
@@ -46,6 +55,7 @@ def render_sidebar(
 
 
 def _render_header() -> None:
+    """Render the inline-SVG header logo at the top of the sidebar."""
     st.markdown(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50"'
         ' style="width:100%;max-width:200px;">'
@@ -66,6 +76,20 @@ def _render_conversation_controls(
     on_new_chat: Callable[[], None] | None,
     on_select: Callable[[str], None] | None,
 ) -> None:
+    """Render the "new chat" button and the conversation history list.
+
+    Side effect: triggers ``st.rerun()`` via the fallback path when no
+    ``on_new_chat`` callback is supplied.
+
+    Args:
+        client: API client used to fetch the conversation list.
+        user_id: External user id whose conversations to display.
+        current_conversation_id: Active conversation id (rendered with
+            ``"secondary"`` style instead of ``"tertiary"``).
+        on_new_chat: Callback invoked when the new-chat button is hit.
+        on_select: Callback invoked with the conversation id on clicks
+            in the history list.
+    """
     # "Новый диалог" is the only chat-control button — same mental model
     # as ChatGPT / Claude / Gemini. Closing the previous conversation
     # (so the worker schedules summarisation + profile refresh) happens
@@ -108,7 +132,16 @@ def _render_conversation_controls(
 
 
 def _format_conversation_label(conv: dict, now: datetime) -> str:
-    """Title (truncated) + relative time, on a single line for the button."""
+    """Build a single-line button label: truncated title plus relative time.
+
+    Args:
+        conv: Conversation dict with ``title`` and ``updated_at``.
+        now: Reference time used to compute the relative-time suffix.
+
+    Returns:
+        Label like ``"Some title · 5 мин"`` (or just the title when no
+        ``updated_at`` is available).
+    """
     title = (conv.get("title") or "Без названия").strip()
     if len(title) > _TITLE_LIMIT:
         title = title[:_TITLE_LIMIT].rstrip() + "…"
@@ -119,6 +152,15 @@ def _format_conversation_label(conv: dict, now: datetime) -> str:
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO-8601 string into a ``datetime``.
+
+    Args:
+        value: ISO-8601 timestamp, possibly ``None`` or malformed.
+
+    Returns:
+        Parsed ``datetime``, or ``None`` if the input is missing or not
+        a valid ISO-8601 string.
+    """
     if not value:
         return None
     try:
@@ -129,7 +171,18 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 
 def _relative_time_ru(then: datetime, now: datetime) -> str:  # noqa: PLR0911
-    """Human-readable delta in Russian: "5 мин", "вчера", "3 дня"."""
+    """Return a human-readable delta in Russian.
+
+    Examples include ``"только что"``, ``"5 мин"``, ``"вчера"`` and
+    ``"3 дн."``; deltas older than a month fall back to ``DD.MM``.
+
+    Args:
+        then: Earlier moment (assumed UTC if naive).
+        now: Reference (current) moment.
+
+    Returns:
+        Russian-language relative-time label.
+    """
     if then.tzinfo is None:
         then = then.replace(tzinfo=UTC)
     delta = now - then

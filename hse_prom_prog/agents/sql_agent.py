@@ -222,11 +222,12 @@ _llm_forced: Any = None
 
 
 def _init_llms() -> tuple[Any, Any]:
-    """Initialize both LLM variants (lazy, once).
+    """Initialize both LLM variants lazily on first use.
 
-    Returns (llm_forced, llm_free):
-      - llm_forced: tool_choice="any" — guarantees a tool call
-      - llm_free: no constraint — model can respond with text
+    Returns:
+        Tuple ``(llm_forced, llm_free)`` where ``llm_forced`` has
+        ``tool_choice="any"`` to guarantee a tool call and ``llm_free``
+        leaves the choice unconstrained so the model can finish with text.
     """
     global _llm_free, _llm_forced  # noqa: PLW0603
     if _llm_free is None:
@@ -246,7 +247,7 @@ _THINK_RE = re.compile(r"<think>[\s\S]*?</think>\s*", flags=re.DOTALL)
 
 
 def _strip_think(messages: list) -> list:
-    """Remove <think>…</think> blocks from prior AI messages to save tokens."""
+    """Remove ``<think>…</think>`` blocks from prior AI messages to save tokens."""
     cleaned = []
     for msg in messages:
         if isinstance(msg, AIMessage) and msg.content:
@@ -264,10 +265,11 @@ def _strip_think(messages: list) -> list:
 
 
 def _has_query_result(messages: list) -> bool:
-    """Check if run_query has returned a successful result AND no retry hint is pending.
+    """Return ``True`` when ``run_query`` succeeded and no retry hint is pending.
 
-    If the last message is a HumanMessage that came AFTER a successful tool result,
-    it's a retry hint — the model must call the tool again (stay in forced mode).
+    If the last message is a ``HumanMessage`` that came AFTER a successful
+    tool result, it's a retry hint — the model must call the tool again
+    (stay in forced mode).
     """
     last_ok_idx = -1
     for i, msg in enumerate(messages):
@@ -286,11 +288,11 @@ def _has_query_result(messages: list) -> bool:
 
 @observe(as_type="generation", name="sql_llm_call")
 def _call_model(state: AgentState) -> dict:
-    """Call the LLM with current messages.
+    """Call the LLM with the current messages.
 
-    Uses tool_choice="any" (forced) until the first successful
-    run_query result, then switches to free mode so the model
-    can finish with a text response.
+    Uses ``tool_choice="any"`` (forced) until the first successful
+    ``run_query`` result, then switches to free mode so the model can
+    finish with a text response.
     """
     llm_forced, llm_free = _init_llms()
     messages = _strip_think(state["messages"])
@@ -369,7 +371,7 @@ def _call_model(state: AgentState) -> dict:
 
 
 def _should_continue(state: AgentState) -> str:
-    """Route: if last message has tool_calls → tools, else → extract."""
+    """Route to ``tools`` when the last message has tool calls, else ``extract``."""
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and last.tool_calls:
         return "tools"
@@ -377,7 +379,7 @@ def _should_continue(state: AgentState) -> str:
 
 
 def _get_last_sqls(messages: list) -> list[str]:
-    """Extract all run_query SQL calls from message history."""
+    """Extract every ``run_query`` SQL string from message history."""
     sqls: list[str] = []
     for msg in messages:
         if isinstance(msg, AIMessage) and msg.tool_calls:
@@ -388,7 +390,7 @@ def _get_last_sqls(messages: list) -> list[str]:
 
 
 def _get_user_query(messages: list) -> str:
-    """Extract the original user question."""
+    """Return the original user question, or ``""`` if not present."""
     for msg in messages:
         if isinstance(msg, HumanMessage):
             return str(msg.content)
@@ -433,13 +435,19 @@ _PLACEHOLDER_PATTERNS = re.compile(
 
 
 def _semantic_check(user_query: str, sql: str) -> str | None:
-    """Return a hint string if SQL semantically mismatches the user query.
+    """Return a hint when the SQL semantically mismatches the user query.
 
     Detects four common errors:
-    1. Aggregation (AVG/SUM) without aggregator words in the question
-    2. MIN/MAX used instead of ORDER BY ... LIMIT 1 (loses feature_teams)
-    3. COUNT of tasks issued against metrics table (wrong granularity)
-    4. Placeholder leaked from prompt (e.g. WHERE feature_teams ILIKE '%team%')
+      1. Aggregation (``AVG`` / ``SUM``) without aggregator words in the question.
+      2. ``MIN`` / ``MAX`` used instead of ``ORDER BY ... LIMIT 1`` (loses
+         ``feature_teams``).
+      3. ``COUNT`` of tasks issued against the metrics table (wrong granularity).
+      4. Placeholder leaked from the prompt (e.g. ``WHERE feature_teams
+         ILIKE '%team%'``).
+
+    Returns:
+        Hint string for the retry message, or ``None`` when the SQL looks
+        consistent with the question.
     """
     is_metric_q = bool(_METRIC_WORDS.search(user_query))
     has_agg_word = bool(_AGG_WORDS.search(user_query))
@@ -493,7 +501,7 @@ def _semantic_check(user_query: str, sql: str) -> str | None:
 
 
 def _check_retry(state: AgentState) -> dict:
-    """Increment retry counter; add hints on SQL errors or semantic mismatch."""
+    """Increment the retry counter and add hints on SQL errors or semantic mismatch."""
     last = state["messages"][-1]
     retry = state.get("retry_count", 0)
     extra_messages: list = []
@@ -542,7 +550,7 @@ def _check_retry(state: AgentState) -> dict:
 
 
 def _after_tools(state: AgentState) -> str:
-    """After tool execution: if max retries → extract, else → model."""
+    """Route after tool execution: ``extract`` at max retries, otherwise ``model``."""
     retry = state.get("retry_count", 0)
     if retry >= _MAX_RETRIES:
         return "extract"
@@ -550,7 +558,11 @@ def _after_tools(state: AgentState) -> str:
 
 
 def _collect_successful_sqls(messages: list) -> tuple[list[str], str, str]:
-    """Walk messages, return (successful_sqls, last_attempted_sql, last_error)."""
+    """Walk messages and split them into successful and failed ``run_query`` calls.
+
+    Returns:
+        Tuple ``(successful_sqls, last_attempted_sql, last_error)``.
+    """
     tc_id_to_sql: dict[str, str] = {}
     successful: list[str] = []
     error = ""
@@ -572,7 +584,7 @@ def _collect_successful_sqls(messages: list) -> tuple[list[str], str, str]:
 
 
 def _extract_results(state: AgentState) -> dict:
-    """Re-execute successful SQLs to get full rows (tool returns only a sample).
+    """Re-execute successful SQLs to get full rows (the tool returns only a sample).
 
     For parallel tool-calls (cross-table), concatenates rows from all queries.
     """
@@ -598,7 +610,7 @@ def _extract_results(state: AgentState) -> dict:
 
 
 def _build_graph() -> Any:
-    """Build the LangGraph state graph."""
+    """Build and compile the LangGraph state graph for the SQL agent."""
     tool_node = ToolNode(SQL_TOOLS)
 
     graph = StateGraph(AgentState)
@@ -634,12 +646,24 @@ def _build_graph() -> Any:
 
 
 class SQLAgent:
-    """LangGraph SQL Agent with tool calling.
+    """LangGraph-based SQL agent with tool calling.
 
-    Drop-in replacement: same process() signature as the old agent.
+    Drop-in replacement for the previous direct-prompt agent: exposes the
+    same :meth:`process` signature.
+
+    Attributes:
+        db: Lazily-bound database connection used by ``run_query`` and the
+            ``_extract_results`` re-execution pass.
     """
 
     def __init__(self, db_connection: DatabaseConnection | None = None) -> None:
+        """Initialize the SQL agent and compile its graph.
+
+        Args:
+            db_connection: Optional database connection. When ``None`` the
+                connection is resolved lazily via :func:`get_database` on
+                the first :meth:`process` call.
+        """
         self.db = db_connection
         self._graph = _build_graph()
         logger.info(
@@ -649,6 +673,7 @@ class SQLAgent:
         )
 
     def _ensure_db(self) -> None:
+        """Resolve ``self.db`` lazily on first use."""
         if not self.db:
             self.db = get_database()
 
@@ -656,10 +681,11 @@ class SQLAgent:
         """Process a user query through the LangGraph SQL agent.
 
         Args:
-            state: Workflow state with 'original_query'.
+            state: Workflow state with ``original_query``.
 
         Returns:
-            dict with sql_query, sql_result, error, original_query.
+            Dict with ``sql_query``, ``sql_result``, ``error``,
+            ``original_query``.
         """
         original_query = state.get("original_query", "")
         intent = state.get("intent") or "unknown"
@@ -785,7 +811,7 @@ def _format_team_line(value: Any) -> str | None:
 
 
 def _format_metric_line(value: Any) -> str | None:
-    """Format ``metric_name`` as a column-pointer line."""
+    """Format ``metric_name`` as a column-pointer hint line."""
     if isinstance(value, str) and value.strip():
         return (
             f"- интересующая метрика — колонка `{value.strip()}` в report_agile_dashboard_metrics"
@@ -856,7 +882,7 @@ def _extract_previous_sql(ctx: ConversationContext | None) -> str | None:
 
 
 def _parse_tool_result(content: str) -> list[dict[str, Any]]:
-    """Parse the JSON output of run_query into list[dict]."""
+    """Parse the JSON output of ``run_query`` into ``list[dict]``."""
     with contextlib.suppress(json.JSONDecodeError, TypeError):
         payload = json.loads(content)
         if isinstance(payload, dict) and "rows" in payload:

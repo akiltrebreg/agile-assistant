@@ -58,7 +58,14 @@ user_id: str = st.session_state.user_id
 
 
 def _load_messages_from_api(conversation_id: str) -> list[dict]:
-    """Fetch the full transcript and shape it for st.chat_message."""
+    """Fetch the full transcript and shape it for ``st.chat_message``.
+
+    Args:
+        conversation_id: Conversation whose history to render.
+
+    Returns:
+        List of ``{"role", "content"}`` dicts in display order.
+    """
     transcript = client.get_messages(conversation_id)
     return [{"role": msg["role"], "content": msg["content"]} for msg in transcript]
 

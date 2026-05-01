@@ -1,4 +1,8 @@
-"""Domain models for HSE Prom Prog."""
+"""Expose domain models for HSE Prom Prog.
+
+Re-exports memory and task models so callers can import the public
+domain surface from a single place.
+"""
 
 from hse_prom_prog.models.memory import (
     Conversation,

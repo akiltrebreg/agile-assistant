@@ -27,9 +27,11 @@ class QueueLengthCollector:
     """
 
     def __init__(self) -> None:
+        """Initialize the collector without opening a Redis connection."""
         self._client: redis.Redis | None = None
 
     def _get_client(self) -> redis.Redis:
+        """Return the cached Redis client, creating it on first use."""
         if self._client is None:
             self._client = redis.Redis(
                 host=settings.redis_host,
@@ -42,6 +44,11 @@ class QueueLengthCollector:
         return self._client
 
     def collect(self):
+        """Yield the queue-length gauge for the current scrape.
+
+        Reads ``LLEN celery`` once per scrape. On Redis errors the cached
+        client is reset so the next scrape retries with a fresh socket.
+        """
         family = GaugeMetricFamily(
             "agile_assistant_celery_queue_length",
             "Number of tasks waiting in Redis queue (LLEN celery)",

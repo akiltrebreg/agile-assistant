@@ -72,6 +72,12 @@ def _load_table(conn: psycopg2.extensions.connection, table: str, csv_path: Path
 
 
 def main() -> None:
+    """Download configured CSVs from S3 and load each into PostgreSQL.
+
+    Exits with code 1 when ``S3_DATA_BUCKET`` is not configured. Each
+    table is truncated and rebuilt via ``COPY FROM STDIN`` inside a
+    single connection that is closed in a ``finally`` block.
+    """
     if not settings.s3_data_bucket:
         logger.error("S3_DATA_BUCKET is not configured")
         sys.exit(1)

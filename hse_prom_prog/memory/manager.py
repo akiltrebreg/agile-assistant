@@ -40,6 +40,16 @@ class MemoryManager:
         context_builder: ContextBuilder | None = None,
         profile_extractor: ProfileExtractor | None = None,
     ) -> None:
+        """Initialize MemoryManager.
+
+        Args:
+            db: Database connection shared by every collaborator.
+            conversation_repo: Optional override for the conversation repo.
+            profile_repo: Optional override for the profile repo.
+            summary_repo: Optional override for the summary repo.
+            context_builder: Optional override for the context builder.
+            profile_extractor: Optional override for the profile extractor.
+        """
         self.db = db
         self.conversation_repo = conversation_repo or ConversationRepository(db)
         self.profile_repo = profile_repo or ProfileRepository(db)
@@ -56,11 +66,27 @@ class MemoryManager:
         conversation_id: UUID | None,
         user_id: UUID | None,
     ) -> Conversation:
-        """Return an existing conversation or create a fresh one."""
+        """Return an existing conversation or create a fresh one.
+
+        Args:
+            conversation_id: Caller-provided conversation id, or ``None``.
+            user_id: Owner of the conversation, or ``None`` for anonymous.
+
+        Returns:
+            The existing or newly created ``Conversation``.
+        """
         return self.conversation_repo.get_or_create(conversation_id, user_id)
 
     def get_context(self, conversation_id: UUID, token_budget: int) -> ConversationContext:
-        """Assemble the short-term memory context for an agent prompt."""
+        """Assemble the short-term memory context for an agent prompt.
+
+        Args:
+            conversation_id: Conversation whose history to assemble.
+            token_budget: Maximum estimated tokens the context may occupy.
+
+        Returns:
+            ``ConversationContext`` ready to inject into a prompt.
+        """
         return self.context_builder.build(conversation_id, token_budget)
 
     def save_turn(
@@ -72,10 +98,22 @@ class MemoryManager:
     ) -> tuple[int, int]:
         """Persist a user/assistant turn pair.
 
-        Returns the ``(user_turn_index, assistant_turn_index)`` actually
-        written. Handles the UNIQUE(conversation_id, turn_index) race by
-        re-reading the max turn_index and retrying a few times — cheaper
-        than SELECT … FOR UPDATE on every save for our traffic profile.
+        Handles the UNIQUE(conversation_id, turn_index) race by re-reading
+        the max turn_index and retrying a few times — cheaper than
+        SELECT … FOR UPDATE on every save for our traffic profile.
+
+        Args:
+            conversation_id: Conversation receiving the turn.
+            user_message: User-side message body.
+            bot_message: Assistant-side message body.
+            metadata: Optional metadata bag attached to both messages.
+
+        Returns:
+            Tuple ``(user_turn_index, assistant_turn_index)`` actually written.
+
+        Raises:
+            IntegrityError: When the turn_index race cannot be resolved
+                within ``SAVE_TURN_MAX_RETRIES`` attempts.
         """
         metadata = metadata or {}
 
@@ -132,12 +170,26 @@ class MemoryManager:
     # ------------------------------------------------------------------ #
 
     def get_profile(self, user_id: UUID) -> dict[str, Any] | None:
-        """Return the user profile as a plain dict, or ``None``."""
+        """Return the user profile as a plain dict, or ``None``.
+
+        Args:
+            user_id: Internal user identifier.
+
+        Returns:
+            Profile dict, or ``None`` when the profile does not exist.
+        """
         profile = self.profile_repo.get(user_id)
         return profile.to_dict() if profile else None
 
     def get_or_create_profile_by_external_id(self, external_id: str) -> dict[str, Any]:
-        """Resolve an external id (e.g. cookie UUID) to a profile dict."""
+        """Resolve an external id (e.g. cookie UUID) to a profile dict.
+
+        Args:
+            external_id: External (cookie / SSO) identifier.
+
+        Returns:
+            Profile dict for the resolved user.
+        """
         return self.profile_repo.get_or_create(external_id).to_dict()
 
     def update_profile(self, user_id: UUID, conversation_id: UUID) -> dict[str, Any]:
@@ -146,6 +198,13 @@ class MemoryManager:
         Aggregates metadata across *all* messages in the given conversation.
         The wider scope (all conversations of a user) is a separate job —
         this method is the per-turn lightweight update.
+
+        Args:
+            user_id: Internal user whose profile to update.
+            conversation_id: Conversation whose metadata feeds the recompute.
+
+        Returns:
+            The freshly persisted ``preferences`` dict.
         """
         messages = self.conversation_repo.get_messages(conversation_id)
         metadata_list = [m.metadata for m in messages if m.metadata]

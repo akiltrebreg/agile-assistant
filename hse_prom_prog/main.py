@@ -1,7 +1,9 @@
-"""Main entry point for the HSE Prom Prog CLI application.
+"""CLI entry point for the Agile AI Assistant workflow.
 
-This module provides the command-line interface for running the
-multi-agent Jira query processing workflow.
+Wires up logging, the LLM client, and the LangGraph workflow, then runs a
+single user query end-to-end and prints the final response. Used for ad-hoc
+checks against a live deployment; the production path is the FastAPI service
+plus Celery workers.
 """
 
 import logging
@@ -13,7 +15,13 @@ from hse_prom_prog.llm.client import get_llm_client
 
 
 def setup_logging() -> None:
-    """Configure logging for the application."""
+    """Configure root logger with stdout handler at the configured level.
+
+    Reads ``settings.log_level`` (DEBUG/INFO/WARNING/ERROR/CRITICAL) and
+    installs a single StreamHandler writing to stdout. Idempotent only
+    insofar as ``logging.basicConfig`` is idempotent: subsequent calls
+    have no effect once a handler is attached.
+    """
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper()),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -24,15 +32,21 @@ def setup_logging() -> None:
 
 
 def print_separator() -> None:
-    """Print a visual separator line."""
+    """Print a 60-character ``=`` separator surrounded by blank lines."""
     print("\n" + "=" * 60 + "\n")
 
 
 def main(query: str | None = None) -> None:
-    """Main function to run the Agile AI Assistant workflow.
+    """Run the workflow on a single query and print the final response.
 
     Args:
-        query: Optional user query. If not provided, will use CLI argument.
+        query: User question to process. When ``None`` (the default), the
+            CLI argv is joined into a single string; if argv is empty,
+            usage is printed and the process exits with code 1.
+
+    Raises:
+        SystemExit: With code 0 on Ctrl+C, code 1 on missing argv or any
+            unhandled workflow exception.
     """
     setup_logging()
     logger = logging.getLogger(__name__)
