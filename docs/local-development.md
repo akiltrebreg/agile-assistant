@@ -64,7 +64,7 @@ pip install awscli
 docker run -d --gpus all --name vllm-server -p 8000:8000 \
     -v /models:/models \
     vllm/vllm-openai:v0.8.5 \
-    --model /models/avibe-gptq-8bit --quantization gptq --dtype float16 --max-model-len 8192
+    --model /models/avibe-gptq-8bit --quantization gptq --dtype float16 --max-model-len 6144
 ```
 
 ## Шаг 4: Запуск приложения

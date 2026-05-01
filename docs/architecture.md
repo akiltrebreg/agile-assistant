@@ -132,7 +132,7 @@
   `SummaryRepository` + `ContextBuilder` + `ProfileExtractor`. Единственная
   точка входа из workflow и Celery
 - **ContextBuilder** — sliding window по токен-бюджету (`HISTORY_TOKEN_BUDGET`,
-  1200 токенов): последние полные ходы, всё выпавшее покрывается rolling summary
+  800 токенов): последние полные ходы, всё выпавшее покрывается rolling summary
 - **ProfileExtractor** — детерминированный rule-based анализ, без LLM:
   `default_team`, `frequent_metrics`, `recent_sprints`, `dominant_query_types`
 - **Анафорический carry-forward** — слой 6 в
