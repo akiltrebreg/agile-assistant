@@ -145,71 +145,37 @@ if prompt := st.chat_input("Введите запрос..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Assistant response with progress tracking
-    with (
-        st.chat_message("assistant"),
-        st.status("Обрабатываю запрос...", expanded=True) as status_box,
-    ):
+    # Assistant response. Spinner shows "Обрабатываю запрос..." with a
+    # left-side wheel; once the block exits, the spinner disappears and
+    # the rendered answer stays in the chat bubble.
+    with st.chat_message("assistant"):
         try:
-            # 1. Submit task (carry memory identifiers)
-            st.write("Отправляю задачу в очередь...")
-            create_resp = client.submit_task(
-                prompt,
-                conversation_id=st.session_state.conversation_id,
-                user_id=user_id,
-            )
-            task_id = create_resp["task_id"]
-            new_conv_id = create_resp.get("conversation_id")
-            # Pin the conversation so a refresh restores this chat. The
-            # very first message of a fresh chat also lands here.
-            if new_conv_id and new_conv_id != st.session_state.conversation_id:
-                st.session_state.conversation_id = new_conv_id
-                pin_conversation_id(new_conv_id)
-
-            # 2. Poll for result
-            st.write("Ожидаю результат...")
-            deadline = time.time() + POLL_TIMEOUT_SEC
-            task_data: dict = {}
-
-            processing_shown = False
-            while time.time() < deadline:
-                task_data = client.get_task(task_id)
-                task_status = task_data.get("status", "")
-
-                if task_status == "COMPLETED":
-                    status_box.update(
-                        label="Готово",
-                        state="complete",
-                        expanded=False,
-                    )
-                    break
-
-                if task_status == "FAILED":
-                    status_box.update(
-                        label="Ошибка",
-                        state="error",
-                        expanded=False,
-                    )
-                    break
-
-                # Still processing
-                if task_status == "PROCESSING" and not processing_shown:
-                    st.write("Задача обрабатывается...")
-                    processing_shown = True
-                time.sleep(POLL_INTERVAL_SEC)
-            else:
-                # Timeout
-                status_box.update(
-                    label="Таймаут",
-                    state="error",
-                    expanded=False,
+            with st.spinner("Обрабатываю запрос..."):
+                create_resp = client.submit_task(
+                    prompt,
+                    conversation_id=st.session_state.conversation_id,
+                    user_id=user_id,
                 )
-                timeout_msg = render_timeout()
-                st.warning(timeout_msg)
-                st.session_state.messages.append({"role": "assistant", "content": timeout_msg})
-                st.stop()
+                task_id = create_resp["task_id"]
+                new_conv_id = create_resp.get("conversation_id")
+                if new_conv_id and new_conv_id != st.session_state.conversation_id:
+                    st.session_state.conversation_id = new_conv_id
+                    pin_conversation_id(new_conv_id)
 
-            # 3. Display result
+                deadline = time.time() + POLL_TIMEOUT_SEC
+                task_data: dict = {}
+                while time.time() < deadline:
+                    task_data = client.get_task(task_id)
+                    task_status = task_data.get("status", "")
+                    if task_status in ("COMPLETED", "FAILED"):
+                        break
+                    time.sleep(POLL_INTERVAL_SEC)
+                else:
+                    timeout_msg = render_timeout()
+                    st.warning(timeout_msg)
+                    st.session_state.messages.append({"role": "assistant", "content": timeout_msg})
+                    st.stop()
+
             final_status = task_data.get("status", "")
             if final_status == "COMPLETED":
                 # The worker may have rotated the conversation (e.g. the
@@ -229,11 +195,6 @@ if prompt := st.chat_input("Введите запрос..."):
             st.session_state.messages.append({"role": "assistant", "content": answer})
 
         except Exception as exc:
-            status_box.update(
-                label="Ошибка соединения",
-                state="error",
-                expanded=False,
-            )
             err_text = f"Не удалось связаться с API:\n\n`{exc}`"
             st.error(err_text)
             st.session_state.messages.append({"role": "assistant", "content": err_text})
