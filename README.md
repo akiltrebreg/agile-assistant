@@ -352,10 +352,18 @@ Langfuse получает трейсы каждого запроса с полн
 
 - **Версия**: Qdrant v1.13.2
 - **Коллекция**: `business_docs` (настраивается через `QDRANT_COLLECTION_NAME`)
-- **Dense vectors**: `intfloat/multilingual-e5-base` (768-мерные, cosine
-  similarity, мультиязычные — поддержка русского языка)
+- **Dense vectors**: модель `intfloat/multilingual-e5-base` (768-мерные, cosine
+  similarity, мультиязычные — поддержка русского языка). В `.env` это
+  `EMBEDDING_MODEL=multilingual-e5-base` — имя папки в S3 / локальном кэше,
+  **не** Hub ID с org-префиксом (см. Шаг 6 Quickstart)
 - **Sparse vectors**: BM25 через `fastembed` (по умолчанию) или BGE-M3 learned
   sparse (`EMBEDDING_SPARSE_MODEL=BAAI/bge-m3`)
+- **Загрузка модели**: snapshot подтягивается из
+  `s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/${EMBEDDING_MODEL}/` в кэш
+  `EMBEDDING_MODEL_CACHE_DIR` (по умолчанию `/app/models/`). Сначала это делает
+  compose-job `download-embedding-model`, при пустом volume — runtime-страховка
+  в `embeddings.ensure_embedding_model_downloaded()`. HuggingFace Hub в
+  продакшене не дёргается
 - **Документы**: PDF и Markdown из `knowledge_base/` (Agile-практики, описания
   метрик, внутренние регламенты)
 - **Ingestion pipeline**: загрузка из S3 (или локальной `knowledge_base/`) →
@@ -693,6 +701,20 @@ docker compose run --rm app python -m hse_prom_prog.rag.ingest
 `load-data` скачивает CSV из `S3_DATA_BUCKET` и загружает в PostgreSQL. `ingest`
 скачивает документы из `S3_KB_BUCKET` и индексирует в Qdrant. Без этих шагов
 SQL-запросы и RAG-запросы не будут работать.
+
+При первом запуске `ingest` дополнительно подтянет embedding-модель из
+`s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/${EMBEDDING_MODEL}/` в локальный кэш
+(`EMBEDDING_MODEL_CACHE_DIR`, по умолчанию `/app/models/`). Это
+runtime-страховка к compose-job `download-embedding-model` (Шаг 3) — если volume
+пустой, модель всё равно появится перед началом индексации.
+
+> **Важно** — контракт `EMBEDDING_MODEL`: когда `S3_MODELS_BUCKET` задан, это
+> **имя папки в S3 / локальном кэше**, а не HuggingFace Hub ID. Правильное
+> значение — `multilingual-e5-base`. Если поставить
+> `intfloat/multilingual-e5-base` (Hub ID с org-префиксом), ingest полезет в
+> `s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/intfloat/multilingual-e5-base/`,
+> где снапшота нет, и упадёт с `RuntimeError: No objects found ...`. Hub ID
+> допустим только в fallback-режиме (`S3_MODELS_BUCKET=` пустой).
 
 ### Шаг 7: API + воркеры + UI
 
