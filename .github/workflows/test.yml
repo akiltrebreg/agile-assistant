@@ -69,11 +69,10 @@ jobs:
       - name: Install dependencies
         # ``--no-interaction`` so a creds prompt never blocks CI.
         # ``--no-ansi`` keeps logs grep-friendly.
-        # ``--group dev`` enables the PEP 735 ``[dependency-groups] dev``
-        # block (pytest, pytest-cov, ruff, ...). Poetry 2.x distinguishes
-        # this from its own ``[tool.poetry.group.<name>.dependencies]``
-        # which is activated via ``--with``. Our pyproject.toml uses PEP 735.
-        run: poetry install --no-interaction --no-ansi --group dev
+        # ``--with dev`` includes the ``[tool.poetry.group.dev.dependencies]``
+        # block (pytest, pytest-cov, ruff, ...). Non-default groups are
+        # opt-in in Poetry 2.x, so without this flag pytest is missing.
+        run: poetry install --no-interaction --no-ansi --with dev
 
       - name: Run unit + contract tests with coverage
         # Integration suite is excluded by design — it needs a real DB,
