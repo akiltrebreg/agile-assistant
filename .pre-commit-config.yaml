@@ -16,6 +16,7 @@ repos:
       - id: end-of-file-fixer
         exclude: "^eval/results/.*$"
       - id: trailing-whitespace
+        exclude: "^eval/results/.*$"
       - id: check-case-conflict
       - id: mixed-line-ending
 

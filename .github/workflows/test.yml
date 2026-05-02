@@ -47,7 +47,11 @@ jobs:
           cache: "pip"
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        # Poetry 2.x is required because pyproject.toml uses PEP 735
+        # ``[dependency-groups]`` (and PEP 621 ``[project]``) instead of the
+        # legacy ``[tool.poetry]`` block. Poetry 1.x falls back with
+        # ``[tool.poetry] section not found``.
+        run: pipx install poetry==2.0.1
 
       - name: Configure Poetry
         run: |
