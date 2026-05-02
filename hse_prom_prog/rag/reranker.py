@@ -2,18 +2,27 @@
 
 Loads a CrossEncoder model once as a module-level singleton (lazy init).
 Provides reranking, threshold filtering, and "Lost in the Middle" reordering.
+
+The model snapshot is downloaded once from Yandex Cloud Object Storage on
+first use (``s3://{s3_models_bucket}/{s3_models_path}/{reranker_model}/``)
+and cached under ``settings.embedding_model_cache_dir`` — the same
+volume + the same idiom used for the embedding model snapshot. The
+HuggingFace Hub is never contacted unless ``s3_models_bucket`` is unset
+(back-compat fallback for ad-hoc local runs without Yandex creds).
 """
 
 from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sentence_transformers import CrossEncoder
 
 from hse_prom_prog.config import settings
 from hse_prom_prog.metrics import RAG_CHUNKS_AFTER_RERANKER, RAG_RERANKER_DURATION
+from hse_prom_prog.rag.embeddings import _HF_SNAPSHOT_MARKER, _download_model_from_s3
 from hse_prom_prog.tracing import langfuse_context, observe
 
 if TYPE_CHECKING:
@@ -171,15 +180,68 @@ class Reranker:
         return result
 
 
+def ensure_reranker_model_downloaded() -> str:
+    """Return the local reranker path, downloading from S3 first if needed.
+
+    Mirrors :func:`hse_prom_prog.rag.embeddings.ensure_embedding_model_downloaded`:
+    when ``s3_models_bucket`` is set, the snapshot at
+    ``s3://{s3_models_bucket}/{s3_models_path}/{reranker_model}/`` is
+    mirrored into ``embedding_model_cache_dir`` and the local path is
+    returned. The presence of ``config.json`` is the cache-hit marker —
+    second call short-circuits without touching S3.
+
+    Returns:
+        Local filesystem path to the reranker directory if S3 is
+        configured. Falls back to ``settings.reranker_model`` (treated
+        as a HuggingFace Hub ID) when ``s3_models_bucket`` is unset.
+
+    Raises:
+        RuntimeError: If the S3 download finishes without producing the
+            ``config.json`` snapshot marker, indicating an incomplete
+            model upload at the configured prefix.
+    """
+    bucket = settings.s3_models_bucket
+    if not bucket:
+        logger.warning(
+            "[Reranker] s3_models_bucket is empty — falling back to HuggingFace Hub ID %r",
+            settings.reranker_model,
+        )
+        return settings.reranker_model
+
+    cache_root = Path(settings.embedding_model_cache_dir)
+    model_dir = cache_root / settings.reranker_model
+    marker = model_dir / _HF_SNAPSHOT_MARKER
+
+    if marker.exists():
+        logger.info("[Reranker] Model snapshot present at %s — skipping S3 download", model_dir)
+        return str(model_dir)
+
+    prefix = f"{settings.s3_models_path.rstrip('/')}/{settings.reranker_model}".lstrip("/")
+    _download_model_from_s3(bucket=bucket, prefix=prefix, local_dir=model_dir)
+
+    if not marker.exists():
+        msg = (
+            f"S3 download finished but {marker} is missing — "
+            f"verify s3://{bucket}/{prefix}/ contains a HuggingFace snapshot"
+        )
+        raise RuntimeError(msg)
+
+    return str(model_dir)
+
+
 def _build_reranker() -> Reranker:
     """Build a ``Reranker`` from application settings.
 
+    Resolves the model snapshot via :func:`ensure_reranker_model_downloaded`
+    so the local path is passed to ``CrossEncoder`` — no Hub lookup
+    happens at runtime when S3 is configured.
+
     Returns:
-        Reranker configured with ``settings.reranker_model``,
+        Reranker configured with the resolved model path,
         ``settings.reranker_threshold`` and ``settings.reranker_top_n``.
     """
     return Reranker(
-        model_name=settings.reranker_model,
+        model_name=ensure_reranker_model_downloaded(),
         threshold=settings.reranker_threshold,
         top_n=settings.reranker_top_n,
     )

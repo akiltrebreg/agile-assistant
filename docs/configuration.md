@@ -104,12 +104,12 @@
 
 ## Reranker Configuration
 
-| Переменная           | Описание                               | По умолчанию              |
-| -------------------- | -------------------------------------- | ------------------------- |
-| `RERANKER_ENABLED`   | Включить cross-encoder reranking       | `true`                    |
-| `RERANKER_MODEL`     | Модель реранкера                       | `BAAI/bge-reranker-v2-m3` |
-| `RERANKER_THRESHOLD` | Минимальный скор для фильтрации чанков | `0.01`                    |
-| `RERANKER_TOP_N`     | Число чанков после реранкинга          | `4`                       |
+| Переменная           | Описание                                                                                               | По умолчанию         |
+| -------------------- | ------------------------------------------------------------------------------------------------------ | -------------------- |
+| `RERANKER_ENABLED`   | Включить cross-encoder reranking                                                                       | `true`               |
+| `RERANKER_MODEL`     | Имя папки в S3 / локальном кэше для cross-encoder reranker (не Hub ID при заданном `S3_MODELS_BUCKET`) | `bge-reranker-v2-m3` |
+| `RERANKER_THRESHOLD` | Минимальный скор для фильтрации чанков                                                                 | `0.01`               |
+| `RERANKER_TOP_N`     | Число чанков после реранкинга                                                                          | `4`                  |
 
 ## Redis Configuration
 

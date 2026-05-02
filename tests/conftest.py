@@ -28,6 +28,14 @@ import pytest
 os.environ.setdefault("LANGFUSE_ENABLED", "false")
 os.environ.setdefault("JUDGE_ENABLED", "false")
 
+# Disable cross-encoder reranker by default in the test suite. Constructing
+# Reranker eagerly triggers ensure_reranker_model_downloaded(), which would
+# try to write into ``embedding_model_cache_dir`` (defaults to ``/app/models``,
+# unwritable on a host pytest run). Tests that exercise the reranker path
+# patch ``rag_agent.get_reranker`` directly so this default doesn't hide
+# regressions in that branch.
+os.environ.setdefault("RERANKER_ENABLED", "false")
+
 
 # --------------------------------------------------------------------- #
 # LLM

@@ -235,8 +235,15 @@ class Settings(BaseSettings):
         description="Enable cross-encoder reranking stage",
     )
     reranker_model: str = Field(
-        default="BAAI/bge-reranker-v2-m3",
-        description="Cross-encoder model for reranking",
+        default="bge-reranker-v2-m3",
+        description=(
+            "Cross-encoder model for reranking. When s3_models_bucket is set, "
+            "this is the folder name inside s3://{s3_models_bucket}/{s3_models_path}/ "
+            "and the snapshot is downloaded on first use (cached under "
+            "embedding_model_cache_dir). When the bucket is None (or empty), the "
+            "value is passed straight to HuggingFace as a Hub ID (back-compat "
+            "fallback). Default folder corresponds to BAAI/bge-reranker-v2-m3."
+        ),
     )
     reranker_threshold: float = Field(
         default=0.01,

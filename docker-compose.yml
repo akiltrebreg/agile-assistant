@@ -186,6 +186,38 @@ services:
     networks:
       - hse-network
 
+  # Download cross-encoder reranker (BAAI/bge-reranker-v2-m3) from Yandex Cloud
+  # S3 into the same shared volume as the embedding model. Matches the
+  # download-embedding-model pattern and removes the runtime HuggingFace Hub
+  # dependency in celery-worker. ensure_reranker_model_downloaded() in
+  # rag/reranker.py is the runtime safety net for ad-hoc / non-compose runs.
+  download-reranker-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/bge-reranker-v2-m3/config.json ]; then
+          echo "bge-reranker-v2-m3 already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading bge-reranker-v2-m3 from S3..."
+        aws s3 sync \
+          s3://${S3_MODELS_BUCKET:-quant-models-agile}/${S3_MODELS_PATH:-models}/bge-reranker-v2-m3/ \
+          /models/bge-reranker-v2-m3/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/bge-reranker-v2-m3/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/bge-reranker-v2-m3/
+    volumes:
+      - embedding-models:/models
+    networks:
+      - hse-network
+
   # vLLM for SQL Agent (Qwen3-8B-AWQ, port 8001)
   vllm-sql:
     image: vllm/vllm-openai:v0.9.1
@@ -348,6 +380,8 @@ services:
         condition: service_healthy
       download-embedding-model:
         condition: service_completed_successfully
+      download-reranker-model:
+        condition: service_completed_successfully
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
@@ -411,6 +445,8 @@ services:
       qdrant:
         condition: service_healthy
       download-embedding-model:
+        condition: service_completed_successfully
+      download-reranker-model:
         condition: service_completed_successfully
     environment:
       - DEBUG=false
@@ -810,8 +846,9 @@ volumes:
   qdrant_data:
   prometheus_data:
   grafana_data:
-  # Shared embedding-model snapshot, populated by download-embedding-model
-  # and consumed by api / celery-worker via /app/models mount.
+  # Shared model snapshots (embedding + reranker), populated by
+  # download-embedding-model + download-reranker-model and consumed by
+  # api / celery-worker via /app/models mount.
   embedding-models:
 
 networks:

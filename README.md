@@ -394,12 +394,13 @@ docker compose ps postgres redis qdrant
 ### Шаг 3: Скачивание моделей из S3
 
 ```bash
-docker compose up download-model download-sql-model download-embedding-model
+docker compose up download-model download-sql-model download-embedding-model download-reranker-model
 ```
 
-Эти job-контейнеры заливают `avibe-gptq-8bit`, `qwen3-8b-awq-4bit` и
-`multilingual-e5-base` в общие Docker volumes. Каждый job сам проверяет, что
-модель уже на диске, и пропускает скачивание — повторный запуск идемпотентен.
+Эти job-контейнеры заливают `avibe-gptq-8bit`, `qwen3-8b-awq-4bit`,
+`multilingual-e5-base` и `bge-reranker-v2-m3` в общие Docker volumes. Каждый job
+сам проверяет, что модель уже на диске, и пропускает скачивание — повторный
+запуск идемпотентен.
 
 ### Шаг 4: vLLM-серверы
 
@@ -444,19 +445,23 @@ docker compose run --rm app python -m hse_prom_prog.rag.ingest
 скачивает документы из `S3_KB_BUCKET` и индексирует в Qdrant. Без этих шагов
 SQL-запросы и RAG-запросы не будут работать.
 
-При первом запуске `ingest` дополнительно подтянет embedding-модель из
-`s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/${EMBEDDING_MODEL}/` в локальный кэш
-(`EMBEDDING_MODEL_CACHE_DIR`, по умолчанию `/app/models/`). Это
-runtime-страховка к compose-job `download-embedding-model` (Шаг 3) — если volume
-пустой, модель всё равно появится перед началом индексации.
+При первом запуске `ingest` (а также при первом RAG-запросе у поднятого
+celery-worker) дополнительно подтянутся embedding- и reranker-модели из
+`s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/${EMBEDDING_MODEL}/` и
+`.../${RERANKER_MODEL}/` в локальный кэш (`EMBEDDING_MODEL_CACHE_DIR`, по
+умолчанию `/app/models/`). Это runtime-страховка к compose-job'ам
+`download-embedding-model` и `download-reranker-model` (Шаг 3) — если volume
+пустой, модели всё равно появятся перед началом работы. HuggingFace Hub в проде
+не дёргается.
 
-> **Важно** — контракт `EMBEDDING_MODEL`: когда `S3_MODELS_BUCKET` задан, это
-> **имя папки в S3 / локальном кэше**, а не HuggingFace Hub ID. Правильное
-> значение — `multilingual-e5-base`. Если поставить
-> `intfloat/multilingual-e5-base` (Hub ID с org-префиксом), ingest полезет в
-> `s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/intfloat/multilingual-e5-base/`,
-> где снапшота нет, и упадёт с `RuntimeError: No objects found ...`. Hub ID
-> допустим только в fallback-режиме (`S3_MODELS_BUCKET=` пустой).
+> **Важно** — контракт `EMBEDDING_MODEL` (и точно так же `RERANKER_MODEL`):
+> когда `S3_MODELS_BUCKET` задан, это **имя папки в S3 / локальном кэше**, а не
+> HuggingFace Hub ID. Правильные значения — `multilingual-e5-base` и
+> `bge-reranker-v2-m3`. Если поставить Hub ID с org-префиксом
+> (`intfloat/multilingual-e5-base`, `BAAI/bge-reranker-v2-m3`), runtime полезет
+> в `s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/<org>/<name>/`, где снапшота
+> нет, и упадёт с `RuntimeError: No objects found ...`. Hub ID допустим только в
+> fallback-режиме (`S3_MODELS_BUCKET=` пустой).
 
 ### Шаг 7: API + воркеры + UI
 

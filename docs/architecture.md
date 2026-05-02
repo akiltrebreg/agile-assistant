@@ -78,7 +78,8 @@
     `EMBEDDING_SPARSE_MODEL`)
   - `hybrid` — dense + sparse с нативным Qdrant RRF fusion (prefetch API)
 - Двухэтапный retrieval (при включённом реранкере): извлечение top-20 чанков →
-  cross-encoder reranking (`BAAI/bge-reranker-v2-m3`) → top-4 наиболее
+  cross-encoder reranking (`bge-reranker-v2-m3`, snapshot из S3 в
+  `embedding_model_cache_dir`, как и embedding-модель) → top-4 наиболее
   релевантных
 - Ограничение контекста: до 4000 символов из top-k релевантных чанков
 - Reranker можно отключить через `RERANKER_ENABLED=false` для A/B-экспериментов
