@@ -563,7 +563,7 @@ poetry run python -m hse_prom_prog.main "Метрики команды lpop"
 poetry run python -m hse_prom_prog.main "Velocity команды linehaul"
 
 # ── query_type=rag (вопросы о практиках и метриках из базы знаний) ──
-poetry run python -m hse_prom_prog.main "Что такое Definition of Done?"
+poetry run python -m hse_prom_prog.main "Что такое Groomed Backlog?"
 poetry run python -m hse_prom_prog.main "Как снизить Scope Drop?"
 poetry run python -m hse_prom_prog.main "Какие бейзлайновые значения метрик?"
 poetry run python -m hse_prom_prog.main "Как рассчитывается velocity?"
@@ -690,14 +690,15 @@ Streamlit-чат на `http://localhost/`. Тонкий клиент, ходит
 
 Все эксперименты сравниваются с этой конфигурацией:
 
-| Параметр               | Значение                                      |
-| ---------------------- | --------------------------------------------- |
-| `SEARCH_TYPE`          | `dense` (multilingual-e5-base)                |
-| `chunk_size / overlap` | 500 / 200                                     |
-| `RETRIEVER_INITIAL_K`  | 20                                            |
-| Reranker               | `bge-reranker-v2-m3`, top_n=4, threshold=0.01 |
-| Промпт                 | Prompt v2 (основные факты, 2-6 предложений)   |
-| `VLLM_MAX_TOKENS`      | 600                                           |
+| Параметр                          | Значение                                      |
+| --------------------------------- | --------------------------------------------- |
+| LLM (Supervisor / RAG / Response) | avibe-8b, GPTQ 8-bit                          |
+| LLM (SQL Agent)                   | qwen3-8b, AWQ 4-bit                           |
+| `SEARCH_TYPE`                     | `dense` (multilingual-e5-base)                |
+| `chunk_size / overlap`            | 500 / 200                                     |
+| `RETRIEVER_INITIAL_K`             | 20                                            |
+| Reranker                          | `bge-reranker-v2-m3`, top_n=4, threshold=0.01 |
+| `VLLM_MAX_TOKENS`                 | 600                                           |
 
 ## Разработка
 
