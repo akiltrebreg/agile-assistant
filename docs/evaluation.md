@@ -3,8 +3,8 @@
 # Оценка агентов
 
 Модуль [eval/](../eval/) содержит четыре независимых eval-пайплайна — по одному
-для каждого LLM-агента. Каждый использует свой golden dataset и свои rule-based
-или LLM-based метрики, результаты пишутся в
+для каждого агента. Каждый использует свой golden dataset и свои rule-based или
+LLM-based метрики, результаты пишутся в
 `eval/results/{experiment}_{timestamp}.json`.
 
 | Eval           | Dataset (кейсов)                      | Метрики                                                                                                                        |

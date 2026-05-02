@@ -114,7 +114,7 @@ cause.
 | `memory_summarizations_total`    | Counter   | —        | Запуски Celery-таски `summarize_session`                  |
 | `memory_profile_updates_total`   | Counter   | —        | Запуски Celery-таски `update_profile_async`               |
 
-**LLM-as-a-Judge (Phase 4)**:
+**LLM-as-a-Judge**:
 
 | Метрика                   | Тип     | Лейблы      | Что показывает                                                                                                                                             |
 | ------------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -122,13 +122,13 @@ cause.
 | `judge_weighted_total`    | Gauge   | —           | Weighted total score последнего evaluation (0.0–1.0)                                                                                                       |
 | `judge_evaluations_total` | Counter | `status`    | Терминальные исходы судьи: `success` / `parse_error` / `api_error`                                                                                         |
 
-**Data sync (Phase 5, Celery Beat)**:
+**Data sync (Celery Beat)**:
 
 | Метрика                       | Тип       | Лейблы           | Что показывает                                                              |
 | ----------------------------- | --------- | ---------------- | --------------------------------------------------------------------------- |
 | `data_sync_timestamp_seconds` | Gauge     | `source`         | Unix-timestamp последнего успешного запуска (`jira_csv` / `knowledge_base`) |
 | `data_sync_total`             | Counter   | `source, status` | Запуски по источнику и исходу (`success` / `failure`)                       |
-| `data_sync_duration_seconds`  | Histogram | `source`         | Длительность одного прогона (CSV: секунды, KB: минуты)                      |
+| `data_sync_duration_seconds`  | Histogram | `source`         | Длительность одного прогона (CSV: секунды, база знаний: минуты)             |
 | `data_sync_rows`              | Gauge     | `source`         | Кол-во строк / чанков после успешного sync                                  |
 
 **FastAPI HTTP** (через `prometheus-fastapi-instrumentator`): автоматические
@@ -143,13 +143,13 @@ Prometheus сам себя не считал.
 автоматически провижионятся при запуске Grafana через `provisioning/dashboards/`
 (см. [monitoring/grafana/provisioning/](../monitoring/grafana/provisioning/)).
 
-| Дашборд                                        | UID                    | Что показывает                                                                                                                               |
-| ---------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Agile Assistant — Overview**                 | `agile-overview`       | E2E latency p50/p95/p99, throughput RPS, error rate, queue wait, in-progress, query_type breakdown, data freshness (Jira CSV / KB last sync) |
-| **Agile Assistant — Infrastructure**           | `agile-infrastructure` | PostgreSQL connections / TPS / replication lag, Redis ops/sec, Qdrant healthcheck, vLLM KV-cache, GPU                                        |
-| **Agile Assistant — Agents Deep Dive**         | `agile-agents`         | Per-agent latency, SQL retries / empty results, RAG retrieval / reranker / fallbacks, response branches                                      |
-| **Agile Assistant — Guardrails & Safety**      | `agile-guardrails`     | L1 injection blocks, L2 layer breakdown, L3 failed checks, sanitizer corrections by layer, memory rotations                                  |
-| **Agile Assistant — Quality (LLM-as-a-Judge)** | `agile-quality`        | Weighted total quality score, per-criterion scores (1h / 24h avg), judge-evaluation outcomes, API errors                                     |
+| Дашборд                                        | UID                    | Что показывает                                                                                                                                        |
+| ---------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agile Assistant — Overview**                 | `agile-overview`       | E2E latency p50/p95/p99, throughput RPS, error rate, queue wait, in-progress, query_type breakdown, data freshness (Jira CSV / база знаний last sync) |
+| **Agile Assistant — Infrastructure**           | `agile-infrastructure` | PostgreSQL connections / TPS / replication lag, Redis ops/sec, Qdrant healthcheck, vLLM KV-cache, GPU                                                 |
+| **Agile Assistant — Agents Deep Dive**         | `agile-agents`         | Per-agent latency, SQL retries / empty results, RAG retrieval / reranker / fallbacks, response branches                                               |
+| **Agile Assistant — Guardrails & Safety**      | `agile-guardrails`     | L1 injection blocks, L2 layer breakdown, L3 failed checks, sanitizer corrections by layer, memory rotations                                           |
+| **Agile Assistant — Quality (LLM-as-a-Judge)** | `agile-quality`        | Weighted total quality score, per-criterion scores (1h / 24h avg), judge-evaluation outcomes, API errors                                              |
 
 Все дашборды настроены на datasource `prometheus`. Разворачиваются автоматически
 после `docker compose up -d grafana` — провижионинг провалидирует dashboards и
@@ -180,8 +180,8 @@ Prometheus сам себя не считал.
 | `QdrantDown`               | `up{job="qdrant"} == 0`, `for: 1m`                                                | critical |
 | `SanitizerFallbackHigh`    | `rate(sanitizer_corrections_total{layer="7_fallback"}[5m])` > 0.5, `for: 10m`     | warning  |
 
-**`agile_assistant_quality`** — LLM-as-a-Judge (Phase 4); 0/1 gauges усредняются
-через `avg_over_time` за час, `for: 15m` глушит одиночные выбросы:
+**`agile_assistant_quality`** — LLM-as-a-Judge; 0/1 gauges усредняются через
+`avg_over_time` за час, `for: 15m` глушит одиночные выбросы:
 
 | Alert                       | Условие                                                                         | Severity |
 | --------------------------- | ------------------------------------------------------------------------------- | -------- |
@@ -191,7 +191,7 @@ Prometheus сам себя не считал.
 | `JudgeLanguageQualityDrop`  | `avg_over_time(judge_criterion_score{criterion="language_quality"}[1h])` < 0.6  | warning  |
 | `JudgeUnavailable`          | доля `judge_evaluations_total{status="api_error"}` за 30 мин > 50%, `for: 10m`  | warning  |
 
-**`agile_assistant_data_freshness`** — Phase 5, Celery Beat sync:
+**`agile_assistant_data_freshness`** — Celery Beat sync:
 
 | Alert                | Условие                                                                                | Severity |
 | -------------------- | -------------------------------------------------------------------------------------- | -------- |
@@ -257,7 +257,7 @@ langfuse_context.update_current_trace(trace_id=trace.id)
 
 LLM-вызовы помечены как `as_type="generation"` — Langfuse выделяет их в
 отдельную сущность с usage tokens, model parameters и поддержкой LLM-as-a-judge
-scoring. Phase 4 использует это: `judge_task` пишет 6 score'ов (practicality /
+scoring. Этим пользуется `judge_task`: пишет 6 score'ов (practicality /
 language_quality / text_cleanliness / agile_correctness / completeness /
 politeness) обратно в исходный trace через `langfuse_client.score`, после чего
 они видны и в Langfuse, и в Grafana (дашборд Quality).

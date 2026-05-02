@@ -64,7 +64,7 @@
 | --------------------------- | --------------------------------------------- | --------------------------------- |
 | `S3_ENDPOINT`               | S3 endpoint URL                               | `https://storage.yandexcloud.net` |
 | `S3_KB_BUCKET`              | S3 bucket для базы знаний                     | `knowledge-base`                  |
-| `S3_KB_PATH`                | Путь внутри bucket для KB                     | `knowledge_base`                  |
+| `S3_KB_PATH`                | Путь внутри bucket для базы знаний            | `knowledge_base`                  |
 | `S3_DATA_BUCKET`            | S3 bucket для CSV данных                      | `database-agile`                  |
 | `S3_DATA_PATH`              | Путь внутри bucket для CSV                    | `data`                            |
 | `S3_MODELS_BUCKET`          | S3 bucket для ML-моделей (embedding/reranker) | `quant-models-agile`              |

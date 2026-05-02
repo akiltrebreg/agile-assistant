@@ -28,7 +28,7 @@ docker compose run --rm migrate
 
 # 3. Загрузить данные из S3
 docker compose run --rm load-data                              # CSV → PostgreSQL
-docker compose run --rm app python -m hse_prom_prog.rag.ingest # KB → Qdrant
+docker compose run --rm app python -m hse_prom_prog.rag.ingest # база знаний → Qdrant
 
 # 4. Запустить API и Celery-воркер
 docker compose up -d api celery-worker
