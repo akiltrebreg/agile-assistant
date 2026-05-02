@@ -1,0 +1,1298 @@
+[
+  {
+    "id": 1,
+    "name": "Одна задача AL-38787 (полные данные)",
+    "category": "sql_task",
+    "state": {
+      "original_query": "Расскажи о задаче AL-38787",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-38787" },
+      "sql_result": [
+        {
+          "issue_key": "AL-38787",
+          "issue_type": "Improvement",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "assignee_name": "yuvpetrov",
+          "storypoints_act": 5.0,
+          "sprint_name": "#1 Q1'26",
+          "summary": "Реализовать фичу X для онбординга",
+          "cluster": "Logistics",
+          "create_time": "2026-01-15 10:00"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-38787", "lpop", "yuvpetrov"],
+      "must_not_contain": [
+        "SELECT",
+        "report_agile_dashboard",
+        "ошибка",
+        "Error"
+      ],
+      "language": "ru",
+      "min_length": 50,
+      "max_length": 2000,
+      "expected_branch": "sql_task",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 2,
+    "name": "Задача с большим количеством NULL-полей",
+    "category": "sql_task",
+    "state": {
+      "original_query": "Покажи задачу AL-38799",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-38799" },
+      "sql_result": [
+        {
+          "issue_key": "AL-38799",
+          "issue_type": "Improvement",
+          "issue_status_act": "Resolved",
+          "feature_teams": "lpop",
+          "storypoints_act": 3.0,
+          "summary": "Доработка по фидбеку",
+          "assignee_name": null,
+          "sprint_name": null,
+          "cluster": null,
+          "resolution": null,
+          "epic_issue_key": null
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-38799", "lpop", "Resolved"],
+      "must_not_contain": ["null", "None", "не указано", "SELECT"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 1500,
+      "expected_branch": "sql_task",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 3,
+    "name": "Задача не найдена (0 строк)",
+    "category": "sql_task",
+    "state": {
+      "original_query": "Информация о задаче AL-99999",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-99999" },
+      "sql_result": [],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {
+        "use_sql": false,
+        "use_rag": false,
+        "note": "No SQL data"
+      }
+    },
+    "checks": {
+      "must_contain": ["AL-99999"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard", "Traceback"],
+      "language": "ru",
+      "min_length": 20,
+      "max_length": 500,
+      "expected_branch": "sql_task_empty",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 4,
+    "name": "Задача с длинным summary",
+    "category": "sql_task",
+    "state": {
+      "original_query": "Расскажи про AL-12345",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-12345" },
+      "sql_result": [
+        {
+          "issue_key": "AL-12345",
+          "issue_type": "Story",
+          "issue_status_act": "Done",
+          "feature_teams": "shopping cart",
+          "assignee_name": "ivanov",
+          "storypoints_act": 8.0,
+          "sprint_name": "#3 Q1'26",
+          "summary": "Реализовать новый механизм синхронизации корзины пользователя между устройствами с учётом конфликтов изменений и оффлайн-режима. Использовать CRDT-подход для разрешения конфликтов на уровне отдельных позиций корзины. Добавить обработку edge-кейсов с одновременным изменением количества и удалением товара.",
+          "cluster": "Marketplace"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-12345", "shopping cart", "Done"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 3000,
+      "expected_branch": "sql_task",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 5,
+    "name": "Задача типа Bug",
+    "category": "sql_task",
+    "state": {
+      "original_query": "Что с задачей AL-50001?",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-50001" },
+      "sql_result": [
+        {
+          "issue_key": "AL-50001",
+          "issue_type": "Bug",
+          "issue_status_act": "Open",
+          "feature_teams": "testops",
+          "assignee_name": "petrov",
+          "storypoints_act": 2.0,
+          "sprint_name": "#2 Q1'26",
+          "summary": "Падает интеграционный тест test_user_login на staging",
+          "cluster": "Platform",
+          "labels": ["regression", "blocker"]
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-50001", "Bug", "testops"],
+      "must_not_contain": ["SELECT", "ERROR", "Traceback"],
+      "language": "ru",
+      "min_length": 50,
+      "max_length": 1500,
+      "expected_branch": "sql_task",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 6,
+    "name": "Задача-эпик с подзадачами",
+    "category": "sql_task",
+    "state": {
+      "original_query": "Покажи эпик AL-77777",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-77777" },
+      "sql_result": [
+        {
+          "issue_key": "AL-77777",
+          "issue_type": "Epic",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "assignee_name": "epic_owner",
+          "storypoints_act": null,
+          "sprint_name": null,
+          "summary": "Большой рефакторинг подсистемы биллинга",
+          "epic_issue_key": null
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-77777", "Epic", "lpop"],
+      "must_not_contain": ["SELECT", "null"],
+      "language": "ru",
+      "min_length": 50,
+      "max_length": 1500,
+      "expected_branch": "sql_task",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 7,
+    "name": "Малый список (3 задачи)",
+    "category": "sql_tasks_filter",
+    "state": {
+      "original_query": "Закрытые задачи команды cthulhu",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": { "team_name": "cthulhu", "status": "Done" },
+      "sql_result": [
+        {
+          "issue_key": "AL-1001",
+          "issue_type": "Story",
+          "issue_status_act": "Done",
+          "feature_teams": "cthulhu",
+          "storypoints_act": 5.0,
+          "summary": "Первая задача",
+          "assignee_name": "user1"
+        },
+        {
+          "issue_key": "AL-1002",
+          "issue_type": "Bug",
+          "issue_status_act": "Done",
+          "feature_teams": "cthulhu",
+          "storypoints_act": 2.0,
+          "summary": "Вторая задача",
+          "assignee_name": "user2"
+        },
+        {
+          "issue_key": "AL-1003",
+          "issue_type": "Improvement",
+          "issue_status_act": "Done",
+          "feature_teams": "cthulhu",
+          "storypoints_act": 3.0,
+          "summary": "Третья задача",
+          "assignee_name": "user3"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-1001", "AL-1002", "AL-1003", "cthulhu"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard"],
+      "language": "ru",
+      "min_length": 80,
+      "max_length": 2000,
+      "expected_branch": "sql_tasks_filter",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 8,
+    "name": "Большой список (70 задач, обрезка до 20)",
+    "category": "sql_tasks_filter",
+    "state": {
+      "original_query": "Все задачи команды cthulhu",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": { "team_name": "cthulhu" },
+      "sql_result": "<<GENERATE: team=cthulhu, limit=70>>",
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["cthulhu", "70"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 3000,
+      "expected_branch": "sql_tasks_filter",
+      "must_have_sources": false,
+      "note": "Должна сработать обрезка до 20 задач, но в ответе должно упоминаться общее число 70"
+    }
+  },
+  {
+    "id": 9,
+    "name": "Пустой результат фильтра",
+    "category": "sql_tasks_filter",
+    "state": {
+      "original_query": "Закрытые баги команды lpop",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": {
+        "team_name": "lpop",
+        "issue_type": "Bug",
+        "status": "Closed"
+      },
+      "sql_result": [],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {
+        "use_sql": false,
+        "use_rag": false,
+        "note": "No SQL data"
+      }
+    },
+    "checks": {
+      "must_contain": [],
+      "must_not_contain": ["SELECT", "Traceback", "AL-"],
+      "language": "ru",
+      "min_length": 20,
+      "max_length": 500,
+      "expected_branch": "sql_tasks_filter_empty",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 10,
+    "name": "Задачи в работе (mixed status)",
+    "category": "sql_tasks_filter",
+    "state": {
+      "original_query": "Задачи в работе у команды lpop",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": { "team_name": "lpop", "status": "In Progress" },
+      "sql_result": [
+        {
+          "issue_key": "AL-3001",
+          "issue_type": "Improvement",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "storypoints_act": 5.0,
+          "summary": "Задача 1",
+          "assignee_name": "yuvpetrov"
+        },
+        {
+          "issue_key": "AL-3002",
+          "issue_type": "Bug",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "storypoints_act": 2.0,
+          "summary": "Задача 2",
+          "assignee_name": "ivanov"
+        },
+        {
+          "issue_key": "AL-3003",
+          "issue_type": "Story",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "storypoints_act": 8.0,
+          "summary": "Задача 3",
+          "assignee_name": "petrov"
+        },
+        {
+          "issue_key": "AL-3004",
+          "issue_type": "Improvement",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "storypoints_act": 3.0,
+          "summary": "Задача 4",
+          "assignee_name": "yuvpetrov"
+        },
+        {
+          "issue_key": "AL-3005",
+          "issue_type": "Bug",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "storypoints_act": 1.0,
+          "summary": "Задача 5",
+          "assignee_name": "smirnov"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-3001", "lpop"],
+      "must_contain_any": [["In Progress", "в процессе", "в работе"]],
+      "must_not_contain": ["SELECT", "Done", "Closed", "Resolved"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 2500,
+      "expected_branch": "sql_tasks_filter",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 11,
+    "name": "Задачи по исполнителю",
+    "category": "sql_tasks_filter",
+    "state": {
+      "original_query": "Задачи исполнителя yuvpetrov",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": { "assignee": "yuvpetrov" },
+      "sql_result": [
+        {
+          "issue_key": "AL-4001",
+          "assignee_name": "yuvpetrov",
+          "feature_teams": "lpop",
+          "issue_status_act": "Done",
+          "storypoints_act": 3.0,
+          "summary": "T1",
+          "issue_type": "Improvement"
+        },
+        {
+          "issue_key": "AL-4002",
+          "assignee_name": "yuvpetrov",
+          "feature_teams": "lpop",
+          "issue_status_act": "In Progress",
+          "storypoints_act": 5.0,
+          "summary": "T2",
+          "issue_type": "Story"
+        },
+        {
+          "issue_key": "AL-4003",
+          "assignee_name": "yuvpetrov",
+          "feature_teams": "lpop",
+          "issue_status_act": "Resolved",
+          "storypoints_act": 2.0,
+          "summary": "T3",
+          "issue_type": "Bug"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["yuvpetrov", "AL-4001"],
+      "must_not_contain": ["SELECT", "ivanov"],
+      "language": "ru",
+      "min_length": 80,
+      "max_length": 2000,
+      "expected_branch": "sql_tasks_filter",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 12,
+    "name": "Все баги (118 задач — обрезка)",
+    "category": "sql_tasks_filter",
+    "state": {
+      "original_query": "Покажи все баги",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": { "issue_type": "Bug" },
+      "sql_result": "<<GENERATE: type=Bug, limit=118>>",
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["118"],
+      "must_contain_any": [["Bug", "баг"]],
+      "must_not_contain": ["SELECT", "report_agile_dashboard"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 3000,
+      "expected_branch": "sql_tasks_filter",
+      "must_have_sources": false,
+      "note": "Должна сработать обрезка до 20 задач"
+    }
+  },
+  {
+    "id": 13,
+    "name": "Одна метрика одной команды (scope_drop cthulhu)",
+    "category": "sql_metric",
+    "state": {
+      "original_query": "Какой scope drop у команды cthulhu?",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" },
+      "sql_result": [
+        { "scope_drop": 6.0, "sprint_name": "172. Нюхлер" },
+        { "scope_drop": 0.0, "sprint_name": "173. Пятиног" }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["cthulhu", "scope", "6"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard_metrics"],
+      "language": "ru",
+      "min_length": 50,
+      "max_length": 1500,
+      "expected_branch": "sql_metric",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 14,
+    "name": "Метрики за 3 спринта (динамика linehaul velocity)",
+    "category": "sql_metric",
+    "state": {
+      "original_query": "Velocity команды linehaul",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": { "team_name": "linehaul", "metric_name": "velocity" },
+      "sql_result": [
+        { "complete_sp": 38.0, "sprint_name": "#1 Q1'26 at Linehaul" },
+        { "complete_sp": 30.5, "sprint_name": "#2 Q1'26 at Linehaul" },
+        { "complete_sp": 27.0, "sprint_name": "#6 Q4'25 at Linehaul" }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["linehaul", "38", "30", "27"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 2000,
+      "expected_branch": "sql_metric",
+      "must_have_sources": false,
+      "note": "В ответе ожидается упоминание динамики/изменения по спринтам"
+    }
+  },
+  {
+    "id": 15,
+    "name": "Все метрики спринта (lpop done_total)",
+    "category": "sql_metric",
+    "state": {
+      "original_query": "Done total команды lpop",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": { "team_name": "lpop", "metric_name": "done_total" },
+      "sql_result": [
+        { "done_total": 82.0, "sprint_name": "#1 Q1'26" },
+        { "done_total": 96.0, "sprint_name": "#2 Q1'26" }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["lpop", "82", "96"],
+      "must_not_contain": ["SELECT", "report_agile_dashboard_metrics"],
+      "language": "ru",
+      "min_length": 50,
+      "max_length": 1500,
+      "expected_branch": "sql_metric",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 16,
+    "name": "Пустой результат метрики",
+    "category": "sql_metric",
+    "state": {
+      "original_query": "Velocity команды несуществующая_команда",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": {
+        "team_name": "несуществующая_команда",
+        "metric_name": "velocity"
+      },
+      "sql_result": [],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {
+        "use_sql": false,
+        "use_rag": false,
+        "note": "No SQL data"
+      }
+    },
+    "checks": {
+      "must_contain": [],
+      "must_not_contain": ["SELECT", "Traceback"],
+      "language": "ru",
+      "min_length": 20,
+      "max_length": 500,
+      "expected_branch": "sql_metric_empty",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 17,
+    "name": "Агрегация: одно числовое значение",
+    "category": "sql_metric",
+    "state": {
+      "original_query": "Сколько всего story points у команды cthulhu?",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": { "team_name": "cthulhu", "metric_name": "storypoints" },
+      "sql_result": [{ "sum": 185.0 }],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["cthulhu", "185"],
+      "must_not_contain": ["SELECT", "SUM("],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 800,
+      "expected_branch": "sql_metric",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 18,
+    "name": "Сравнительная агрегация (топ-3 команды)",
+    "category": "sql_metric",
+    "state": {
+      "original_query": "Топ-3 команды по количеству задач",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": { "metric_name": "task_count" },
+      "sql_result": [
+        { "feature_teams": "shopping cart", "cnt": 196 },
+        { "feature_teams": "testops", "cnt": 151 },
+        { "feature_teams": "rint", "cnt": 131 }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["shopping cart", "testops", "rint", "196", "151", "131"],
+      "must_not_contain": ["SELECT", "GROUP BY"],
+      "language": "ru",
+      "min_length": 80,
+      "max_length": 1500,
+      "expected_branch": "sql_metric",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 19,
+    "name": "RAG: теоретический вопрос с источниками",
+    "category": "rag",
+    "state": {
+      "original_query": "Что такое velocity в Scrum?",
+      "query_type": "rag",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": "Velocity — это метрика производительности Scrum-команды, которая измеряет количество story points, завершённых за один спринт. Она используется для планирования будущих спринтов и оценки пропускной способности команды. Velocity рассчитывается как сумма story points всех задач, доведённых до состояния Done в спринте.",
+      "rag_sources": [
+        "scrum_guide/velocity.md",
+        "agile_metrics/team_metrics.md"
+      ],
+      "validation_result": { "use_sql": false, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": [
+        "Velocity",
+        "story points",
+        "Источники",
+        "scrum_guide/velocity.md"
+      ],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 2000,
+      "expected_branch": "rag",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 20,
+    "name": "RAG без источников",
+    "category": "rag",
+    "state": {
+      "original_query": "Объясни понятие WIP-лимита",
+      "query_type": "rag",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": "WIP-лимит (Work In Progress limit) — это ограничение на количество задач, которые могут одновременно находиться в работе у команды или на определённой стадии процесса. Используется в Kanban для предотвращения перегрузки команды и выявления узких мест.",
+      "rag_sources": [],
+      "validation_result": { "use_sql": false, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["WIP", "Kanban"],
+      "must_not_contain": ["SELECT", "Error", "Источники"],
+      "language": "ru",
+      "min_length": 80,
+      "max_length": 1500,
+      "expected_branch": "rag",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 21,
+    "name": "RAG: длинный ответ с множественными источниками",
+    "category": "rag",
+    "state": {
+      "original_query": "Какие есть методики оценки задач в Agile?",
+      "query_type": "rag",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": "Существует несколько распространённых методик оценки задач в Agile-командах:\n\n1. **Planning Poker** — командная оценка по карточкам с числами Фибоначчи. Каждый член команды независимо выбирает число, затем обсуждают расхождения.\n\n2. **T-shirt sizing** — оценка размерами XS, S, M, L, XL. Используется на ранних стадиях планирования.\n\n3. **Story Points** — относительная оценка сложности задачи в абстрактных единицах.\n\n4. **Bucket System** — задачи распределяются по «корзинам» сложности.\n\n5. **Affinity Estimation** — задачи группируются по схожести и оцениваются группами.\n\nВыбор методики зависит от зрелости команды, типа продукта и горизонта планирования.",
+      "rag_sources": [
+        "agile_estimation/planning_poker.md",
+        "agile_estimation/tshirt_sizing.md",
+        "agile_estimation/story_points.md",
+        "agile_estimation/bucket_system.md"
+      ],
+      "validation_result": { "use_sql": false, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": [
+        "Planning Poker",
+        "Story Points",
+        "Источники",
+        "agile_estimation"
+      ],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 200,
+      "max_length": 5000,
+      "expected_branch": "rag",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 22,
+    "name": "RAG: короткий ответ",
+    "category": "rag",
+    "state": {
+      "original_query": "Что такое спринт?",
+      "query_type": "rag",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": "Спринт — это фиксированный временной отрезок в Scrum (обычно 1-4 недели), за который команда создаёт инкремент продукта.",
+      "rag_sources": ["scrum_guide/sprint.md"],
+      "validation_result": { "use_sql": false, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["Спринт", "Scrum", "scrum_guide/sprint.md"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 800,
+      "expected_branch": "rag",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 23,
+    "name": "RAG: ответ с markdown-форматированием",
+    "category": "rag",
+    "state": {
+      "original_query": "Чем отличается Scrum от Kanban?",
+      "query_type": "rag",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": "## Scrum vs Kanban\n\n| Аспект | Scrum | Kanban |\n|---|---|---|\n| Итерации | Фиксированные спринты | Непрерывный поток |\n| Роли | PO, SM, Dev Team | Не предписаны |\n| Метрики | Velocity | Cycle time, lead time |\n| Изменения | После спринта | В любой момент |\n\nВыбор зависит от характера работы: Scrum для продуктовой разработки, Kanban — для операционных потоков.",
+      "rag_sources": ["agile_methodologies/scrum_vs_kanban.md"],
+      "validation_result": { "use_sql": false, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["Scrum", "Kanban", "Источники"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 2000,
+      "expected_branch": "rag",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 24,
+    "name": "Hybrid: метрика + рекомендации",
+    "category": "hybrid",
+    "state": {
+      "original_query": "У команды cthulhu scope drop 6 в спринте 172. Это нормально и как улучшить?",
+      "query_type": "hybrid",
+      "intent": "metric",
+      "entities": {
+        "team_name": "cthulhu",
+        "metric_name": "scope_drop",
+        "sprint_name": "172"
+      },
+      "sql_result": [
+        { "scope_drop": 6.0, "sprint_name": "172. Нюхлер" },
+        { "scope_drop": 0.0, "sprint_name": "173. Пятиног" }
+      ],
+      "rag_response": "Scope drop > 5% обычно сигнализирует о проблемах планирования: команда берёт больше, чем может выполнить. Рекомендации:\n1. Уточнить definition of ready перед спринтом\n2. Проводить груминг за 2-3 дня до планирования\n3. Использовать исторический velocity для оценки capacity",
+      "rag_sources": [
+        "agile_metrics/scope_drop.md",
+        "scrum_guide/sprint_planning.md"
+      ],
+      "validation_result": { "use_sql": true, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["cthulhu", "6", "scope", "Источники"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 200,
+      "max_length": 4000,
+      "expected_branch": "hybrid",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 25,
+    "name": "Hybrid: метрика + пустой RAG",
+    "category": "hybrid",
+    "state": {
+      "original_query": "Velocity команды linehaul и как его улучшить?",
+      "query_type": "hybrid",
+      "intent": "metric",
+      "entities": { "team_name": "linehaul", "metric_name": "velocity" },
+      "sql_result": [
+        { "complete_sp": 38.0, "sprint_name": "#1 Q1'26 at Linehaul" },
+        { "complete_sp": 30.5, "sprint_name": "#2 Q1'26 at Linehaul" },
+        { "complete_sp": 27.0, "sprint_name": "#6 Q4'25 at Linehaul" }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["linehaul", "38", "30", "27"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 80,
+      "max_length": 2500,
+      "expected_branch": "hybrid",
+      "must_have_sources": false,
+      "note": "RAG пустой — Validator установил use_rag=false. Ответ должен быть на основе только SQL"
+    }
+  },
+  {
+    "id": 26,
+    "name": "Hybrid: пустой SQL + RAG",
+    "category": "hybrid",
+    "state": {
+      "original_query": "Метрика для команды zzz_unknown и теория",
+      "query_type": "hybrid",
+      "intent": "metric",
+      "entities": { "team_name": "zzz_unknown", "metric_name": "velocity" },
+      "sql_result": [],
+      "rag_response": "Velocity — это сумма story points, завершённых командой за спринт. Используется для планирования следующих спринтов.",
+      "rag_sources": ["agile_metrics/velocity.md"],
+      "validation_result": { "use_sql": false, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["Velocity", "story points"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 50,
+      "max_length": 2000,
+      "expected_branch": "hybrid",
+      "must_have_sources": true,
+      "note": "Только RAG доступен. Ответ должен быть теоретическим без выдуманных данных по zzz_unknown"
+    }
+  },
+  {
+    "id": 27,
+    "name": "Hybrid: задача + рекомендации",
+    "category": "hybrid",
+    "state": {
+      "original_query": "Что с задачей AL-38787 и как лучше планировать такие?",
+      "query_type": "hybrid",
+      "intent": "task",
+      "entities": { "issue_key": "AL-38787" },
+      "sql_result": [
+        {
+          "issue_key": "AL-38787",
+          "issue_type": "Improvement",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "assignee_name": "yuvpetrov",
+          "storypoints_act": 5.0,
+          "sprint_name": "#1 Q1'26",
+          "summary": "Реализовать фичу X"
+        }
+      ],
+      "rag_response": "При оценке Improvement-задач рекомендуется использовать Planning Poker с участием минимум 3 разработчиков. Story points 5 соответствует ~2-3 дням работы одного разработчика.",
+      "rag_sources": ["agile_estimation/improvements.md"],
+      "validation_result": { "use_sql": true, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-38787", "lpop", "Planning Poker", "Источники"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 150,
+      "max_length": 3000,
+      "expected_branch": "hybrid",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 28,
+    "name": "Hybrid: список задач + рекомендации",
+    "category": "hybrid",
+    "state": {
+      "original_query": "Покажи багов команды cthulhu и расскажи как их предотвращать",
+      "query_type": "hybrid",
+      "intent": "tasks_filter",
+      "entities": { "team_name": "cthulhu", "issue_type": "Bug" },
+      "sql_result": [
+        {
+          "issue_key": "AL-6001",
+          "issue_type": "Bug",
+          "issue_status_act": "Open",
+          "feature_teams": "cthulhu",
+          "summary": "Bug 1",
+          "storypoints_act": 2.0,
+          "assignee_name": "user1"
+        },
+        {
+          "issue_key": "AL-6002",
+          "issue_type": "Bug",
+          "issue_status_act": "In Progress",
+          "feature_teams": "cthulhu",
+          "summary": "Bug 2",
+          "storypoints_act": 3.0,
+          "assignee_name": "user2"
+        }
+      ],
+      "rag_response": "Для снижения количества багов рекомендуется: 1) Code review каждого PR; 2) Автотесты на критичных путях; 3) Постмортемы по инцидентам.",
+      "rag_sources": ["quality/bug_prevention.md"],
+      "validation_result": { "use_sql": true, "use_rag": true, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-6001", "cthulhu", "Code review", "Источники"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 150,
+      "max_length": 3000,
+      "expected_branch": "hybrid",
+      "must_have_sources": true
+    }
+  },
+  {
+    "id": 29,
+    "name": "Hybrid: оба пустые → fallback",
+    "category": "hybrid",
+    "state": {
+      "original_query": "Метрика для несуществующей команды xyz и теория",
+      "query_type": "hybrid",
+      "intent": "metric",
+      "entities": { "team_name": "xyz", "metric_name": "velocity" },
+      "sql_result": [],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {
+        "use_sql": false,
+        "use_rag": false,
+        "note": "No data from SQL or RAG"
+      }
+    },
+    "checks": {
+      "must_contain": ["Ошибка", "переформулировать"],
+      "must_not_contain": ["SELECT", "Traceback", "AL-"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 500,
+      "expected_branch": "fail",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 30,
+    "name": "Simple: приветствие",
+    "category": "simple",
+    "state": {
+      "original_query": "Привет!",
+      "query_type": "simple",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {}
+    },
+    "checks": {
+      "must_contain": [],
+      "must_not_contain": ["SELECT", "AL-", "Error", "Traceback"],
+      "language": "ru",
+      "min_length": 10,
+      "max_length": 800,
+      "expected_branch": "simple",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 31,
+    "name": "Simple: что умеешь",
+    "category": "simple",
+    "state": {
+      "original_query": "Что ты умеешь?",
+      "query_type": "simple",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {}
+    },
+    "checks": {
+      "must_contain": ["Jira"],
+      "must_not_contain": ["SELECT", "Error"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 1500,
+      "expected_branch": "simple",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 32,
+    "name": "Simple: спасибо",
+    "category": "simple",
+    "state": {
+      "original_query": "Спасибо!",
+      "query_type": "simple",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {}
+    },
+    "checks": {
+      "must_contain": [],
+      "must_not_contain": ["SELECT", "AL-", "Error"],
+      "language": "ru",
+      "min_length": 5,
+      "max_length": 500,
+      "expected_branch": "simple",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 33,
+    "name": "Simple: мета-вопрос про систему",
+    "category": "simple",
+    "state": {
+      "original_query": "На каком языке программирования ты написан?",
+      "query_type": "simple",
+      "intent": "general",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": {}
+    },
+    "checks": {
+      "must_contain": [],
+      "must_not_contain": ["SELECT", "AL-", "Error"],
+      "language": "ru",
+      "min_length": 10,
+      "max_length": 1500,
+      "expected_branch": "simple",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 34,
+    "name": "Error: classifier недоступен (query_type=error)",
+    "category": "error",
+    "state": {
+      "original_query": "Покажи задачу AL-38787",
+      "query_type": "error",
+      "intent": "error",
+      "entities": {},
+      "sql_result": null,
+      "rag_response": null,
+      "rag_sources": [],
+      "error": "Supervisor LLM unavailable: Connection refused",
+      "validation_result": {}
+    },
+    "checks": {
+      "must_contain": ["классификатор"],
+      "must_not_contain": [
+        "SELECT",
+        "AL-38787",
+        "Connection refused",
+        "Traceback"
+      ],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 500,
+      "expected_branch": "error",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 35,
+    "name": "Error: SQL execution error",
+    "category": "error",
+    "state": {
+      "original_query": "Покажи статистику команды cthulhu",
+      "query_type": "sql",
+      "intent": "metric",
+      "entities": { "team_name": "cthulhu" },
+      "sql_result": [],
+      "rag_response": null,
+      "rag_sources": [],
+      "error": "psycopg2.OperationalError: connection to server timed out",
+      "validation_result": {
+        "use_sql": false,
+        "use_rag": false,
+        "note": "psycopg2.OperationalError: connection to server timed out"
+      }
+    },
+    "checks": {
+      "must_contain": ["Ошибка", "переформулировать"],
+      "must_not_contain": ["AL-", "SELECT"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 1000,
+      "expected_branch": "sql_error",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 36,
+    "name": "Error: оба агента упали (hybrid)",
+    "category": "error",
+    "state": {
+      "original_query": "Метрика и теория по xyz",
+      "query_type": "hybrid",
+      "intent": "metric",
+      "entities": { "team_name": "xyz" },
+      "sql_result": [],
+      "rag_response": null,
+      "rag_sources": [],
+      "error": "SQL Agent timeout after 30s",
+      "validation_result": {
+        "use_sql": false,
+        "use_rag": false,
+        "note": "SQL Agent timeout after 30s"
+      }
+    },
+    "checks": {
+      "must_contain": ["Ошибка", "переформулировать"],
+      "must_not_contain": ["AL-", "SELECT"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 1000,
+      "expected_branch": "fail",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 37,
+    "name": "Edge: NULL во всех optional полях задачи",
+    "category": "edge",
+    "state": {
+      "original_query": "Покажи задачу AL-99000",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-99000" },
+      "sql_result": [
+        {
+          "issue_key": "AL-99000",
+          "issue_type": "Story",
+          "issue_status_act": "Open",
+          "feature_teams": "lpop",
+          "summary": "Минимальная задача",
+          "assignee_name": null,
+          "storypoints_act": null,
+          "sprint_name": null,
+          "cluster": null,
+          "resolution": null,
+          "epic_issue_key": null,
+          "create_time": null,
+          "labels": null,
+          "merged_pr_count": null,
+          "time_h_in_progress": null
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-99000", "lpop"],
+      "must_not_contain": ["null", "None", "не указано", "SELECT"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 1000,
+      "expected_branch": "sql_task",
+      "must_have_sources": false
+    }
+  },
+  {
+    "id": 38,
+    "name": "Edge: очень длинный sql_result (50 задач)",
+    "category": "edge",
+    "state": {
+      "original_query": "Все задачи команды shopping cart",
+      "query_type": "sql",
+      "intent": "tasks_filter",
+      "entities": { "team_name": "shopping cart" },
+      "sql_result": "<<GENERATE: team=shopping cart, limit=50>>",
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["shopping cart", "50"],
+      "must_not_contain": ["SELECT", "Traceback"],
+      "language": "ru",
+      "min_length": 100,
+      "max_length": 4000,
+      "expected_branch": "sql_tasks_filter",
+      "must_have_sources": false,
+      "note": "Должна сработать обрезка до 20 задач, общее число 50 должно фигурировать в ответе"
+    }
+  },
+  {
+    "id": 39,
+    "name": "Edge: пустой original_query при валидном sql_result",
+    "category": "edge",
+    "state": {
+      "original_query": "",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-38787" },
+      "sql_result": [
+        {
+          "issue_key": "AL-38787",
+          "issue_type": "Improvement",
+          "issue_status_act": "In Progress",
+          "feature_teams": "lpop",
+          "assignee_name": "yuvpetrov",
+          "storypoints_act": 5.0,
+          "sprint_name": "#1 Q1'26",
+          "summary": "Реализовать фичу X"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-38787"],
+      "must_not_contain": ["SELECT", "Traceback"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 2000,
+      "expected_branch": "sql_task",
+      "must_have_sources": false,
+      "note": "Edge case: пустой query, но данные есть. Не должен падать"
+    }
+  },
+  {
+    "id": 40,
+    "name": "Edge: спецсимволы в summary (кавычки, юникод, эмодзи)",
+    "category": "edge",
+    "state": {
+      "original_query": "Покажи AL-88888",
+      "query_type": "sql",
+      "intent": "task",
+      "entities": { "issue_key": "AL-88888" },
+      "sql_result": [
+        {
+          "issue_key": "AL-88888",
+          "issue_type": "Bug",
+          "issue_status_act": "Open",
+          "feature_teams": "lpop",
+          "assignee_name": "test_user",
+          "storypoints_act": 1.0,
+          "sprint_name": "#1 Q1'26",
+          "summary": "Поле \"name\" не сохраняется при значениях с символами <>&'\" → нужен escape. Тест: 中文 αβγ 🚀"
+        }
+      ],
+      "rag_response": null,
+      "rag_sources": [],
+      "validation_result": { "use_sql": true, "use_rag": false, "note": null }
+    },
+    "checks": {
+      "must_contain": ["AL-88888", "lpop"],
+      "must_not_contain": ["SELECT", "Traceback", "JSONDecodeError"],
+      "language": "ru",
+      "min_length": 30,
+      "max_length": 2000,
+      "expected_branch": "sql_task",
+      "must_have_sources": false,
+      "note": "Не должен падать на спецсимволах при сериализации в промпт"
+    }
+  }
+]

@@ -1,0 +1,28 @@
+# ServiceMonitor for celery-judge (Phase 4 LLM-as-a-Judge worker).
+# Separate Service / port (9101) from celery-worker so JUDGE_*
+# metrics are scraped from the process that actually owns them.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: celery-judge
+  namespace: agile-assistant
+  labels:
+    app: celery-judge
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      app: celery-judge
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: celery-judge

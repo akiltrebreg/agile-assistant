@@ -8,9 +8,16 @@ metadata:
 data:
   # vLLM
   VLLM_BASE_URL: "http://vllm-server:8000/v1"
-  VLLM_MODEL: "Qwen/Qwen2.5-3B-Instruct"
+  VLLM_MODEL: "/models/avibe-gptq-8bit"
   VLLM_TEMPERATURE: "0.7"
-  VLLM_MAX_TOKENS: "512"
+  VLLM_MAX_TOKENS: "2048"
+  VLLM_REPETITION_PENALTY: "1.15"
+
+  # S3 Model Storage (Yandex Cloud)
+  S3_ENDPOINT: "https://storage.yandexcloud.net"
+  S3_BUCKET: "quant-models-agile"
+  S3_MODEL_PATH: "models/avibe-gptq-8bit"
+  AWS_DEFAULT_REGION: "ru-central1"
 
   # PostgreSQL
   POSTGRES_HOST: "postgres-cluster-rw"
@@ -40,6 +47,18 @@ data:
   API_BASE_URL: "http://api:8080"
   POLL_INTERVAL_SEC: "2"
   POLL_TIMEOUT_SEC: "300"
+
+  # Memory Layer
+  # HISTORY_TOKEN_BUDGET: token budget for the short-term history slot
+  # injected into agent prompts (see memory.context_builder).
+  # SESSION_TIMEOUT_MINUTES: a conversation idle longer than this is
+  # auto-closed and a fresh one is started on the next request
+  # (see tasks.workflow_task._maybe_rotate_stale_conversation).
+  # MAX_CONVERSATION_TURNS: upper bound on turns kept per conversation
+  # before forced rollover / summarisation.
+  HISTORY_TOKEN_BUDGET: "1200"
+  SESSION_TIMEOUT_MINUTES: "30"
+  MAX_CONVERSATION_TURNS: "50"
 
   # Logging
   LOG_LEVEL: "INFO"

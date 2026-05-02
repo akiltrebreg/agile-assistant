@@ -1,0 +1,30 @@
+# ServiceMonitor for Qdrant — vector store exposes /metrics on the
+# REST port (6333). The existing qdrant Service already declares a
+# named port ``http`` on 6333, so a plain ServiceMonitor works.
+# 30s interval mirrors the historical scrape config (Qdrant metrics
+# are coarse and don't need 15s resolution).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: qdrant
+  namespace: agile-assistant
+  labels:
+    app: qdrant
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      app: qdrant
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: qdrant

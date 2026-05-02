@@ -1,0 +1,557 @@
+16:36:09  Loaded 46 SQL test cases
+16:36:16  Initializing database connection to postgresql://hse_user:****@postgres:5432/hse_jira_db
+16:36:17  Database connection initialized successfully
+16:36:17  [SQL Agent] Initialized LangGraph agent (model=/models/qwen3-8b-awq-4bit, url=http://vllm-sql:8000/v1)
+16:36:17  [1/46] #1 Расскажи о задаче AL-38787
+16:36:17  [SQL Agent] Processing: Расскажи о задаче AL-38787
+16:36:17  [SchemaLoader] Loaded DDL schema: 2 tables, 6354 chars
+16:36:18  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:18  [SQL Agent] LLM response: tool_calls=1, content=''
+16:36:18  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38787'
+16:36:18  [SQL Tools] run_query returned 2 rows (LLM sees 3)
+16:36:26  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:26  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked about the task AL-38787. I need to provide a detailed answer based on the query results.\n\nFirst, looking at the tool response, there are two entries for AL-38787 in different sprints. Each entry has details like sprint name, dates, and status. The user probably wants all'
+16:36:26  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38787'
+16:36:26  [SQL Agent] Returned 2 row(s)
+16:36:26    PASS: all fields match (9.9s)
+16:36:26  [2/46] #2 Покажи данные по задаче AL-38799
+16:36:26  [SQL Agent] Processing: Покажи данные по задаче AL-38799
+16:36:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:27  [SQL Agent] LLM response: tool_calls=1, content=''
+16:36:27  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38799'
+16:36:27  [SQL Tools] run_query returned 2 rows (LLM sees 3)
+16:36:36  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:36  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for data on the task AL-38799. I need to check the response from the tool call. The query returned two rows, which makes sense because the task might be part of multiple sprints. Let me look at the columns provided. The columns shown include launch_id, issue_key, jiraspr'
+16:36:36  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38799'
+16:36:36  [SQL Agent] Returned 2 row(s)
+16:36:36    PASS: all fields match (9.4s)
+16:36:36  [3/46] #3 Информация о задаче AL-99999
+16:36:36  [SQL Agent] Processing: Информация о задаче AL-99999
+16:36:37  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:37  [SQL Agent] LLM response: tool_calls=1, content=''
+16:36:37  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-99999'
+16:36:41  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:41  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, the user asked for information about the task AL-99999. I used the run_query function to fetch data from the report_agile_dashboard table where the issue_key is exactly 'AL-99999'. The response came back with zero rows, meaning there's no record for that task in the database.\n\nHmm, may"
+16:36:41  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-99999'
+16:36:41  [SQL Agent] Returned 0 row(s)
+16:36:41    PASS: rows: 0 (expected 0) (4.9s)
+16:36:41  [4/46] #4 Все задачи команды cthulhu
+16:36:41  [SQL Agent] Processing: Все задачи команды cthulhu
+16:36:41  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:41  [SQL Agent] LLM response: tool_calls=1, content=''
+16:36:41  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%cthulhu%%'
+16:36:41  [SQL Tools] run_query returned 70 rows (LLM sees 3)
+16:36:50  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:50  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for "Все задачи команды cthulhu" which translates to "All tasks for the cthulhu team." Let me check the previous interaction. The assistant ran a query using ILIKE \'%%cthulhu%%\' on the feature_teams column of the report_agile_dashboard table. The response showed 70 rows '
+16:36:50  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%cthulhu%%'
+16:36:50  [SQL Agent] Returned 70 row(s)
+16:36:50    PASS: rows: 70 (expected 70) (9.5s)
+16:36:50  [5/46] #5 Задачи команды lpop в спринте #1 Q1'26
+16:36:50  [SQL Agent] Processing: Задачи команды lpop в спринте #1 Q1'26
+16:36:51  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:36:51  [SQL Agent] LLM response: tool_calls=1, content=''
+16:36:51  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%lpop%%' AND sprint_name ILIKE '%%#1 Q1''26%%'
+16:36:51  [SQL Tools] run_query returned 57 rows (LLM sees 3)
+16:37:00  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:00  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for "Задачи команды lpop в спринте #1 Q1\'26" which translates to "Tasks for the lpop team in sprint #1 Q1\'26". \n\nFirst, I need to determine which table to use. Since they\'re asking for individual tasks, the report_agile_dashboard table is the right choice. The metrics ta'
+16:37:00  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%lpop%%' AND sprint_name ILIKE '%%#1 Q1''26%%'
+16:37:00  [SQL Agent] Returned 57 row(s)
+16:37:00    PASS: rows: 57 (expected 57) (9.6s)
+16:37:00  [6/46] #6 Покажи все баги
+16:37:00  [SQL Agent] Processing: Покажи все баги
+16:37:01  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:01  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:01  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE issue_type = 'Bug'
+16:37:01  [SQL Tools] run_query returned 118 rows (LLM sees 3)
+16:37:07  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:07  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, the user asked to show all bugs. I need to check the SQL query I ran. The initial query was SELECT * FROM report_agile_dashboard WHERE issue_type = 'Bug'. The response had 118 rows, and the sample data shows entries with issue_type as Bug.\n\nWait, but according to the critical rules, fo"
+16:37:07  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE issue_type = 'Bug'
+16:37:07  [SQL Agent] Returned 118 row(s)
+16:37:07    PASS: rows: 118 (expected 118) (7.6s)
+16:37:07  [7/46] #7 Баги в кластере Logistics
+16:37:07  [SQL Agent] Processing: Баги в кластере Logistics
+16:37:08  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:08  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:08  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE cluster ILIKE '%Logistics%' AND issue_type = 'Bug'
+16:37:08  [SQL Tools] run_query returned 13 rows (LLM sees 3)
+16:37:17  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:17  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for "Баги в кластере Logistics", which translates to "Bugs in the Logistics cluster". Let me break this down.\n\nFirst, I need to find all bugs (issue_type = \'Bug\') that are in the Logistics cluster. The schema has two tables: report_agile_dashboard for individual tasks an'
+16:37:17  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE cluster ILIKE '%Logistics%' AND issue_type = 'Bug'
+16:37:17  [SQL Agent] Returned 13 row(s)
+16:37:17    PASS: rows: 13 (expected 13) (9.5s)
+16:37:17  [8/46] #8 Задачи со статусом In Progress
+16:37:17  [SQL Agent] Processing: Задачи со статусом In Progress
+16:37:18  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:18  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:18  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE issue_status_act = 'In Progress'
+16:37:18  [SQL Tools] run_query returned 78 rows (LLM sees 3)
+16:37:26  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:26  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for tasks with the status "In Progress". I need to check the schema to see which table holds this data. The report_agile_dashboard table has an issue_status_act column, which is the current status. So, I should query that table where issue_status_act equals \'In Progress\''
+16:37:26  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE issue_status_act = 'In Progress'
+16:37:26  [SQL Agent] Returned 78 row(s)
+16:37:26    PASS: rows: 78 (expected 78) (9.4s)
+16:37:26  [9/46] #9 Задачи исполнителя yuvpetrov
+16:37:26  [SQL Agent] Processing: Задачи исполнителя yuvpetrov
+16:37:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:27  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:27  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE assignee_name ILIKE '%%yuvpetrov%%'
+16:37:27  [SQL Tools] run_query returned 19 rows (LLM sees 3)
+16:37:36  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:36  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for "Задачи исполнителя yuvpetrov" which translates to "Tasks for executor yuvpetrov." I need to find all tasks where the assignee is yuvpetrov.\n\nFirst, I check the available tables. The report_agile_dashboard table has an assignee_name field. So the correct approach is '
+16:37:36  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE assignee_name ILIKE '%%yuvpetrov%%'
+16:37:36  [SQL Agent] Returned 19 row(s)
+16:37:36    PASS: rows: 19 (expected 19) (9.5s)
+16:37:36  [10/46] #10 Закрытые баги команды lpop
+16:37:36  [SQL Agent] Processing: Закрытые баги команды lpop
+16:37:37  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:37  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:37  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%lpop%%' AND issue_status_act = 'Done' AND issue_type = 'Bug'
+16:37:46  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:46  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for "Закрытые баги команды lpop", which translates to "Closed bugs for the lpop team". \n\nFirst, I need to check the correct tables and columns. The user is asking about bugs, so the report_agile_dashboard table is the right choice since it has issue_type and i'
+16:37:46  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%lpop%%' AND issue_status_act = 'Done' AND issue_type = 'Bug'
+16:37:46  [SQL Agent] Returned 0 row(s)
+16:37:46    PASS: rows: 0 (expected 0) (9.8s)
+16:37:46  [11/46] #11 Какой scope drop у команды cthulhu?
+16:37:46  [SQL Agent] Processing: Какой scope drop у команды cthulhu?
+16:37:46  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:46  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:46  [SQL Tools] run_query: SELECT feature_teams, sprint_name, scope_drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%cthulhu%%'
+16:37:46  [SQL Tools] run_query returned 2 rows (LLM sees 3)
+16:37:53  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:53  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked, "Какой scope drop у команды cthulhu?" which translates to "What is the scope drop for the cthulhu team?" \n\nFirst, I need to recall the schema. The scope_drop metric is in the report_agile_dashboard_metrics table. The rules mention that for metrics, we should use the rep'
+16:37:53  [SQL Agent] Final SQL: SELECT feature_teams, sprint_name, scope_drop FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%cthulhu%%'
+16:37:53  [SQL Agent] Returned 2 row(s)
+16:37:53    PASS: all rows match (7.3s)
+16:37:53  [12/46] #12 Done total команды lpop
+16:37:53  [SQL Agent] Processing: Done total команды lpop
+16:37:54  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:54  [SQL Agent] LLM response: tool_calls=1, content=''
+16:37:54  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%lpop%%' GROUP BY feature_teams
+16:37:54  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:37:58  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:37:58  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "done total" of the lpop team. Let me check the previous interaction. The assistant ran a query to get the average done_total for lpop. The response showed one row with the average as 89.0.\n\nNow, the user\'s question is in Russian, and they might be looking for a '
+16:37:58  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%lpop%%' GROUP BY feature_teams
+16:37:58  [SQL Agent] Returned 1 row(s)
+16:37:58    FAIL: row count: 1 != 2 (4.8s)
+16:37:58  [13/46] #13 Метрики спринта #1 Q1'26
+16:37:58  [SQL Agent] Processing: Метрики спринта #1 Q1'26
+16:38:00  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:00  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:00  [SQL Tools] run_query: SELECT sprint_name, initial_commitment_sp, added_work_sp, final_commitment_sp, complete_sp, complete_initial_sp, complete_count_sg, count_sg, done_total, sprint_goal, scope_drop, cancel_rate, done_iss
+16:38:00  [SQL Tools] run_query returned 2 rows (LLM sees 3)
+16:38:08  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:08  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for "Метрики спринта #1 Q1\'26" which translates to "Metrics for sprint #1 Q1\'26". \n\nFirst, I need to figure out which table to query. The user mentioned metrics like velocity, done_total, scope_drop, etc., which are in the report_agile_dashboard_metrics table.'
+16:38:08  [SQL Agent] Final SQL: SELECT sprint_name, initial_commitment_sp, added_work_sp, final_commitment_sp, complete_sp, complete_initial_sp, complete_count_sg, count_sg, done_total, sprint_goal, scope_drop, cancel_rate, done_iss
+16:38:08  [SQL Agent] Returned 2 row(s)
+16:38:08    PASS: rows: 2 (expected 2) (10.7s)
+16:38:08  [14/46] #14 Velocity команды linehaul
+16:38:08  [SQL Agent] Processing: Velocity команды linehaul
+16:38:09  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:09  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:09  [SQL Tools] run_query: SELECT feature_teams, AVG(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%linehaul%%' GROUP BY feature_teams
+16:38:09  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:38:14  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:14  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the velocity of the linehaul team. Let me check the previous interaction. The assistant ran a query to get the average complete_sp for linehaul. The response showed an average of 31.83. Now, the user\'s next query is in Russian, which translates to "Velocity of the li'
+16:38:14  [SQL Agent] Final SQL: SELECT feature_teams, AVG(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%linehaul%%' GROUP BY feature_teams
+16:38:14  [SQL Agent] Returned 1 row(s)
+16:38:14    FAIL: row count: 1 != 3 (5.8s)
+16:38:14  [15/46] #15 Sprint goal команды lpop
+16:38:14  [SQL Agent] Processing: Sprint goal команды lpop
+16:38:15  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:15  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:15  [SQL Tools] run_query: SELECT feature_teams, sprint_name, sprint_goal FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%lpop%%' ORDER BY sprint_name DESC
+16:38:15  [SQL Tools] run_query returned 2 rows (LLM sees 3)
+16:38:21  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:21  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for the "sprint goal" of the lpop team. The assistant ran a query on the report_agile_dashboard_metrics table, filtering for feature_teams like \'lpop\', ordering by sprint_name descending. The response shows two entries with sprint_goal as 100.0 for both sprint'
+16:38:21  [SQL Agent] Final SQL: SELECT feature_teams, sprint_name, sprint_goal FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%lpop%%' ORDER BY sprint_name DESC
+16:38:21  [SQL Agent] Returned 2 row(s)
+16:38:21    PASS: all rows match (6.4s)
+16:38:21  [16/46] #16 Cancel rate команды marketplace
+16:38:21  [SQL Agent] Processing: Cancel rate команды marketplace
+16:38:22  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:22  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:22  [SQL Tools] run_query: SELECT feature_teams, AVG(cancel_rate) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%marketplace%%' GROUP BY feature_teams
+16:38:22  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:38:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:27  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "cancel rate" of the marketplace team. Let me start by recalling the schema and the rules.\n\nFirst, the metrics are in the report_agile_dashboard_metrics table. The cancel_rate is a metric there. According to the critical rules, I shouldn\'t filter by sprint_state,'
+16:38:27  [SQL Agent] Final SQL: SELECT feature_teams, AVG(cancel_rate) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%marketplace%%' GROUP BY feature_teams
+16:38:27  [SQL Agent] Returned 1 row(s)
+16:38:27    FAIL: row count: 1 != 3 (6.7s)
+16:38:27  [17/46] #17 Сколько всего story points у команды cthulhu?
+16:38:27  [SQL Agent] Processing: Сколько всего story points у команды cthulhu?
+16:38:28  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:28  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:28  [SQL Tools] run_query: SELECT SUM(storypoints_act) FROM report_agile_dashboard WHERE feature_teams ILIKE '%%cthulhu%%'
+16:38:28  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:38:33  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:33  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the total story points of the cthulhu team. Let me check the steps I took.\n\nFirst, I needed to determine which table to use. Since they want story points, the report_agile_dashboard table is the right choice because it has the storypoints_act column. The metrics tabl'
+16:38:33  [SQL Agent] Final SQL: SELECT SUM(storypoints_act) FROM report_agile_dashboard WHERE feature_teams ILIKE '%%cthulhu%%'
+16:38:33  [SQL Agent] Returned 1 row(s)
+16:38:33    PASS: value: 185.0 (expected 185.0) (5.5s)
+16:38:33  [18/46] #18 Сколько задач каждого типа у команды lpop?
+16:38:33  [SQL Agent] Processing: Сколько задач каждого типа у команды lpop?
+16:38:34  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:34  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:34  [SQL Tools] run_query: SELECT issue_type, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%lpop%' GROUP BY issue_type;
+16:38:34  [SQL Tools] run_query returned 6 rows (LLM sees 3)
+16:38:42  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:42  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked, "Сколько задач каждого типа у команды lpop?" which translates to "How many tasks of each type does the lpop team have?" \n\nFirst, I need to figure out which table to use. The user is asking about task types, so the report_agile_dashboard table is the right cho'
+16:38:42  [SQL Agent] Final SQL: SELECT issue_type, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%lpop%' GROUP BY issue_type;
+16:38:42  [SQL Agent] Returned 6 row(s)
+16:38:42    PASS: 6 groups match (8.8s)
+16:38:42  [19/46] #19 Распределение задач по статусам у команды cthulhu
+16:38:42  [SQL Agent] Processing: Распределение задач по статусам у команды cthulhu
+16:38:43  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:43  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:43  [SQL Tools] run_query: SELECT issue_status_act, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%cthulhu%' GROUP BY issue_status_act;
+16:38:43  [SQL Tools] run_query returned 5 rows (LLM sees 3)
+16:38:48  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:48  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, let's see. The user asked for the distribution of tasks by status for the cthulhu team. The query I ran was selecting issue_status_act and counting the tasks, grouping by the status. The response shows the counts for To Do, Groomed, and Done. But wait, the user might expect all possibl"
+16:38:48  [SQL Agent] Final SQL: SELECT issue_status_act, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%cthulhu%' GROUP BY issue_status_act;
+16:38:48  [SQL Agent] Returned 5 row(s)
+16:38:48    PASS: 5 groups match (6.1s)
+16:38:48  [20/46] #20 У какой команды самый высокий done_total?
+16:38:48  [SQL Agent] Processing: У какой команды самый высокий done_total?
+16:38:49  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:49  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:49  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY 2 DESC LIMIT 1;
+16:38:49  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:38:57  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:57  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user is asking which team has the highest done_total. Let me recall the rules and the correct approach.\n\nFirst, the done_total is a metric found in the report_agile_dashboard_metrics table. According to the metric queries, when comparing teams or looking for the top value, we need '
+16:38:57  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY 2 DESC LIMIT 1;
+16:38:57  [SQL Agent] Returned 1 row(s)
+16:38:57    PASS: all fields match (9.2s)
+16:38:57  [21/46] #21 У какой команды самый большой scope drop?
+16:38:57  [SQL Agent] Processing: У какой команды самый большой scope drop?
+16:38:58  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:38:58  [SQL Agent] LLM response: tool_calls=1, content=''
+16:38:58  [SQL Tools] run_query: SELECT feature_teams, AVG(scope_drop) AS avg_scope_drop FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_scope_drop DESC LIMIT 1;
+16:38:58  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:39:05  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:05  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked, "У какой команды самый большой scope drop?" which translates to "Which team has the largest scope drop?" \n\nFirst, I need to figure out which table to use. The scope_drop metric is in the report_agile_dashboard_metrics table. The rules mention that for averages, I should'
+16:39:05  [SQL Agent] Final SQL: SELECT feature_teams, AVG(scope_drop) AS avg_scope_drop FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_scope_drop DESC LIMIT 1;
+16:39:05  [SQL Agent] Returned 1 row(s)
+16:39:05    PASS: all fields match (8.4s)
+16:39:05  [22/46] #22 Топ-3 команды по количеству задач
+16:39:05  [SQL Agent] Processing: Топ-3 команды по количеству задач
+16:39:06  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:06  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:06  [SQL Tools] run_query: SELECT feature_teams, COUNT(*) as task_count FROM report_agile_dashboard WHERE issue_status_act = 'Done' GROUP BY feature_teams ORDER BY task_count DESC LIMIT 3
+16:39:06  [SQL Tools] run_query returned 3 rows (LLM sees 3)
+16:39:10  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:10  [SQL Agent] LLM response: tool_calls=1, content='<think>\nOkay, the user asked for the top 3 teams by the number of tasks. Let me check the query I ran. Oh wait, I used WHERE issue_status_act = \'Done\', which counts only completed tasks. But according to the critical rules, "количество задач" is COUNT(*) of ALL tasks, not just Done. So my initial qu'
+16:39:10  [SQL Tools] run_query: SELECT feature_teams, COUNT(*) as task_count FROM report_agile_dashboard GROUP BY feature_teams ORDER BY task_count DESC LIMIT 3
+16:39:10  [SQL Tools] run_query returned 3 rows (LLM sees 3)
+16:39:16  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:16  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for the top 3 teams by the number of tasks. The first query I ran filtered for \'Done\' status, but the user didn\'t specify that. So the second query removed that condition, counting all tasks. The response shows "shopping cart" with 196 tasks, which is higher t'
+16:39:16  [SQL Agent] Final SQL: SELECT feature_teams, COUNT(*) as task_count FROM report_agile_dashboard GROUP BY feature_teams ORDER BY task_count DESC LIMIT 3
+16:39:16  [SQL Agent] Returned 3 row(s)
+16:39:16    PASS: 3 groups match (10.8s)
+16:39:16  [23/46] #23 Покажи scope drop команды cthulhu и их задачи со статусом Ca
+16:39:16  [SQL Agent] Processing: Покажи scope drop команды cthulhu и их задачи со статусом Cancelled
+16:39:18  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:18  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:18  [SQL Tools] run_query: SELECT r.feature_teams, r.scope_drop, d.issue_status_act FROM report_agile_dashboard_metrics r JOIN report_agile_dashboard d ON r.feature_teams = d.feature_teams AND r.launch_id = d.launch_id AND r.ji
+16:39:26  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:26  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, let's see. The user asked for the scope drop of the cthulhu team and their tasks with the status Cancelled. The initial query joined the metrics and tasks tables, filtering by the team name and task status. But the result was empty. Hmm, maybe there are no tasks with status Cancelled f"
+16:39:26  [SQL Agent] Final SQL: SELECT r.feature_teams, r.scope_drop, d.issue_status_act FROM report_agile_dashboard_metrics r JOIN report_agile_dashboard d ON r.feature_teams = d.feature_teams AND r.launch_id = d.launch_id AND r.ji
+16:39:26  [SQL Agent] Returned 0 row(s)
+16:39:26    FAIL: composite: 0 rows (manual review needed) (10.3s)
+16:39:26  [24/46] #24 Задачи команды несуществующая_команда
+16:39:26  [SQL Agent] Processing: Задачи команды несуществующая_команда
+16:39:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:27  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:27  [SQL Tools] run_query: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%несуществующая_команда%%'
+16:39:30  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:30  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for tasks in the "несуществующая_команда" (non-existent team). I ran the query to check the report_agile_dashboard table where feature_teams matches that team name using ILIKE. The result was zero rows. So, there are no tasks for that team. I should inform the user that '
+16:39:30  [SQL Agent] Final SQL: SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%%несуществующая_команда%%'
+16:39:30  [SQL Agent] Returned 0 row(s)
+16:39:30    PASS: rows: 0 (expected 0) (3.6s)
+16:39:30  [25/46] #25 Среднее значение done total у команды cthulhu
+16:39:30  [SQL Agent] Processing: Среднее значение done total у команды cthulhu
+16:39:31  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:31  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:31  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%cthulhu%%' GROUP BY feature_teams
+16:39:31  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:39:36  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:36  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, the user asked for the average done total for the cthulhu team. Let me check the query I ran. I used the report_agile_dashboard_metrics table because that's where the metrics like done_total are stored. The query groups by feature_teams and calculates the average of done_total where th"
+16:39:36  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%cthulhu%%' GROUP BY feature_teams
+16:39:36  [SQL Agent] Returned 1 row(s)
+16:39:36    PASS: value: 97.0 (expected 97.0, tol±0.1) (6.2s)
+16:39:36  [26/46] #26 Среднее done total команды marketplace за все спринты
+16:39:36  [SQL Agent] Processing: Среднее done total команды marketplace за все спринты
+16:39:37  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:37  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:37  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%marketplace%%' GROUP BY feature_teams
+16:39:37  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:39:42  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:42  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, let's see. The user asked for the average done total of the marketplace team across all sprints. The query was run using the report_agile_dashboard_metrics table, which is correct because that's where the metrics like done_total are stored. The SQL query uses ILIKE to search for 'marke"
+16:39:42  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%marketplace%%' GROUP BY feature_teams
+16:39:42  [SQL Agent] Returned 1 row(s)
+16:39:42    PASS: value: 83.67 (expected 83.67, tol±0.1) (5.5s)
+16:39:42  [27/46] #27 Средняя velocity команды linehaul
+16:39:42  [SQL Agent] Processing: Средняя velocity команды linehaul
+16:39:43  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:43  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:43  [SQL Tools] run_query: SELECT feature_teams, AVG(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%linehaul%%' GROUP BY feature_teams
+16:39:43  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:39:49  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:49  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "средняя velocity команды linehaul", which translates to the average velocity of the linehaul team. Let me break this down.\n\nFirst, I need to recall the schema. The metrics are in report_agile_dashboard_metrics, and velocity is represented by complete_sp. The use'
+16:39:49  [SQL Agent] Final SQL: SELECT feature_teams, AVG(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%linehaul%%' GROUP BY feature_teams
+16:39:49  [SQL Agent] Returned 1 row(s)
+16:39:49    PASS: value: 31.83 (expected 31.83, tol±0.1) (7.1s)
+16:39:49  [28/46] #28 Средний scope drop у команды shopping cart
+16:39:49  [SQL Agent] Processing: Средний scope drop у команды shopping cart
+16:39:50  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:50  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:50  [SQL Tools] run_query: SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%shopping cart%%' GROUP BY feature_teams
+16:39:50  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:39:54  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:54  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for the average scope drop for the "shopping cart" team. I need to make sure I use the right table and correct SQL syntax.\n\nFirst, the metric "scope drop" is in the report_agile_dashboard_metrics table. The user mentioned "средний scope drop", which translates'
+16:39:54  [SQL Agent] Final SQL: SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%shopping cart%%' GROUP BY feature_teams
+16:39:54  [SQL Agent] Returned 1 row(s)
+16:39:54    PASS: value: 34.0 (expected 34.0, tol±0.1) (4.8s)
+16:39:54  [29/46] #29 Средний done total по каждой команде
+16:39:54  [SQL Agent] Processing: Средний done total по каждой команде
+16:39:55  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:39:55  [SQL Agent] LLM response: tool_calls=1, content=''
+16:39:55  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY AVG(done_total) DESC;
+16:39:55  [SQL Tools] run_query returned 22 rows (LLM sees 3)
+16:40:03  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:03  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "Средний done total по каждой команде", which translates to the average done total for each team. Let me break this down.\n\nFirst, I need to recall the schema. The metrics are in report_agile_dashboard_metrics. The done_total is a metric there. The user wants the '
+16:40:03  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY AVG(done_total) DESC;
+16:40:03  [SQL Agent] Returned 22 row(s)
+16:40:03    PASS: 22 groups match (9.5s)
+16:40:03  [30/46] #30 Средний scope drop по каждой команде
+16:40:03  [SQL Agent] Processing: Средний scope drop по каждой команде
+16:40:04  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:04  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:04  [SQL Tools] run_query: SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY AVG(scope_drop) DESC;
+16:40:04  [SQL Tools] run_query returned 22 rows (LLM sees 3)
+16:40:13  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:13  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "Средний scope drop по каждой команде", which translates to the average scope drop for each team. Let me break this down.\n\nFirst, I need to recall the schema. The metrics are in report_agile_dashboard_metrics. The scope_drop is a metric there. The user wants the '
+16:40:13  [SQL Agent] Final SQL: SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY AVG(scope_drop) DESC;
+16:40:13  [SQL Agent] Returned 22 row(s)
+16:40:13    PASS: 22 groups match (9.6s)
+16:40:13  [31/46] #31 Какой максимальный story points у одной задачи?
+16:40:13  [SQL Agent] Processing: Какой максимальный story points у одной задачи?
+16:40:13  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:13  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:13  [SQL Tools] run_query: SELECT MAX(storypoints_act) FROM report_agile_dashboard;
+16:40:13  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:40:17  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:17  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user is asking for the maximum story points of a single task. Let me think about how to approach this.\n\nFirst, I need to check the tables available. The relevant table here is report_agile_dashboard because it contains the storypoints_act column for each task. The metrics table is '
+16:40:17  [SQL Agent] Final SQL: SELECT MAX(storypoints_act) FROM report_agile_dashboard;
+16:40:17  [SQL Agent] Returned 1 row(s)
+16:40:17    PASS: value: 29.0 (expected 29.0) (4.7s)
+16:40:17  [32/46] #32 Какой минимальный done total среди всех команд и спринтов?
+16:40:17  [SQL Agent] Processing: Какой минимальный done total среди всех команд и спринтов?
+16:40:18  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:18  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:18  [SQL Tools] run_query: SELECT MIN(done_total) FROM report_agile_dashboard_metrics;
+16:40:18  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:40:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:27  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user is asking for the minimum "done total" among all teams and sprints. Let me think about how to approach this.\n\nFirst, I need to recall the schema. The "done_total" metric is in the report_agile_dashboard_metrics table. The critical rules mention that for metrics, we should use '
+16:40:27  [SQL Agent] Final SQL: SELECT MIN(done_total) FROM report_agile_dashboard_metrics;
+16:40:27  [SQL Agent] Returned 1 row(s)
+16:40:27    FAIL: feature_teams: None != 'shopping cart'; sprint_name: None != '26Q1-3' (9.3s)
+16:40:27  [33/46] #33 В каком спринте был самый большой scope drop?
+16:40:27  [SQL Agent] Processing: В каком спринте был самый большой scope drop?
+16:40:28  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:28  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:28  [SQL Tools] run_query: SELECT sprint_name, MAX(scope_drop) FROM report_agile_dashboard_metrics GROUP BY sprint_name ORDER BY 2 DESC LIMIT 1;
+16:40:28  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:40:36  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:36  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user is asking, "В каком спринте был самый большой scope drop?" which translates to "In which sprint was the largest scope drop?" \n\nFirst, I need to figure out which table to use. The scope_drop metric is in the report_agile_dashboard_metrics table. The critical rules mention that '
+16:40:36  [SQL Agent] Final SQL: SELECT sprint_name, MAX(scope_drop) FROM report_agile_dashboard_metrics GROUP BY sprint_name ORDER BY 2 DESC LIMIT 1;
+16:40:36  [SQL Agent] Returned 1 row(s)
+16:40:36    FAIL: feature_teams: None != 'shopping cart' (9.5s)
+16:40:36  [34/46] #34 Сколько задач в каждом кластере?
+16:40:36  [SQL Agent] Processing: Сколько задач в каждом кластере?
+16:40:37  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:37  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:37  [SQL Tools] run_query: SELECT cluster, COUNT(*) FROM report_agile_dashboard GROUP BY cluster;
+16:40:37  [SQL Tools] run_query returned 12 rows (LLM sees 3)
+16:40:44  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:44  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked, "Сколько задач в каждом кластере?" which translates to "How many tasks are in each cluster?" Let me break this down.\n\nFirst, I need to determine which table to use. The user is asking about the count of tasks grouped by cluster. The report_agile_dashboard table has the '
+16:40:44  [SQL Agent] Final SQL: SELECT cluster, COUNT(*) FROM report_agile_dashboard GROUP BY cluster;
+16:40:44  [SQL Agent] Returned 12 row(s)
+16:40:44    PASS: 12 groups match (7.6s)
+16:40:44  [35/46] #35 Сколько задач со статусом Done в каждом кластере?
+16:40:44  [SQL Agent] Processing: Сколько задач со статусом Done в каждом кластере?
+16:40:45  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:45  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:45  [SQL Tools] run_query: SELECT cluster, COUNT(*) FROM report_agile_dashboard WHERE issue_status_act = 'Done' GROUP BY cluster;
+16:40:45  [SQL Tools] run_query returned 11 rows (LLM sees 3)
+16:40:53  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:53  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked, "Сколько задач со статусом Done в каждом кластере?" which translates to "How many tasks with status Done are in each cluster?" \n\nFirst, I need to figure out which table to use. The user is asking about task counts, so the report_agile_dashboard table is the r'
+16:40:53  [SQL Agent] Final SQL: SELECT cluster, COUNT(*) FROM report_agile_dashboard WHERE issue_status_act = 'Done' GROUP BY cluster;
+16:40:53  [SQL Agent] Returned 11 row(s)
+16:40:53    PASS: 11 groups match (9.6s)
+16:40:53  [36/46] #36 Сколько задач у команды shopping cart в каждом спринте?
+16:40:53  [SQL Agent] Processing: Сколько задач у команды shopping cart в каждом спринте?
+16:40:55  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:40:55  [SQL Agent] LLM response: tool_calls=1, content=''
+16:40:55  [SQL Tools] run_query: SELECT feature_teams, sprint_name, COUNT(*) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%shopping cart%%' GROUP BY feature_teams, sprint_name ORDER BY sprint_name;
+16:40:55  [SQL Tools] run_query returned 4 rows (LLM sees 3)
+16:41:03  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:03  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked, "Сколько задач у команды shopping cart в каждом спринте?" which translates to "How many tasks does the shopping cart team have in each sprint?" \n\nFirst, I need to figure out which table to use. The user is asking about the count of tasks per sprint for a spec'
+16:41:03  [SQL Agent] Final SQL: SELECT feature_teams, sprint_name, COUNT(*) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%shopping cart%%' GROUP BY feature_teams, sprint_name ORDER BY sprint_name;
+16:41:03  [SQL Agent] Returned 4 row(s)
+16:41:03    FAIL: 25Q4-136: 1 != 97; 26Q1-1: 1 != 21; 26Q1-2: 1 != 78 (9.7s)
+16:41:03  [37/46] #37 Суммарная velocity команды rint за все спринты
+16:41:03  [SQL Agent] Processing: Суммарная velocity команды rint за все спринты
+16:41:04  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:04  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:04  [SQL Tools] run_query: SELECT feature_teams, SUM(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%rint%%' GROUP BY feature_teams
+16:41:04  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:41:13  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:13  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for the "суммарная velocity команды rint за все спринты". So, "summarized velocity" for the team "rint" across all sprints.\n\nFirst, I need to figure out which table to use. The metrics are in report_agile_dashboard_metrics, and velocity is represented by compl'
+16:41:13  [SQL Agent] Final SQL: SELECT feature_teams, SUM(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%rint%%' GROUP BY feature_teams
+16:41:13  [SQL Agent] Returned 1 row(s)
+16:41:13    PASS: value: 249.0 (expected 249.0) (9.8s)
+16:41:13  [38/46] #38 Сколько всего SP было добавлено в спринты команды shopping c
+16:41:13  [SQL Agent] Processing: Сколько всего SP было добавлено в спринты команды shopping cart?
+16:41:14  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:14  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:14  [SQL Tools] run_query: SELECT SUM(added_work_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%shopping cart%';
+16:41:14  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:41:20  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:20  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user is asking for the total story points (SP) added to the sprints of the "shopping cart" team. \n\nFirst, I need to recall the schema. The report_agile_dashboard_metrics table has an added_work_sp column, which represents the SP added after the sprint started. The user w'
+16:41:20  [SQL Agent] Final SQL: SELECT SUM(added_work_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%shopping cart%';
+16:41:20  [SQL Agent] Returned 1 row(s)
+16:41:20    PASS: value: 7.5 (expected 7.5) (6.9s)
+16:41:20  [39/46] #39 Какие команды имеют средний done total ниже 80%?
+16:41:20  [SQL Agent] Processing: Какие команды имеют средний done total ниже 80%?
+16:41:21  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:21  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:21  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) AS avg_done_total FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_done_total ASC
+16:41:21  [SQL Tools] run_query returned 22 rows (LLM sees 3)
+16:41:29  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:29  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked, "Какие команды имеют средний done total ниже 80%?" which translates to "Which teams have an average done total below 80%?" \n\nFirst, I need to recall the schema. The done_total metric is in the report_agile_dashboard_metrics table. The user wants the average o'
+16:41:29  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) AS avg_done_total FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_done_total ASC
+16:41:29  [SQL Agent] Returned 22 row(s)
+16:41:29    PASS: 5 groups match (9.4s)
+16:41:29  [40/46] #40 Команды со средним scope drop больше 25%
+16:41:29  [SQL Agent] Processing: Команды со средним scope drop больше 25%
+16:41:30  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:30  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:30  [SQL Tools] run_query: SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY 2 DESC
+16:41:30  [SQL Tools] run_query returned 22 rows (LLM sees 3)
+16:41:39  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:39  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, let\'s see. The user asked for "Команды со средним scope drop больше 25%", which translates to "Teams with an average scope drop greater than 25%." \n\nFirst, I need to recall the correct SQL query structure based on the provided schema and rules. The user is asking for an average, so acc'
+16:41:39  [SQL Agent] Final SQL: SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY 2 DESC
+16:41:39  [SQL Agent] Returned 22 row(s)
+16:41:39    PASS: 3 groups match (9.4s)
+16:41:39  [41/46] #41 Кластеры, в которых больше 100 задач
+16:41:39  [SQL Agent] Processing: Кластеры, в которых больше 100 задач
+16:41:40  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:40  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:40  [SQL Tools] run_query: SELECT cluster, COUNT(*) FROM report_agile_dashboard GROUP BY cluster HAVING COUNT(*) > 100;
+16:41:40  [SQL Tools] run_query returned 9 rows (LLM sees 3)
+16:41:48  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:48  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, let's see. The user asked for clusters that have more than 100 tasks. The query I ran grouped the report_agile_dashboard table by cluster and counted the number of tasks in each, filtering those with a count over 100. The response shows three clusters: RRE TRX Hub with 291, AI Lab with"
+16:41:48  [SQL Agent] Final SQL: SELECT cluster, COUNT(*) FROM report_agile_dashboard GROUP BY cluster HAVING COUNT(*) > 100;
+16:41:48  [SQL Agent] Returned 9 row(s)
+16:41:48    PASS: 9 groups match (9.5s)
+16:41:48  [42/46] #42 Средний размер Story в story points
+16:41:48  [SQL Agent] Processing: Средний размер Story в story points
+16:41:49  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:49  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:49  [SQL Tools] run_query: SELECT AVG(storypoints_act) FROM report_agile_dashboard WHERE issue_type = 'Story'
+16:41:49  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:41:58  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:58  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "Средний размер Story в story points", which translates to the average size of stories in story points. Let me break this down.\n\nFirst, I need to find all story points from the report_agile_dashboard table. The storypoints_act column holds the story points for ea'
+16:41:58  [SQL Agent] Final SQL: SELECT AVG(storypoints_act) FROM report_agile_dashboard WHERE issue_type = 'Story'
+16:41:58  [SQL Agent] Returned 1 row(s)
+16:41:58    PASS: value: 4.24 (expected 4.24, tol±0.1) (9.6s)
+16:41:58  [43/46] #43 Средний размер бага в story points
+16:41:58  [SQL Agent] Processing: Средний размер бага в story points
+16:41:59  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:41:59  [SQL Agent] LLM response: tool_calls=1, content=''
+16:41:59  [SQL Tools] run_query: SELECT AVG(storypoints_act) FROM report_agile_dashboard WHERE issue_type = 'Bug'
+16:41:59  [SQL Tools] run_query returned 1 rows (LLM sees 3)
+16:42:06  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:06  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the "средний размер бага в story points," which translates to the average size of bugs in story points. Let me break this down.\n\nFirst, I need to find all bug issues. The schema mentions that the `report_agile_dashboard` table has an `issue_type` column, so I should '
+16:42:06  [SQL Agent] Final SQL: SELECT AVG(storypoints_act) FROM report_agile_dashboard WHERE issue_type = 'Bug'
+16:42:06  [SQL Agent] Returned 1 row(s)
+16:42:06    PASS: value: 1.99 (expected 1.99, tol±0.1) (7.9s)
+16:42:06  [44/46] #44 Топ-5 команд по средней velocity
+16:42:06  [SQL Agent] Processing: Топ-5 команд по средней velocity
+16:42:07  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:07  [SQL Agent] LLM response: tool_calls=1, content=''
+16:42:07  [SQL Tools] run_query: SELECT feature_teams, AVG(complete_sp) AS avg_velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_velocity DESC LIMIT 5
+16:42:07  [SQL Tools] run_query returned 5 rows (LLM sees 3)
+16:42:15  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:15  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, let's see. The user asked for the top-5 teams by average velocity. The assistant ran a query using the report_agile_dashboard_metrics table, grouping by feature_teams and averaging the complete_sp, which is the velocity metric. They ordered it in descending order and limited to 5 resul"
+16:42:15  [SQL Agent] Final SQL: SELECT feature_teams, AVG(complete_sp) AS avg_velocity FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_velocity DESC LIMIT 5
+16:42:15  [SQL Agent] Returned 5 row(s)
+16:42:15    PASS: 5 groups match (9.2s)
+16:42:15  [45/46] #45 Топ-3 команды по количеству багов
+16:42:15  [SQL Agent] Processing: Топ-3 команды по количеству багов
+16:42:16  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:16  [SQL Agent] LLM response: tool_calls=1, content=''
+16:42:16  [SQL Tools] run_query: SELECT feature_teams, COUNT(*) as bug_count FROM report_agile_dashboard WHERE issue_type = 'Bug' GROUP BY feature_teams ORDER BY bug_count DESC LIMIT 3
+16:42:16  [SQL Tools] run_query returned 3 rows (LLM sees 3)
+16:42:21  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:21  [SQL Agent] LLM response: tool_calls=0, content="<think>\nOkay, let's see. The user asked for the top 3 teams with the most bugs. The query I ran was counting the number of bugs per team using the report_agile_dashboard table, filtering by issue_type = 'Bug'. The result shows three teams: honey badger with 14, recruitment tech with 11, and shuttle "
+16:42:21  [SQL Agent] Final SQL: SELECT feature_teams, COUNT(*) as bug_count FROM report_agile_dashboard WHERE issue_type = 'Bug' GROUP BY feature_teams ORDER BY bug_count DESC LIMIT 3
+16:42:21  [SQL Agent] Returned 3 row(s)
+16:42:21    PASS: 3 groups match (6.4s)
+16:42:21  [46/46] #46 Средний done total команды несуществующая_команда
+16:42:21  [SQL Agent] Processing: Средний done total команды несуществующая_команда
+16:42:22  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:22  [SQL Agent] LLM response: tool_calls=1, content=''
+16:42:22  [SQL Tools] run_query: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%несуществующая_команда%%' GROUP BY feature_teams
+16:42:27  HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+16:42:27  [SQL Agent] LLM response: tool_calls=0, content='<think>\nOkay, the user asked for the average done total of a non-existent team called "несуществующая_команда". I ran the query using the report_agile_dashboard_metrics table, filtering with ILIKE for the team name. The result came back with zero rows, which means there\'s no data for that team.\n\nNow'
+16:42:27  [SQL Agent] Final SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%%несуществующая_команда%%' GROUP BY feature_teams
+16:42:27  [SQL Agent] Returned 0 row(s)
+16:42:27    PASS: no rows (treated as NULL) (5.4s)
+
+============================================================
+SQL Eval: sql_qwen3_langgraph_v12  (39/46 passed, 7 failed)
+============================================================
+
+16:42:27  Results saved → /app/eval/results/sql_qwen3_langgraph_v12_20260417_164227.json
+Category        Total    Passed  Rate
+------------  -------  --------  ------
+aggregation        20        19  95%
+comparative         7         5  71%
+cross_table         1         0  0%
+metric              6         3  50%
+negative            3         3  100%
+single_task         2         2  100%
+tasks_filter        7         7  100%
+
+Difficulty      Total    Passed  Rate
+------------  -------  --------  ------
+easy               16        13  81%
+hard               14        11  79%
+medium             16        15  94%
+
+Failed (7):
+  #12 [metric] Done total команды lpop
+    SQL: SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics WHERE ...
+    row count: 1 != 2
+  #14 [metric] Velocity команды linehaul
+    SQL: SELECT feature_teams, AVG(complete_sp) FROM report_agile_dashboard_metrics WHERE...
+    row count: 1 != 3
+  #16 [metric] Cancel rate команды marketplace
+    SQL: SELECT feature_teams, AVG(cancel_rate) FROM report_agile_dashboard_metrics WHERE...
+    row count: 1 != 3
+  #23 [cross_table] Покажи scope drop команды cthulhu и их задачи с...
+    SQL: SELECT r.feature_teams, r.scope_drop, d.issue_status_act FROM report_agile_dashb...
+    composite: 0 rows (manual review needed)
+  #32 [comparative] Какой минимальный done total среди всех команд ...
+    SQL: SELECT MIN(done_total) FROM report_agile_dashboard_metrics;...
+    feature_teams: None != 'shopping cart'; sprint_name: None != '26Q1-3'
+  #33 [comparative] В каком спринте был самый большой scope drop?
+    SQL: SELECT sprint_name, MAX(scope_drop) FROM report_agile_dashboard_metrics GROUP BY...
+    feature_teams: None != 'shopping cart'
+  #36 [aggregation] Сколько задач у команды shopping cart в каждом ...
+    SQL: SELECT feature_teams, sprint_name, COUNT(*) FROM report_agile_dashboard_metrics ...
+    25Q4-136: 1 != 97; 26Q1-1: 1 != 21; 26Q1-2: 1 != 78
+
+Latency: avg=8.05s, min=3.60s, max=10.81s
+

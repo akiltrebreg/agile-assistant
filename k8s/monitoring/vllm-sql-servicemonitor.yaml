@@ -1,0 +1,26 @@
+# ServiceMonitor for the SQL vLLM (Qwen3-8B-AWQ).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm-sql
+  namespace: agile-assistant
+  labels:
+    app: vllm-sql
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      app: vllm-sql
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: vllm-sql

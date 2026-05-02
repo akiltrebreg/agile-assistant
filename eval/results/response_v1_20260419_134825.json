@@ -1,0 +1,752 @@
+{
+  "experiment": "response_v1",
+  "timestamp": "20260419_134825",
+  "aggregate": {
+    "total": 40,
+    "passed": 31,
+    "failed": 9,
+    "pass_rate": 0.775
+  },
+  "results": [
+    {
+      "id": 1,
+      "name": "Одна задача AL-38787 (полные данные)",
+      "category": "sql_task",
+      "expected_branch": "sql_task",
+      "response": "**Задача AL-38787:**  \n- **Ключ/тип/статус:** Улучшение в статусе «В процессе».  \n- **Команда/исполнитель:** Команда *lpop*, исполнитель *yuvpetrov*.  \n- **Sprint/Story Points:** Входит в спринт #1 Q1’26, оценена в 5 story points.  \n\n**Дополнительно:**  \n- Тема задачи связана с реализацией фичи X для процесса онбординга.  \n- Текущая дата создания задачи — 15 января 2026 года.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 378,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.037,
+      "error": null
+    },
+    {
+      "id": 2,
+      "name": "Задача с большим количеством NULL-полей",
+      "category": "sql_task",
+      "expected_branch": "sql_task",
+      "response": "**Задача AL-38799**\n\n- **Ключ**: AL-38799  \n- **Тип**: Improvement  \n- **Статус**: Resolved  \n\n- **Команда**: lpop  \n- **Исполнитель**: Не указан в данных  \n\n- **Story Points**: 3.0  \n- **Спринт**: Не указано в данных  \n\n- **Другие важные детали**:  \n  - Задача связана с доработкой по фидбеку.  \n  - Статус «Resolved» указывает на успешное завершение задачи.  \n\n*Примечание*: Некоторые поля (например, исполнитель, спринт) отсутствуют в предоставленных данных.",
+      "checks": {
+        "pass": false,
+        "missing_terms": [],
+        "forbidden_terms": [
+          "не указано"
+        ],
+        "language_ok": true,
+        "length": 461,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.157,
+      "error": null
+    },
+    {
+      "id": 3,
+      "name": "Задача не найдена (0 строк)",
+      "category": "sql_task",
+      "expected_branch": "sql_task_empty",
+      "response": "Ошибка при выполнении запроса:\n\nNo SQL data\n\n---\n*Попробуйте переформулировать запрос*",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "AL-99999"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 86,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 4,
+      "name": "Задача с длинным summary",
+      "category": "sql_task",
+      "expected_branch": "sql_task",
+      "response": "**Краткое описание задачи AL-12345:**  \n\n- **Ключ задачи**: AL-12345  \n- **Тип задачи**: Story  \n- **Текущий статус**: Done  \n\n- **Команда**: shopping cart  \n- **Исполнитель**: ivanov  \n\n- **Sprint**: #3 Q1'26  \n- **Story Points**: 8.0  \n\n- **Другие релевантные детали**:  \n  - Задача связана с кластером **Marketplace**, что может указывать на интеграцию или взаимодействие с продуктами/сервисами Marketplace.  \n  - Описание задачи включает реализацию механизма синхронизации корзины пользователей между устройствами с учетом конфликтов изменений и оффлайн-режима. Использование подхода CRDT (Conflict-Free Replicated Data Types) указано как метод решения проблем с конфликтами при репликации данных. Также упоминается необходимость обработки edge-кейсов, связанных с одновременными изменениями количества товаров в корзине и их удалением.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 840,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 3.153,
+      "error": null
+    },
+    {
+      "id": 5,
+      "name": "Задача типа Bug",
+      "category": "sql_task",
+      "expected_branch": "sql_task",
+      "response": "**Задача AL-50001:**  \n- **Статус:** Open (открыта).  \n- **Тип:** Bug (баг).  \n- **Команда:** testops.  \n- **Исполнитель:** petrov.  \n- **Sprint:** #2 Q1'26.  \n- **Story Points:** 2.0.  \n- **Метки:** regression, blocker.  \n\n**Кратко:** Открытая задача типа бага в команде testops. Исполнителем назначен petrov. Задача относится к спринту #2 Q1'26, имеет оценку сложности 2 SP и помечена как регрессионный баг уровня блокера.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 424,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.17,
+      "error": null
+    },
+    {
+      "id": 6,
+      "name": "Задача-эпик с подзадачами",
+      "category": "sql_task",
+      "expected_branch": "sql_task",
+      "response": "**Эпик AL-77777**\n\n- **Ключ**: AL-77777  \n- **Тип**: Epic  \n- **Статус**: In Progress  \n\n- **Команда**: lpop  \n- **Исполнитель**: epic_owner  \n\n*Примечание*: В предоставленных данных отсутствуют значения для Story Points и спринта.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 231,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 1.16,
+      "error": null
+    },
+    {
+      "id": 7,
+      "name": "Малый список (3 задачи)",
+      "category": "sql_tasks_filter",
+      "expected_branch": "sql_tasks_filter",
+      "response": "Найдено: **3** закрытых задачи команды `cthulhu`.  \n\n### Задачи:  \n1. **AL-1001** | Done | cthulhu | SP:5.0 | Первая задача  \n2. **AL-1002** | Done | cthulhu | SP:2.0 | Вторая задача  \n3. **AL-1003** | Done | cthulhu | SP:3.0 | Третья задача  \n\n---  \nЕсли требуется дополнительная фильтрация или группировка, уточните параметры запроса.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 336,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 1.925,
+      "error": null
+    },
+    {
+      "id": 8,
+      "name": "Большой список (70 задач, обрезка до 20)",
+      "category": "sql_tasks_filter",
+      "expected_branch": "sql_tasks_filter",
+      "response": "Найдено: **100** задач команд «lpop» и «linehaul». Ниже приведены первые 20 задач:\n\n---\n\n### **Задачи команды \"lpop\"**\n#### **Статус: In Progress**\n1. **AL-38787**  \n   *Приёмочное тестирование B2C FBS ПВЗ-Постамат*  \n   **SP:** 5.0  \n\n#### **Статус: Resolved**\n2. **AL-38799**  \n   *[5POST FBS B2C] Фичи для B2C (честный знак, выгрузки отчетов, работа с API)*  \n   **SP:** 3.0  \n\n#### **Статус: Open**\n3. **AL-39041**  \n   *Draft TDR*  \n   **SP:** 5.0  \n\n4. **AL-39043**  \n   *Собрать требования для TDR*  \n   **SP:** 5.0  \n\n#### **Статус: Resolved**\n5. **AL-39210**  \n   *Запретить переход в CANCELLED в трекинге для 3PL СД*  \n   **SP:** 1.0  \n\n---\n\n### **Задачи команды \"linehaul\"**\n#### **Статус: Done**\n6. **AL-38242**  \n   *Оживить ретроспективу LPOP*  \n   **SP:** 0.0  \n\n#### **Статус: Resolved**\n7. **AL-40625**  \n   *[openapi-developer-portal] Обновить документацию для POD*  \n   **SP:** 0.5  \n\n8. **AL-40656**  \n   *Не отображаются даты в списке заказов*  \n   **SP:** 1.0  \n\n---\n\n### **Дополнительные задачи**\n#### **Команда \"lpop\"**\n9. **AL-40615**  \n   *Провести действия после запуска 5post b2c*  \n   **SP:** None  \n\n10. **AL-40623**  \n    *[delivery-api-facade] Добавить новый DeliveryPaymentStatus - POD*  \n    **SP:** 1.0  \n\n#### **Команда \"linehaul\"**\n11. **AL-40670**  \n    *Пофиксить выпадающие фильтры в дереве категорий*  \n    **SP:** 0.5  \n\n12. **AL-40671**  \n    *[GOK] Разрешить повторную попытку регистрации посылки у партнера*  \n    **SP:** 2.0  \n\n13. **AL-40681**  \n    *[AL] rpc для смены статуса issue*  \n    **SP:** 2.0  \n\n---\n\n### **Примечания**\n- Показаны только первые **20** задач из общего числа (**100**). Для полного списка требуется дополнительная фильтрация.\n- Задачи распределены между командами **\"lpop\"** и **\"linehaul\"**.\n- Статусы задач включают **In Progress**, **Resolved**, **Open**, **Done**.",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "cthulhu"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 1840,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 10.676,
+      "error": null
+    },
+    {
+      "id": 9,
+      "name": "Пустой результат фильтра",
+      "category": "sql_tasks_filter",
+      "expected_branch": "sql_tasks_filter_empty",
+      "response": "Ошибка при выполнении запроса:\n\nNo SQL data\n\n---\n*Попробуйте переформулировать запрос*",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 86,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 10,
+      "name": "Задачи в работе (mixed status)",
+      "category": "sql_tasks_filter",
+      "expected_branch": "sql_tasks_filter",
+      "response": "Найдено: **5** задач у команды `lpop`.  \n\n### Группы по статусу  \n#### В Progress (5 задач):  \n| Ключ       | Статус     | SP   | Описание         |  \n|---------------|----------------|-------|----------------------|  \n| AL-3001    | In Progress | 5.0  | Задача 1           |  \n| AL-3002    | In Progress | 2.0  | Задача 2           |  \n| AL-3003    | In Progress | 8.0  | Задача 3           |  \n| AL-3004    | In Progress | 3.0  | Задача 4           |  \n| AL-3005    | In Progress | 1.0  | Задача 5           |  \n\n--- \n\nЕсли потребуется дополнительная фильтрация или группировка — уточните!",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 591,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 3.057,
+      "error": null
+    },
+    {
+      "id": 11,
+      "name": "Задачи по исполнителю",
+      "category": "sql_tasks_filter",
+      "expected_branch": "sql_tasks_filter",
+      "response": "Задач исполнителя **yuvpetrov** не найдено в предоставленном списке. \n\nЕсли требуется проверить другие критерии фильтрации или уточнить данные, уточните, пожалуйста, детали запроса.",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "AL-4001"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 181,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.611,
+      "error": null
+    },
+    {
+      "id": 12,
+      "name": "Все баги (118 задач — обрезка)",
+      "category": "sql_tasks_filter",
+      "expected_branch": "sql_tasks_filter",
+      "response": "Найдено: **20 задач**  \n\n### Баги  \n#### Статус: `Resolved`  \n1. **AL-39582** | Resolved | lpop | SP:0.5 | Вернуть лимиты service-item после распродажи и высокого сезона  \n2. **AL-40656** | Resolved | lpop | SP:1.0 | Не отображаются даты в списке заказов  \n\n#### Статус: `In Progress`  \n3. **AL-40615** | In Progress | lpop | SP:1.0 | Запретить переход в CANCELLED в трекинге для 3PL СД  \n\n---\n\nЕсли требуется более детальный анализ багов, уточните критерии фильтрации (например, критичность, тип ошибки).",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "Bug",
+          "118"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 505,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.706,
+      "error": null
+    },
+    {
+      "id": 13,
+      "name": "Одна метрика одной команды (scope_drop cthulhu)",
+      "category": "sql_metric",
+      "expected_branch": "sql_metric",
+      "response": "**Ответ:**  \nКоманда *cthulhu* не указана в предоставленных данных.  \n\n**Факты из данных:**  \n1. **Спринт 172 (\"Нюхлер\")**:  \n   - `Scope Drop`: **6.0**.  \n\n2. **Спринт 173 (\"Пятиног\")**:  \n   - `Scope Drop`: **0.0**.  \n\n**Динамика Scope Drop:**  \n- В спринте 172 произошло снижение объема задач (`Scope Drop = 6.0`).  \n- В спринте 173 объем задач остался неизменным (`Scope Drop = 0.0`).  \n\n**Вывод:**  \nДанные охватывают два спринта с разными значениями `Scope Drop`. Команда *cthulhu* отсутствует в выборке.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 510,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.712,
+      "error": null
+    },
+    {
+      "id": 14,
+      "name": "Метрики за 3 спринта (динамика linehaul velocity)",
+      "category": "sql_metric",
+      "expected_branch": "sql_metric",
+      "response": "**Velocity команды Linehaul:**  \n- **#1 Sprint (Q1'26):** 38 SP  \n- **#2 Sprint (Q1'26):** 30.5 SP  \n- **#6 Sprint (Q4'25):** 27 SP  \n\n**Динамика velocity:**  \n- Снижение с #1 до #2 спринта (-7.5 SP).  \n- Дополнительное снижение с #2 до #6 спринта (-3.5 SP).  \n\nПримечание: Данные охватывают разные кварталы (Q1'26 vs Q4'25), что может влиять на сравнение показателей.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 368,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.186,
+      "error": null
+    },
+    {
+      "id": 15,
+      "name": "Все метрики спринта (lpop done_total)",
+      "category": "sql_metric",
+      "expected_branch": "sql_metric",
+      "response": "**Ответ:**  \nЗа два спринта команда **lpop** выполнила следующие объемы задач:  \n\n1. **#1 Q1'26**: выполнено **82 задачи**.  \n2. **#2 Q1'26**: выполнено **96 задач**.  \n\n**Динамика выполнения задач:**  \n- За второй спринт объем выполненных задач увеличился на **14 задач** (+17%). Это указывает на рост эффективности работы команды в течение квартала.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 351,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 1.539,
+      "error": null
+    },
+    {
+      "id": 16,
+      "name": "Пустой результат метрики",
+      "category": "sql_metric",
+      "expected_branch": "sql_metric_empty",
+      "response": "Ошибка при выполнении запроса:\n\nNo SQL data\n\n---\n*Попробуйте переформулировать запрос*",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 86,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 17,
+      "name": "Агрегация: одно числовое значение",
+      "category": "sql_metric",
+      "expected_branch": "sql_metric",
+      "response": "Всего story points у команды **cthulhu** составляет **185.0**. \n\nДанные предоставлены за один период (возможно, один спринт), поэтому динамика не прослеживается.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 161,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.657,
+      "error": null
+    },
+    {
+      "id": 18,
+      "name": "Сравнительная агрегация (топ-3 команды)",
+      "category": "sql_metric",
+      "expected_branch": "sql_metric",
+      "response": "**Топ-3 команды по количеству задач:**  \n1. **Shopping Cart**: 196 задач.  \n2. **TestOps**: 151 задача.  \n3. **RINT**: 131 задача.  \n\nДанные отражают количество задач в каждой команде за один период (например, один спринт). Динамика не прослеживается, так как представлены только итоговые значения.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 298,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 1.335,
+      "error": null
+    },
+    {
+      "id": 19,
+      "name": "RAG: теоретический вопрос с источниками",
+      "category": "rag",
+      "expected_branch": "rag",
+      "response": "Velocity — это метрика производительности Scrum-команды, которая измеряет количество story points, завершённых за один спринт. Она используется для планирования будущих спринтов и оценки пропускной способности команды. Velocity рассчитывается как сумма story points всех задач, доведённых до состояния Done в спринте.\n\n---\n**Источники:**\n- scrum_guide/velocity.md\n- agile_metrics/team_metrics.md",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 395,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 20,
+      "name": "RAG без источников",
+      "category": "rag",
+      "expected_branch": "rag",
+      "response": "WIP-лимит (Work In Progress limit) — это ограничение на количество задач, которые могут одновременно находиться в работе у команды или на определённой стадии процесса. Используется в Kanban для предотвращения перегрузки команды и выявления узких мест.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 251,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 21,
+      "name": "RAG: длинный ответ с множественными источниками",
+      "category": "rag",
+      "expected_branch": "rag",
+      "response": "Существует несколько распространённых методик оценки задач в Agile-командах:\n\n1. **Planning Poker** — командная оценка по карточкам с числами Фибоначчи. Каждый член команды независимо выбирает число, затем обсуждают расхождения.\n\n2. **T-shirt sizing** — оценка размерами XS, S, M, L, XL. Используется на ранних стадиях планирования.\n\n3. **Story Points** — относительная оценка сложности задачи в абстрактных единицах.\n\n4. **Bucket System** — задачи распределяются по «корзинам» сложности.\n\n5. **Affinity Estimation** — задачи группируются по схожести и оцениваются группами.\n\nВыбор методики зависит от зрелости команды, типа продукта и горизонта планирования.\n\n---\n**Источники:**\n- agile_estimation/planning_poker.md\n- agile_estimation/tshirt_sizing.md\n- agile_estimation/story_points.md\n- agile_estimation/bucket_system.md",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 823,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 22,
+      "name": "RAG: короткий ответ",
+      "category": "rag",
+      "expected_branch": "rag",
+      "response": "Спринт — это фиксированный временной отрезок в Scrum (обычно 1-4 недели), за который команда создаёт инкремент продукта.\n\n---\n**Источники:**\n- scrum_guide/sprint.md",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 164,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 23,
+      "name": "RAG: ответ с markdown-форматированием",
+      "category": "rag",
+      "expected_branch": "rag",
+      "response": "## Scrum vs Kanban\n\n| Аспект | Scrum | Kanban |\n|---|---|---|\n| Итерации | Фиксированные спринты | Непрерывный поток |\n| Роли | PO, SM, Dev Team | Не предписаны |\n| Метрики | Velocity | Cycle time, lead time |\n| Изменения | После спринта | В любой момент |\n\nВыбор зависит от характера работы: Scrum для продуктовой разработки, Kanban — для операционных потоков.\n\n---\n**Источники:**\n- agile_methodologies/scrum_vs_kanban.md",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 422,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 24,
+      "name": "Hybrid: метрика + рекомендации",
+      "category": "hybrid",
+      "expected_branch": "hybrid",
+      "response": "### 1. ДАННЫЕ  \nИз предоставленных данных:  \n- **Sprint 172 (\"Нюхлер\")**: Scope drop = **6.0** (что превышает порог в 5%, указанный в базе знаний).  \n\n---\n\n### 2. АНАЛИЗ  \n#### **Проблема**  \nScope drop = **6.0** указывает на то, что команда взяла задачи на сумму, превышающую фактическую выполненную работу на 6%. Это нарушает рекомендацию из базы знаний: *\"Scope drop > 5% обычно сигнализирует о проблемах планирования\"* [база знаний].\n\n#### **Рекомендации**  \nНа основании рекомендаций из базы знаний предложены следующие действия:\n\n1. **Уточнение Definition of Ready (DoR)**  \n   Перед началом спринта необходимо строго проверять готовность задач к включению в спринт. Это включает проверку наличия всех необходимых артефактов (например, документации, тестовых сценариев) и согласования приоритетов с заинтересованными сторонами.\n\n2. **Проведение груминга за 2–3 дня до планирования спринта**  \n   Груминг должен быть систематическим процессом, включающим обсуждение и уточнение требований к задачам, а также их разбиение на более мелкие подзадачи. Это позволит команде лучше понимать объем работы и избежать ситуации, когда задачи оказываются недооцененными или недостаточно детализированными.\n\n3. **Использование исторического Velocity при оценке Capacity**  \n   При планировании спринта необходимо учитывать исторические данные о скорости выполнения задач командой (Velocity). Это поможет более точно оценить объем работ, который команда сможет реально выполнить в рамках текущего спринта. Кроме того, рекомендуется использовать дополнительные методы оценки объема работ, такие как планирование на основе исторических данных о выполнении аналогичных задач в прошлом.\n\n4. **Регулярный анализ причин возникновения высоких значений Scope Drop**  \n   Необходимо проводить регулярный анализ причин возникновения высоких значений Scope Drop. Это позволит выявить системные проблемы в процессе планирования спринтов и принять меры по их устранению. Анализ причин можно проводить путем проведения регулярных встреч команды разработчиков с Product Owner и другими заинтересованными сторонами для обсуждения проблемных ситуаций и поиска путей их решения.\n\nЭти шаги помогут снизить риск повторного возникновения высоких значений Scope Drop в будущем.\n\n---\n**Источники:**\n- agile_metrics/scope_drop.md\n- scrum_guide/sprint_planning.md",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "cthulhu"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 2329,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 6.983,
+      "error": null
+    },
+    {
+      "id": 25,
+      "name": "Hybrid: метрика + пустой RAG",
+      "category": "hybrid",
+      "expected_branch": "hybrid",
+      "response": "### 1. ДАННЫЕ  \nНа основании данных из БД (Velocity команды Linehaul):  \n\n| Номер спринта | Название спринта                          | Velocity (story points) |\n|---------------------|-------------------------------------------------------|----------------------------------|\n| #1                  | #1 Q1'26 at Linehaul                   | 38.0                           |\n| #2                  | #2 Q1'26 at Linehaul                   | 30.5                           |\n| #6                  | #6 Q4'25 at Linehaul                    | 27.0                            |\n\n---\n\n### 2. АНАЛИЗ  \n**Рекомендации по улучшению Velocity:**  \n\n1. **Анализ причин снижения Velocity:**  \n   - В спринте #6 (Q4'25) Velocity упала до 27.0 SP. Это может быть связано с увеличением сложности задач или недостаточной подготовкой команды к началу спринта.  \n   - Источник: Анализ исторических данных о Velocity команды Linehaul [Документация по управлению проектами].  \n\n2. **Оптимизация процессов планирования спринтов:**  \n   - Для повышения Velocity рекомендуется проводить более тщательное планирование спринтов, включая оценку сложности задач и распределение ресурсов между участниками команды.  \n   - Источник: Рекомендации по оптимизации процессов управления проектами [Руководство по методологиям разработки ПО].  \n\n3. **Повышение квалификации участников команды:**  \n   - Для улучшения производительности команды рекомендуется проводить регулярные тренинги и семинары по повышению квалификации участников команды.  \n   - Источник: Методические рекомендации по организации обучения персонала [Методическое пособие по обучению сотрудников].  \n\n--- \n\nЭти меры помогут команде Linehaul повысить свою Velocity и достичь лучших результатов в управлении проектами.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 1752,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 5.437,
+      "error": null
+    },
+    {
+      "id": 26,
+      "name": "Hybrid: пустой SQL + RAG",
+      "category": "hybrid",
+      "expected_branch": "hybrid",
+      "response": "### 1. ДАННЫЕ  \nК сожалению, данные из вашей базы не предоставлены. Пожалуйста, уточните или приложите соответствующие данные (например, историю спринтов команды `zzz_unknown`, значения velocity и т.д.).  \n\n---\n\n### 2. АНАЛИЗ  \n**Рекомендации:**  \nДля корректного анализа метрик команды `zzz_unknown` необходимо иметь доступ к следующим данным:  \n- История спринтов команды (начало, завершение, выполненные задачи).  \n- Значения velocity для каждого спринта.  \n- Данные о незавершенных задачах (если применимо).  \n\nБез этих данных невозможно провести анализ эффективности команды, выявить тенденции или спланировать будущие спринты.  \n\n**Источники:**  \n[Теория Velocity]\n\n---\n**Источники:**\n- agile_metrics/velocity.md",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "story points"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 718,
+        "length_ok": true,
+        "sources_ok": false
+      },
+      "latency_s": 2.514,
+      "error": null
+    },
+    {
+      "id": 27,
+      "name": "Hybrid: задача + рекомендации",
+      "category": "hybrid",
+      "expected_branch": "hybrid",
+      "response": "### 1. ДАННЫЕ  \nИз БД получены следующие факты:  \n- **Ключ задачи**: `AL-38787`.  \n- **Тип задачи**: `Improvement`.  \n- **Оценка сложности**: `Story Points = 5.0`.  \n- **Текущий статус**: `In Progress`.  \n\n---\n\n### 2. АНАЛИЗ  \n#### Рекомендации по планированию задач типа `Improvement`:  \n1. **Использование метода Planning Poker**  \n   - Для оценки сложности задачи (например, `AL-38787`)) необходимо проводить оценку через Planning Poker. Это позволит учесть мнения всех участников команды при определении сложности задачи.  \n   - Источник: [Руководство по методам планирования](https://example.com)).  \n\n2. **Учет времени выполнения задачи**  \n   - Оценка сложности задачи в story points позволяет приблизительно определить время ее выполнения. Например, задача со значением story points равным 5 может быть выполнена примерно за 2–3 рабочих дня одним разработчиком.  \n   - Источник: [Методические указания по использованию story points](https://example.com)).  \n\n--- \n\nТаким образом, для эффективного управления задачами типа `Improvement` следует применять методы коллективной оценки сложности задач и учитывать временные затраты на их выполнение.\n\n---\n**Источники:**\n- agile_estimation/improvements.md",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "lpop"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 1207,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 4.196,
+      "error": null
+    },
+    {
+      "id": 28,
+      "name": "Hybrid: список задач + рекомендации",
+      "category": "hybrid",
+      "expected_branch": "hybrid",
+      "response": "### 1. ДАННЫЕ  \nКоманда **cthulhu** имеет следующие задачи с багами:  \n- **AL-6001**: Статус \"Open\", тип бага: **Bug 1**.  \n- **AL-6002**: Статус \"In Progress\", тип бага: **Bug 2**.  \n\n---\n\n### 2. АНАЛИЗ  \nНа основании рекомендаций из базы знаний предложены меры для предотвращения багов у команды **cthulhu**:  \n\n#### Рекомендации:  \n1. **Code Review каждого Pull Request (PR)**:  \n   - Проведение регулярных код-ревью перед слиянием изменений. Это позволяет выявлять потенциальные ошибки до завершения разработки.  \n\n2. **Автотесты на критичных путях**:  \n   - Разработка автоматизированных тестов для ключевых функций системы. Это обеспечивает регулярную проверку работоспособности критических компонентов.  \n\n3. **Постмортемы по инцидентам**:  \n   - Проведение детальных разборов инцидентов после их устранения. Это помогает выявить коренные причины проблем и разработать стратегии для их предотвращения в будущем.  \n\n--- \n\nИсточники:  \n[Рекомендации по снижению количества багов]\n\n---\n**Источники:**\n- quality/bug_prevention.md",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 1032,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 3.871,
+      "error": null
+    },
+    {
+      "id": 29,
+      "name": "Hybrid: оба пустые → fallback",
+      "category": "hybrid",
+      "expected_branch": "fail",
+      "response": "Ошибка при выполнении запроса:\n\nNo data from SQL or RAG\n\n---\n*Попробуйте переформулировать запрос*",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 98,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 30,
+      "name": "Simple: приветствие",
+      "category": "simple",
+      "expected_branch": "simple",
+      "response": "Привет! Я ваш помощник в анализе данных из Jira и Agile-метрик. Могу помочь:\n\n1. **Анализ задач**:  \n   - Статистика времени выполнения задач.  \n   - Анализ загруженности команды.  \n\n2. **Метрики спринтов**:  \n   - Velocity (скорость) команды за последние спринты.  \n   - Burn-down график текущего спринта.  \n\n3. **Рекомендации по Agile-практикам**:  \n   - Оптимизация процессов планирования спринтов.  \n   - Улучшение коммуникации между участниками проекта.  \n\nЕсли у вас есть конкретные вопросы или требуется помощь с анализом данных, дайте знать!",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 549,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.078,
+      "error": null
+    },
+    {
+      "id": 31,
+      "name": "Simple: что умеешь",
+      "category": "simple",
+      "expected_branch": "simple",
+      "response": "Привет! Я помощник для анализа данных из Jira и Agile-метрик. Могу:\n\n1. **Анализировать задачи в Jira**:  \n   - Подсчёт количества задач по статусам/типу.  \n   - Выявление \"утечек\" задач за пределами спринта.  \n\n2. **Рассчитывать ключевые метрики спринтов**:  \n   - Velocity (скорость выполнения задач).  \n   - Burn-down график (оценка прогресса закрытия задач).  \n   - Lead time vs Cycle time (время от создания задачи до её завершения).  \n\n3. **Давать рекомендации по улучшению процессов**:  \n   - Анализ причин задержек задач (например, частые изменения требований).  \n   - Предложения по оптимизации рабочих потоков (например, внедрение Kanban с визуализацией этапов).  \n\nЕсли у вас есть конкретные данные или вопросы — дайте знать, помогу разобраться! 😊",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 758,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.891,
+      "error": null
+    },
+    {
+      "id": 32,
+      "name": "Simple: спасибо",
+      "category": "simple",
+      "expected_branch": "simple",
+      "response": "Здравствуйте! Я помогу вам анализировать задачи в Jira и отслеживать ключевые метрики Agile-процессов. Могу предоставить отчеты по эффективности спринтов, загруженности команды или другим параметрам. Готов ответить на конкретные вопросы или предложить анализ имеющихся данных.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 276,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.8,
+      "error": null
+    },
+    {
+      "id": 33,
+      "name": "Simple: мета-вопрос про систему",
+      "category": "simple",
+      "expected_branch": "simple",
+      "response": "Я создан на основе модели искусственного интеллекта Qwen, разработанной Alibaba Cloud. \n\nЕсли у вас есть вопросы об анализе данных из Jira или других Agile-метрик, я с радостью помогу вам разобраться в этих вопросах!",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 216,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.748,
+      "error": null
+    },
+    {
+      "id": 34,
+      "name": "Error: classifier недоступен (query_type=error)",
+      "category": "error",
+      "expected_branch": "error",
+      "response": "Извините, классификатор запросов временно недоступен. Попробуйте повторить запрос через несколько секунд или переформулировать его.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 131,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 35,
+      "name": "Error: SQL execution error",
+      "category": "error",
+      "expected_branch": "sql_error",
+      "response": "Ошибка при выполнении запроса:\n\npsycopg2.OperationalError: connection to server timed out\n\n---\n*Попробуйте переформулировать запрос*",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 132,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 36,
+      "name": "Error: оба агента упали (hybrid)",
+      "category": "error",
+      "expected_branch": "fail",
+      "response": "Ошибка при выполнении запроса:\n\nSQL Agent timeout after 30s\n\n---\n*Попробуйте переформулировать запрос*",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 102,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 37,
+      "name": "Edge: NULL во всех optional полях задачи",
+      "category": "edge",
+      "expected_branch": "sql_task",
+      "response": "**Задача AL-99000**\n\n- **Ключ**: AL-99000  \n- **Тип**: Story  \n- **Статус**: Open  \n\n- **Команда**: lpop  \n- **Исполнитель**: Не указан  \n\n- **Story Points**: Неизвестно  \n- **Спринт**: Не назначен  \n\nДополнительные поля не заполнены или отсутствуют в предоставленных данных.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 275,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 1.354,
+      "error": null
+    },
+    {
+      "id": 38,
+      "name": "Edge: очень длинный sql_result (50 задач)",
+      "category": "edge",
+      "expected_branch": "sql_tasks_filter",
+      "response": "Найдено: **100** задач.  \n\n### Показаны первые 20 задач из списка:\n\n#### Группа \"In Progress\":\n1. **AL-38787**:  \n   *Статус*: In Progress  \n   *SP*: 5.0  \n   *Описание*: Приёмочное тестирование B2C FBS ПВЗ-Постамат  \n\n---\n\n#### Группа \"Resolved\":\n2. **AL-38799**:  \n   *Статус*: Resolved  \n   *SP*: 3.0  \n   *Описание*: [5POST FBS B2C] Фичи для B2C (честный знак, выгрузки отчетов, работа с API)  \n\n---\n\n#### Группа \"Open\":\n3. **AL-39041**:  \n   *Статус*: Open  \n   *SP*: 5.0  \n   *Описание*: Draft TDR  \n\n4. **AL-39043**:  \n   *Статус*: Open  \n   *SP*: 5.0  \n   *Описание*: Собрать требования для TDR  \n\n---\n\n#### Группа \"To Do\":\n5. **AL-39438**:  \n   *Статус*: To Do  \n   *SP*: 0.0  \n   *Описание*: Метрики дежурного LPOP  \n\n---\n\n#### Группа \"Done\":\n6. **AL-38242**:  \n   *Статус*: Done  \n   *SP*: 0.0  \n   *Описание*: Ожижить ретроспективу LPOP  \n\n---\n\nЕсли требуется дополнительная фильтрация или группировка по другим критериям (например, приоритетность, тип задачи), уточните!",
+      "checks": {
+        "pass": false,
+        "missing_terms": [
+          "shopping cart",
+          "50"
+        ],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 983,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 5.435,
+      "error": null
+    },
+    {
+      "id": 39,
+      "name": "Edge: пустой original_query при валидном sql_result",
+      "category": "edge",
+      "expected_branch": "sql_task",
+      "response": "**Краткое описание задачи:**  \nЗадача **\"AL-38787\"**, типа **\"Improvement\"**, находится в статусе **\"In Progress\"**.  \n\nВыполняется командой **\"lpop\"** исполнителем **\"yuvpetrov\"**.  \n\nОценка сложности: **5.0 story points**.  \nПринадлежит к спринту: **#1 Q1'26**.  \n\nДополнительная информация отсутствует.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 305,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 1.551,
+      "error": null
+    },
+    {
+      "id": 40,
+      "name": "Edge: спецсимволы в summary (кавычки, юникод, эмодзи)",
+      "category": "edge",
+      "expected_branch": "sql_task",
+      "response": "**Краткое описание задачи AL-88888:**  \n\n- **Ключ задачи**: AL-88888  \n- **Тип задачи**: Bug  \n- **Текущий статус**: Open  \n\n- **Команда**: lpop  \n- **Исполнитель**: test_user  \n\n- **Sprint**: #1 Q1'26  \n- **Story Points**: 1.0  \n\n**Дополнительная информация**:  \nЗадача связана с проблемой сохранения поля `\"name\"` в системе. При вводе значений, содержащих символы `<`, `>`, `&`, `'` или `\"` (например, HTML-теги), поле не сохраняет корректное значение. Это требует реализации механизма экранирования таких символов перед сохранением данных. \n\nПример теста из описания задачи демонстрирует проблему с сохранением специальных символов, включая китайские иероглифы и математические символы.",
+      "checks": {
+        "pass": true,
+        "missing_terms": [],
+        "forbidden_terms": [],
+        "language_ok": true,
+        "length": 689,
+        "length_ok": true,
+        "sources_ok": true
+      },
+      "latency_s": 2.788,
+      "error": null
+    }
+  ]
+}

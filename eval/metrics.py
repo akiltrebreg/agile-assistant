@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 JUDGE_MODEL = "openai/gpt-5.2"
 JUDGE_BASE_URL = "https://api.vsellm.ru/v1"
-EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
+EMBEDDING_MODEL: str | None = None  # lazy: set from settings in _build_embeddings()
 
 METRIC_NAMES = (
     "context_precision",
@@ -75,13 +75,23 @@ def _build_judge_llm():
 
 
 def _build_embeddings():
-    """Build embeddings for the answer_relevancy metric."""
+    """Build embeddings for the answer_relevancy metric.
+
+    Uses the same S3-aware resolver as the production retriever
+    (``ensure_embedding_model_downloaded``) so the local snapshot under
+    ``/app/models/{embedding_model}/`` is reused. ``settings.embedding_model``
+    holds a folder name (not a HF Hub ID) when ``S3_MODELS_BUCKET`` is set,
+    so passing it directly to ``HuggingFaceEmbeddings`` would force a Hub
+    lookup at ``sentence-transformers/<folder>`` and fail with 401.
+    """
     from langchain_huggingface import HuggingFaceEmbeddings
     from ragas.embeddings import LangchainEmbeddingsWrapper
 
+    from hse_prom_prog.rag.embeddings import ensure_embedding_model_downloaded
+
     emb = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={"device": "cpu"},
+        model_name=ensure_embedding_model_downloaded(),
+        model_kwargs={"device": "cpu", "trust_remote_code": True},
         encode_kwargs={"normalize_embeddings": True},
     )
     return LangchainEmbeddingsWrapper(emb)
@@ -132,7 +142,7 @@ def evaluate_rag(samples: list[RAGSample]) -> dict:
     dataset = EvaluationDataset(samples=ragas_samples)
 
     logger.info("Running RAGAS evaluation on %d samples …", len(samples))
-    result = evaluate(dataset=dataset, metrics=metrics)
+    result = evaluate(dataset=dataset, metrics=metrics, llm=llm, embeddings=emb)
 
     df = result.to_pandas()
     metric_cols = [

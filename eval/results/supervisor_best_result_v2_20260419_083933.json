@@ -1,0 +1,1832 @@
+{
+  "experiment": "supervisor_best_result_v2",
+  "timestamp": "20260419_083933",
+  "aggregate": {
+    "total": 66,
+    "routing_match": 65,
+    "exact_match": 62,
+    "partial_match": 63,
+    "routing_accuracy": 0.985,
+    "exact_accuracy": 0.939
+  },
+  "results": [
+    {
+      "id": 1,
+      "query": "Расскажи о задаче AL-38787",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 2,
+      "query": "Покажи данные по задаче AL-38799",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38799"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38799"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 3,
+      "query": "AL-38787",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 4,
+      "query": "Что там с AL-39041?",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-39041"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-39041"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 5,
+      "query": "Информация о задаче AL-99999",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-99999"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-99999"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 6,
+      "query": "Выведи задачу DATA-1234",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "DATA-1234"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "DATA-1234"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 7,
+      "query": "покажи AL-40001 в подробностях",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-40001"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-40001"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 8,
+      "query": "задача RND-55",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "RND-55"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "RND-55"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 9,
+      "query": "open AL-38787",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 10,
+      "query": "Details for AL-38800",
+      "category": "task_regex",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38800"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38800"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 11,
+      "query": "Все задачи команды cthulhu",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.629,
+      "error": null
+    },
+    {
+      "id": 12,
+      "query": "Задачи команды lpop в спринте #1 Q1'26",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "sprint_name": "#1 Q1'26"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "sprint_name": "#1 Q1'26"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.744,
+      "error": null
+    },
+    {
+      "id": 13,
+      "query": "Покажи все баги",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "issue_type": "Bug"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "issue_type": "Bug"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.481,
+      "error": null
+    },
+    {
+      "id": 14,
+      "query": "Баги в кластере Logistics",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "issue_type": "Bug",
+          "cluster": "Logistics"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_type": "Bug",
+          "cluster": "Logistics"
+        }
+      },
+      "routing_match": true,
+      "intent_match": false,
+      "entities_match": true,
+      "partial_match": false,
+      "exact_match": false,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.568,
+      "error": null
+    },
+    {
+      "id": 15,
+      "query": "Задачи со статусом In Progress",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "status": "In Progress"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "status": "In Progress"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.465,
+      "error": null
+    },
+    {
+      "id": 16,
+      "query": "Задачи исполнителя yuvpetrov",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "assignee": "yuvpetrov"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "assignee": "yuvpetrov"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.524,
+      "error": null
+    },
+    {
+      "id": 17,
+      "query": "Закрытые баги команды lpop",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "issue_type": "Bug",
+          "status": "Closed"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "issue_type": "Bug"
+        }
+      },
+      "routing_match": true,
+      "intent_match": false,
+      "entities_match": false,
+      "partial_match": false,
+      "exact_match": false,
+      "entity_mismatches": [
+        "status: None != 'Closed'"
+      ],
+      "fast_path": false,
+      "latency_s": 0.6,
+      "error": null
+    },
+    {
+      "id": 18,
+      "query": "Сторис команды linehaul в активном спринте",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "linehaul",
+          "issue_type": "Story"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "linehaul",
+          "issue_type": "Story"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.639,
+      "error": null
+    },
+    {
+      "id": 19,
+      "query": "Покажи задачи marketplace",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "marketplace"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "marketplace"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.497,
+      "error": null
+    },
+    {
+      "id": 20,
+      "query": "задачи команды shopping cart в кластере Mobile",
+      "category": "tasks_filter",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "shopping cart",
+          "cluster": "Mobile"
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "shopping cart",
+          "cluster": "Mobile"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.603,
+      "error": null
+    },
+    {
+      "id": 21,
+      "query": "Какой scope drop у команды cthulhu?",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "scope_drop"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "scope_drop"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.654,
+      "error": null
+    },
+    {
+      "id": 22,
+      "query": "Done total команды lpop",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "metric_name": "done_total"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "metric_name": "done_total"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.631,
+      "error": null
+    },
+    {
+      "id": 23,
+      "query": "Velocity команды linehaul",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "linehaul",
+          "metric_name": "velocity"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "linehaul",
+          "metric_name": "velocity"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.589,
+      "error": null
+    },
+    {
+      "id": 24,
+      "query": "Sprint goal команды lpop",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "metric_name": "sprint_goal"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "lpop",
+          "metric_name": "sprint_goal"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.643,
+      "error": null
+    },
+    {
+      "id": 25,
+      "query": "Cancel rate команды marketplace",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "marketplace",
+          "metric_name": "cancel_rate"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "marketplace",
+          "metric_name": "cancel_rate"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.633,
+      "error": null
+    },
+    {
+      "id": 26,
+      "query": "Метрики спринта #1 Q1'26",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "sprint_name": "#1 Q1'26"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "sprint_name": "#1 Q1'26"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.546,
+      "error": null
+    },
+    {
+      "id": 27,
+      "query": "Среднее значение done total у команды cthulhu",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "done_total"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "done_total"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.644,
+      "error": null
+    },
+    {
+      "id": 28,
+      "query": "Суммарная velocity команды rint за все спринты",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "rint",
+          "metric_name": "velocity"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "rint",
+          "metric_name": "velocity"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.585,
+      "error": null
+    },
+    {
+      "id": 29,
+      "query": "У какой команды самый высокий done_total?",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "metric_name": "done_total"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "metric_name": "done_total"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.483,
+      "error": null
+    },
+    {
+      "id": 30,
+      "query": "Топ-5 команд по средней velocity",
+      "category": "metric",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "metric_name": "velocity"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "metric_name": "velocity"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.451,
+      "error": null
+    },
+    {
+      "id": 31,
+      "query": "Как рассчитывается Done Total?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.354,
+      "error": null
+    },
+    {
+      "id": 32,
+      "query": "Какой целевой порог метрики Done Total?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.491,
+      "error": null
+    },
+    {
+      "id": 33,
+      "query": "Что такое Scope Drop и каков его целевой порог?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.351,
+      "error": null
+    },
+    {
+      "id": 34,
+      "query": "Как снизить Scope Drop?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.345,
+      "error": null
+    },
+    {
+      "id": 35,
+      "query": "Сколько Sprint Goals оптимально брать в спринт?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.356,
+      "error": null
+    },
+    {
+      "id": 36,
+      "query": "Что такое Definition of Done?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.353,
+      "error": null
+    },
+    {
+      "id": 37,
+      "query": "Какие бейзлайновые значения метрик?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.36,
+      "error": null
+    },
+    {
+      "id": 38,
+      "query": "Что делать если velocity падает?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.353,
+      "error": null
+    },
+    {
+      "id": 39,
+      "query": "Расскажи про метрику scope drop",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.355,
+      "error": null
+    },
+    {
+      "id": 40,
+      "query": "Как идентифицируется Sprint Goal в JIRA?",
+      "category": "rag",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.356,
+      "error": null
+    },
+    {
+      "id": 41,
+      "query": "Покажи scope drop команды cthulhu и дай рекомендации",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "scope_drop"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "scope_drop"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.658,
+      "error": null
+    },
+    {
+      "id": 42,
+      "query": "Done total команды lpop и что можно улучшить",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "lpop",
+          "metric_name": "done_total"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "lpop",
+          "metric_name": "done_total"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.649,
+      "error": null
+    },
+    {
+      "id": 43,
+      "query": "Velocity linehaul — как её повысить?",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "linehaul",
+          "metric_name": "velocity"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "linehaul",
+          "metric_name": "velocity"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.612,
+      "error": null
+    },
+    {
+      "id": 44,
+      "query": "Cancel rate marketplace и как с этим бороться",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "marketplace",
+          "metric_name": "cancel_rate"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "marketplace",
+          "metric_name": "cancel_rate"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.636,
+      "error": null
+    },
+    {
+      "id": 45,
+      "query": "Посмотри sprint goal команды cthulhu и объясни метрику",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "sprint_goal"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "sprint_goal"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.673,
+      "error": null
+    },
+    {
+      "id": 46,
+      "query": "Покажи метрики команды shopping cart и дай советы",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "shopping cart"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "shopping cart"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.486,
+      "error": null
+    },
+    {
+      "id": 47,
+      "query": "scope drop команды rint — это нормально?",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "rint",
+          "metric_name": "scope_drop"
+        }
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": false,
+      "intent_match": false,
+      "entities_match": false,
+      "partial_match": false,
+      "exact_match": false,
+      "entity_mismatches": [
+        "team_name: None != 'rint'",
+        "metric_name: None != 'scope_drop'"
+      ],
+      "fast_path": false,
+      "latency_s": 0.353,
+      "error": null
+    },
+    {
+      "id": 48,
+      "query": "Что с метриками команды linehaul и как их улучшить",
+      "category": "hybrid",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "linehaul"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "linehaul"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.481,
+      "error": null
+    },
+    {
+      "id": 49,
+      "query": "Привет",
+      "category": "simple",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.35,
+      "error": null
+    },
+    {
+      "id": 50,
+      "query": "Здравствуйте",
+      "category": "simple",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.347,
+      "error": null
+    },
+    {
+      "id": 51,
+      "query": "Спасибо!",
+      "category": "simple",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.348,
+      "error": null
+    },
+    {
+      "id": 52,
+      "query": "Как дела?",
+      "category": "simple",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.344,
+      "error": null
+    },
+    {
+      "id": 53,
+      "query": "Что ты умеешь?",
+      "category": "simple",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.346,
+      "error": null
+    },
+    {
+      "id": 54,
+      "query": "Hi there",
+      "category": "simple",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.346,
+      "error": null
+    },
+    {
+      "id": 55,
+      "query": "Привет, расскажи про AL-38787",
+      "category": "adversarial",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 56,
+      "query": "Задачи команды AL-38787",
+      "category": "adversarial",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 57,
+      "query": "DROP TABLE report_agile_dashboard",
+      "category": "adversarial",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.567,
+      "error": null
+    },
+    {
+      "id": 58,
+      "query": "Задачи по Done Total у команды cthulhu",
+      "category": "adversarial",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "done_total"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "done_total"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.637,
+      "error": null
+    },
+    {
+      "id": 59,
+      "query": "How's velocity of linehaul team?",
+      "category": "adversarial",
+      "expected": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "linehaul",
+          "metric_name": "velocity"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "linehaul",
+          "metric_name": "velocity"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.584,
+      "error": null
+    },
+    {
+      "id": 60,
+      "query": "Scope drop",
+      "category": "adversarial",
+      "expected": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "rag",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.346,
+      "error": null
+    },
+    {
+      "id": 61,
+      "query": "Покажи задачи",
+      "category": "adversarial",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.384,
+      "error": null
+    },
+    {
+      "id": 62,
+      "query": "al-38787",
+      "category": "adversarial",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 63,
+      "query": "задачи cthulhu и сравни с linehaul",
+      "category": "adversarial",
+      "expected": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": [
+            "cthulhu",
+            "linehaul"
+          ]
+        }
+      },
+      "actual": {
+        "intent": "tasks_filter",
+        "query_type": "sql",
+        "entities": {
+          "team_name": "cthulhu"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": false,
+      "partial_match": true,
+      "exact_match": false,
+      "entity_mismatches": [
+        "team_name: 'cthulhu' != ['cthulhu', 'linehaul']"
+      ],
+      "fast_path": false,
+      "latency_s": 0.659,
+      "error": null
+    },
+    {
+      "id": 64,
+      "query": "AL-38787 это хорошо или плохо?",
+      "category": "adversarial",
+      "expected": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "actual": {
+        "intent": "task",
+        "query_type": "sql",
+        "entities": {
+          "issue_key": "AL-38787"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": true,
+      "latency_s": 0.0,
+      "error": null
+    },
+    {
+      "id": 65,
+      "query": "",
+      "category": "adversarial",
+      "expected": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "actual": {
+        "intent": "general",
+        "query_type": "simple",
+        "entities": {}
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.347,
+      "error": null
+    },
+    {
+      "id": 66,
+      "query": "расскажи как считается Done Total и покажи значение у cthulhu",
+      "category": "adversarial",
+      "expected": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "done_total"
+        }
+      },
+      "actual": {
+        "intent": "metric",
+        "query_type": "hybrid",
+        "entities": {
+          "team_name": "cthulhu",
+          "metric_name": "done_total"
+        }
+      },
+      "routing_match": true,
+      "intent_match": true,
+      "entities_match": true,
+      "partial_match": true,
+      "exact_match": true,
+      "entity_mismatches": [],
+      "fast_path": false,
+      "latency_s": 0.655,
+      "error": null
+    }
+  ]
+}

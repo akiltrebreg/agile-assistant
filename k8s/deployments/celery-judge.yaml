@@ -1,0 +1,78 @@
+# Phase 4: dedicated worker for the ``judge`` queue (LLM-as-a-Judge).
+# Mirrors docker-compose's celery-judge: separate process, separate
+# Prometheus port (9101) so it doesn't collide with celery-worker's
+# 9100 sidecar, and --queues=judge isolates its consumption from
+# user-facing workflow tasks (a slow vsellm call can't starve them).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-judge
+  namespace: agile-assistant
+  labels:
+    app: celery-judge
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-judge
+  template:
+    metadata:
+      labels:
+        app: celery-judge
+    spec:
+      imagePullSecrets:
+        - name: registry-credentials
+      containers:
+        - name: celery-judge
+          image: ghcr.io/akiltrebreg/agile-assistant:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - hse_prom_prog.tasks.celery_app
+            - worker
+            - --loglevel=info
+            - --pool=threads
+            - --concurrency=2
+            - --queues=judge
+            - --hostname=judge@%h
+          ports:
+            - name: http-metrics
+              containerPort: 9101
+          env:
+            # Override default 9100 so the judge worker binds 9101 — the
+            # port the celery-judge ServiceMonitor scrapes.
+            - name: PROMETHEUS_PORT
+              value: "9101"
+            - name: JUDGE_ENABLED
+              value: "true"
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
+          readinessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import os; assert os.path.exists('/proc/1/status')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import os; assert os.path.exists('/proc/1/status')"
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi

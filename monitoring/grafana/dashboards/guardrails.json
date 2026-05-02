@@ -1,0 +1,343 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Guardrails",
+      "id": 100,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "piechart",
+      "title": "L1: TopicGuard Results (1h)",
+      "id": 1,
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (increase(agile_assistant_guardrail_l1_results_total[1h]))",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "L1: Injection Blocks Over Time",
+      "id": 2,
+      "gridPos": { "x": 8, "y": 1, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.001 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_guardrail_l1_results_total{reason=\"injection_blocked\"}[5m])",
+          "legendFormat": "injections/s"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "L2: SQLGuard Blocks by Layer (1h)",
+      "id": 3,
+      "gridPos": { "x": 16, "y": 1, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" },
+        "xField": "layer"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (layer) (increase(agile_assistant_guardrail_l2_results_total{allowed=\"false\"}[1h]))",
+          "legendFormat": "{{layer}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "L3: ResponseGuard Results (1h)",
+      "id": 4,
+      "gridPos": { "x": 0, "y": 9, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (passed, blocked) (increase(agile_assistant_guardrail_l3_results_total[1h]))",
+          "legendFormat": "passed={{passed}} blocked={{blocked}}"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "L3: Failed Check Types (1h)",
+      "id": 5,
+      "gridPos": { "x": 8, "y": 9, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" },
+        "xField": "check_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (check_name) (increase(agile_assistant_guardrail_l3_checks_failed_total[1h]))",
+          "legendFormat": "{{check_name}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Off-Topic Rate",
+      "id": 6,
+      "gridPos": { "x": 16, "y": 9, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_supervisor_classifications_total{query_type=\"off_topic\"}[5m])",
+          "legendFormat": "off-topic/s"
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "Entity Sanitizer",
+      "id": 200,
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "barchart",
+      "title": "Corrections by Layer (1h)",
+      "id": 7,
+      "gridPos": { "x": 0, "y": 18, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" },
+        "xField": "layer"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (layer) (increase(agile_assistant_sanitizer_corrections_total[1h]))",
+          "legendFormat": "{{layer}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Anaphora Carry-Forward by Entity (1h)",
+      "id": 8,
+      "gridPos": { "x": 8, "y": 18, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" },
+        "xField": "entity_type"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (entity_type) (increase(agile_assistant_sanitizer_anaphora_carries_total[1h]))",
+          "legendFormat": "{{entity_type}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Fallback Extractions by Field (1h)",
+      "id": 9,
+      "gridPos": { "x": 16, "y": 18, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" },
+        "xField": "field"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "round(sum by (field) (increase(agile_assistant_sanitizer_fallback_extractions_total[1h])))",
+          "legendFormat": "{{field}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "Memory",
+      "id": 300,
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Context Window Tokens (median/p95)",
+      "id": 10,
+      "gridPos": { "x": 0, "y": 27, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum(rate(agile_assistant_memory_context_tokens_bucket[5m])) by (le))",
+          "legendFormat": "median"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(agile_assistant_memory_context_tokens_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Context Turns (median)",
+      "id": 11,
+      "gridPos": { "x": 12, "y": 27, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum(rate(agile_assistant_memory_context_turns_bucket[5m])) by (le))",
+          "legendFormat": "median turns"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Session Rotations by Reason (1h)",
+      "id": 12,
+      "gridPos": { "x": 0, "y": 35, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (increase(agile_assistant_memory_session_rotations_total[1h]))",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Profile Updates & Summarizations",
+      "id": 13,
+      "gridPos": { "x": 12, "y": 35, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(agile_assistant_memory_profile_updates_total[5m]))",
+          "legendFormat": "Profile updates"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(agile_assistant_memory_summarizations_total[5m]))",
+          "legendFormat": "Summarizations"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["agile-assistant", "guardrails"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Agile Assistant — Guardrails & Safety",
+  "uid": "agile-guardrails",
+  "version": 1,
+  "weekStart": ""
+}

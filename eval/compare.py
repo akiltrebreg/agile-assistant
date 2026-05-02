@@ -108,7 +108,7 @@ def _print_config_diff(results: list[dict]) -> None:
         print("\nPipeline configs are identical across experiments.")
         return
 
-    print(f"\n{'Config differences':}")
+    print("\nConfig differences:")
     print(tabulate(diff_rows, headers=["param", *labels], tablefmt="simple"))
 
 

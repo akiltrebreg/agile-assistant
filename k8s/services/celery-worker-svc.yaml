@@ -1,0 +1,25 @@
+# Headless Service for celery-worker pods.
+#
+# Celery has no inbound traffic — workers pull from Redis — so the only
+# reason this Service exists is to give Prometheus Operator's
+# ServiceMonitor a stable selector and a named port for endpoint
+# discovery. clusterIP: None keeps the Service routing-free; pods are
+# discovered by EndpointSlice via the label selector.
+apiVersion: v1
+kind: Service
+metadata:
+  name: celery-worker
+  namespace: agile-assistant
+  labels:
+    app: celery-worker
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: celery-worker
+  ports:
+    - name: http-metrics
+      port: 9100
+      targetPort: http-metrics
+      protocol: TCP

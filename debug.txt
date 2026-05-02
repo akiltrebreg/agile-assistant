@@ -1,0 +1,8 @@
+Initializing database connection to postgresql://hse_user:****@postgres:5432/hse_jira_db
+Database connection initialized successfully
+[SQL Agent] Initialized LangGraph agent (model=/models/qwen3-8b-awq-4bit, url=http://vllm-sql:8000/v1)
+[SQL Agent] Processing: Расскажи о задаче AL-38787
+HTTP Request: POST http://vllm-sql:8000/v1/chat/completions "HTTP/1.1 200 OK"
+[SQL Agent] LLM response: tool_calls=0, content='!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+RESULT: {'original_query': 'Расскажи о задаче AL-38787', 'sql_query': None, 'sql_result': None, 'error': None}
+[SQL Agent] Returned 0 row(s)

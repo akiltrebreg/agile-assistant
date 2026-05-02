@@ -41,12 +41,14 @@ class TaskRepository:
         self,
         query: str,
         celery_task_id: str | None = None,
+        conversation_id: UUID | None = None,
     ) -> Task:
         """Create a new task with PENDING status.
 
         Args:
             query: User query to process.
             celery_task_id: Optional Celery task ID for tracking.
+            conversation_id: Optional memory-layer conversation id.
 
         Returns:
             Created Task instance with generated task_id.
@@ -55,10 +57,11 @@ class TaskRepository:
             SQLAlchemyError: If database operation fails.
         """
         sql = """
-            INSERT INTO tasks (query, status, celery_task_id)
-            VALUES (:query, :status, :celery_task_id)
+            INSERT INTO tasks (query, status, celery_task_id, conversation_id)
+            VALUES (:query, :status, :celery_task_id, :conversation_id)
             RETURNING task_id, query, status, result, error, celery_task_id,
-                      created_at, started_at, completed_at, workflow_state
+                      created_at, started_at, completed_at, workflow_state,
+                      conversation_id
         """
 
         try:
@@ -69,6 +72,7 @@ class TaskRepository:
                         "query": query,
                         "status": TaskStatus.PENDING.value,
                         "celery_task_id": celery_task_id,
+                        "conversation_id": (str(conversation_id) if conversation_id else None),
                     },
                 )
                 session.commit()
@@ -94,7 +98,8 @@ class TaskRepository:
         """
         sql = """
             SELECT task_id, query, status, result, error, celery_task_id,
-                   created_at, started_at, completed_at, workflow_state
+                   created_at, started_at, completed_at, workflow_state,
+                   conversation_id
             FROM tasks
             WHERE task_id = :task_id
         """
@@ -184,6 +189,41 @@ class TaskRepository:
             logger.error(f"[TaskRepository] Failed to update task {task_id}: {e}")
             raise
 
+    def update_conversation_id(self, task_id: UUID, conversation_id: UUID) -> None:
+        """Repoint a task at a different conversation.
+
+        Used when the worker rotates a stale conversation mid-flight: the
+        request was originally accepted against the old conversation, but
+        actually executed in the context of a freshly created one. Without
+        this the audit row in ``tasks`` keeps pointing at the closed
+        conversation, which makes debugging "which session ran this query"
+        misleading.
+        """
+        sql = "UPDATE tasks SET conversation_id = :conversation_id WHERE task_id = :task_id"
+        try:
+            with self.db.get_session() as session:
+                session.execute(
+                    text(sql),
+                    {
+                        "task_id": str(task_id),
+                        "conversation_id": str(conversation_id),
+                    },
+                )
+                session.commit()
+                logger.info(
+                    "[TaskRepository] Repointed task %s to conversation %s",
+                    task_id,
+                    conversation_id,
+                )
+        except SQLAlchemyError as e:
+            logger.error(
+                "[TaskRepository] Failed to repoint task %s to conversation %s: %s",
+                task_id,
+                conversation_id,
+                e,
+            )
+            raise
+
     def _row_to_task(self, row: Any) -> Task:
         """Convert database row to Task instance.
 
@@ -204,4 +244,5 @@ class TaskRepository:
             started_at=row.started_at,
             completed_at=row.completed_at,
             workflow_state=row.workflow_state,  # Already parsed from JSONB
+            conversation_id=getattr(row, "conversation_id", None),
         )

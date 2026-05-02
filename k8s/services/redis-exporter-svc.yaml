@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exporter
+  namespace: agile-assistant
+  labels:
+    app: redis-exporter
+    app.kubernetes.io/part-of: agile-assistant
+spec:
+  type: ClusterIP
+  selector:
+    app: redis-exporter
+  ports:
+    - name: http-metrics
+      port: 9121
+      targetPort: http-metrics
+      protocol: TCP

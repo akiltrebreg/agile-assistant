@@ -13,10 +13,25 @@ services:
         condition: service_healthy
       static:
         condition: service_started
+      # Monitoring upstreams: nginx config references prometheus and
+      # grafana hostnames; if either container is missing at startup
+      # nginx fails the resolver. service_started is enough — gzip
+      # + first-request DNS lookup handle the rest.
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
+      langfuse:
+        condition: service_started
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount the directory (not a single file): bind-mounting a single
+      # file pins to its inode, so atomic rewrites by `git pull` or an
+      # editor leave the container holding the stale version. Mounting
+      # the parent dir makes new content visible immediately, so a
+      # plain `nginx -s reload` is enough — no --force-recreate.
+      - ./nginx:/etc/nginx/conf.d:ro
       - static_files:/var/www/static:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
@@ -71,7 +86,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./database/data:/docker-entrypoint-initdb.d/data
+      # Second init script: creates the langfuse_db sidecar database.
+      # Init scripts run only on first volume init — for an existing
+      # postgres_data volume, create the DB manually via psql.
+      - ./database/init-langfuse.sql:/docker-entrypoint-initdb.d/init-langfuse.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hse_user}"]
       interval: 10s
@@ -80,18 +98,188 @@ services:
     networks:
       - hse-network
 
-  # vLLM service for serving the LLM model
+  # Download avibe-gptq-8bit model from Yandex Cloud S3 into shared volume
+  download-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/avibe-gptq-8bit/config.json ]; then
+          echo "Model already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading avibe-gptq-8bit from S3..."
+        aws s3 sync \
+          s3://${S3_BUCKET:-quant-models-agile}/${S3_MODEL_PATH:-models/avibe-gptq-8bit}/ \
+          /models/avibe-gptq-8bit/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/avibe-gptq-8bit/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/avibe-gptq-8bit/
+    volumes:
+      - vllm-cache:/models
+    networks:
+      - hse-network
+
+  # Download Qwen3-8B-AWQ from S3 into shared volume
+  download-sql-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/qwen3-8b-awq-4bit/config.json ]; then
+          echo "Qwen3-8B-AWQ already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading qwen3-8b-awq-4bit from S3..."
+        aws s3 sync \
+          s3://${S3_BUCKET:-quant-models-agile}/models/qwen3-8b-awq-4bit/ \
+          /models/qwen3-8b-awq-4bit/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/qwen3-8b-awq-4bit/config.json || { echo "ERROR: config.json not found"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/qwen3-8b-awq-4bit/
+    volumes:
+      - vllm-cache:/models
+    networks:
+      - hse-network
+
+  # Download embedding model (multilingual-e5-base) from Yandex Cloud S3
+  # into the shared volume that the API and Celery workers mount at
+  # /app/models. Mirrors the download-model / download-sql-model pattern;
+  # ensure_embedding_model_downloaded() in rag/embeddings.py also handles
+  # this at runtime as a safety net for ad-hoc / non-compose runs.
+  download-embedding-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/multilingual-e5-base/config.json ]; then
+          echo "multilingual-e5-base already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading multilingual-e5-base from S3..."
+        aws s3 sync \
+          s3://${S3_MODELS_BUCKET:-quant-models-agile}/${S3_MODELS_PATH:-models}/multilingual-e5-base/ \
+          /models/multilingual-e5-base/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/multilingual-e5-base/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/multilingual-e5-base/
+    volumes:
+      - embedding-models:/models
+    networks:
+      - hse-network
+
+  # Download cross-encoder reranker (BAAI/bge-reranker-v2-m3) from Yandex Cloud
+  # S3 into the same shared volume as the embedding model. Matches the
+  # download-embedding-model pattern and removes the runtime HuggingFace Hub
+  # dependency in celery-worker. ensure_reranker_model_downloaded() in
+  # rag/reranker.py is the runtime safety net for ad-hoc / non-compose runs.
+  download-reranker-model:
+    image: amazon/aws-cli:2.22.35
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        if [ -f /models/bge-reranker-v2-m3/config.json ]; then
+          echo "bge-reranker-v2-m3 already downloaded, skipping"
+          exit 0
+        fi
+        echo "Downloading bge-reranker-v2-m3 from S3..."
+        aws s3 sync \
+          s3://${S3_MODELS_BUCKET:-quant-models-agile}/${S3_MODELS_PATH:-models}/bge-reranker-v2-m3/ \
+          /models/bge-reranker-v2-m3/ \
+          --endpoint-url ${S3_ENDPOINT:-https://storage.yandexcloud.net} || exit 1
+        test -f /models/bge-reranker-v2-m3/config.json || { echo "ERROR: config.json not found after download"; exit 1; }
+        echo "Download complete"
+        ls -lh /models/bge-reranker-v2-m3/
+    volumes:
+      - embedding-models:/models
+    networks:
+      - hse-network
+
+  # vLLM for SQL Agent (Qwen3-8B-AWQ, port 8001)
+  vllm-sql:
+    image: vllm/vllm-openai:v0.9.1
+    container_name: vllm-sql-server
+    depends_on:
+      download-sql-model:
+        condition: service_completed_successfully
+    ports:
+      - "8001:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    command:
+      - --model=/models/qwen3-8b-awq-4bit
+      - --dtype=auto
+      - --max-model-len=6144
+      - --gpu-memory-utilization=0.38
+      - --max-num-seqs=2
+      - --enforce-eager
+      - --enable-auto-tool-choice
+      - --tool-call-parser=hermes
+    volumes:
+      - vllm-cache:/models
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    networks:
+      - hse-network
+
+  # vLLM service for serving the main LLM (avibe-gptq-8bit from S3)
   vllm:
-    image: vllm/vllm-openai:v0.8.5
+    image: vllm/vllm-openai:v0.9.1
     container_name: vllm-server
+    depends_on:
+      download-model:
+        condition: service_completed_successfully
+      vllm-sql:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
     command:
-      - --model=Qwen/Qwen2.5-3B-Instruct
+      - --model=/models/avibe-gptq-8bit
+      - --quantization=gptq
+      - --dtype=float16
+      - --max-model-len=6144
+      - --gpu-memory-utilization=0.55
+      - --max-num-seqs=2
+      - --enforce-eager
     volumes:
-      - vllm-cache:/root/.cache/huggingface
+      - vllm-cache:/models
     ipc: host
     deploy:
       resources:
@@ -120,12 +308,16 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      vllm-sql:
+        condition: service_healthy
       qdrant:
         condition: service_healthy
     environment:
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
+      - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
+      - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -134,8 +326,17 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
       - QDRANT_URL=http://qdrant:6333
       - QDRANT_COLLECTION_NAME=business_docs
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+      - S3_KB_BUCKET=${S3_KB_BUCKET:-knowledge-base}
+      - S3_KB_PATH=${S3_KB_PATH:-knowledge_base}
+      - S3_DATA_BUCKET=${S3_DATA_BUCKET:-database-agile}
+      - S3_DATA_PATH=${S3_DATA_PATH:-data}
+      - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
+      - ./eval:/app/eval
       - ./.env:/app/.env
     stdin_open: true
     tty: true
@@ -175,11 +376,20 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      vllm-sql:
+        condition: service_healthy
+      download-embedding-model:
+        condition: service_completed_successfully
+      download-reranker-model:
+        condition: service_completed_successfully
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
+      - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
+      - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
+      - EMBEDDING_MODEL_CACHE_DIR=/app/models
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -191,12 +401,20 @@ services:
       - REDIS_DB=0
       - FASTAPI_HOST=0.0.0.0
       - FASTAPI_PORT=8080
+      # Langfuse tracing (Phase 3) — keys come from .env, host is the
+      # in-network DNS name. ENABLED=false disables the SDK entirely so
+      # the service still runs without a Langfuse container.
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
     # No external ports — nginx is the single public entrypoint
     expose:
       - "8080"
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+      - embedding-models:/app/models
     # Production: gunicorn with uvicorn workers (no --reload)
     command:
       gunicorn hse_prom_prog.api.app:app -k uvicorn.workers.UvicornWorker --bind
@@ -222,13 +440,22 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      vllm-sql:
+        condition: service_healthy
       qdrant:
         condition: service_healthy
+      download-embedding-model:
+        condition: service_completed_successfully
+      download-reranker-model:
+        condition: service_completed_successfully
     environment:
       - DEBUG=false
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
+      - VLLM_MODEL=/models/avibe-gptq-8bit
       - VLLM_API_KEY=EMPTY
+      - SQL_VLLM_BASE_URL=http://vllm-sql:8000/v1
+      - SQL_VLLM_MODEL=/models/qwen3-8b-awq-4bit
+      - EMBEDDING_MODEL_CACHE_DIR=/app/models
       - LOG_LEVEL=INFO
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -242,23 +469,186 @@ services:
       - QDRANT_COLLECTION_NAME=business_docs
       - CELERY_TASK_TIME_LIMIT=600
       - CELERY_TASK_SOFT_TIME_LIMIT=300
+      # Langfuse tracing (Phase 3). The Celery worker is where most
+      # spans actually originate (workflow runs here), so the env vars
+      # must mirror the api service.
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
-    # --pool=threads: I/O-bound tasks (waiting for vLLM HTTP), not CPU-bound
+      - embedding-models:/app/models
+    # Prometheus side-car port (metrics exporter started by celery_app.py).
+    # Internal-only — Prometheus scrapes celery-worker:9100 over the docker network.
+    expose:
+      - "9100"
+    # --pool=threads: I/O-bound tasks (waiting for vLLM HTTP), not CPU-bound.
+    # --concurrency=1: parallelism comes from k8s horizontal scaling (multiple
+    # replicas with concurrency=1 each), not from in-process threads. Keeps
+    # Compose and k8s deployments behaviourally identical and avoids GIL /
+    # shared-memory contention on the single-GPU vLLM bottleneck.
     command:
       celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
-      --pool=threads --concurrency=4
+      --pool=threads --concurrency=1
     healthcheck:
+      # ``inspect ping`` was previously used here but the cold Python
+      # import inside the probe (langgraph + qdrant + tokenizers,
+      # ~25s) plus the 20s broker wait blew past Docker's healthcheck
+      # timeout — the worker was functionally healthy but Docker
+      # marked it unhealthy. The Prometheus side-car on :9100 is
+      # bound only after ``worker_process_init`` fires, so a 200 here
+      # proves both that the process is alive AND that signal
+      # handlers (which is what makes the worker actually consume
+      # tasks) are wired up. ~50 ms instead of ~30 s.
       test:
         [
-          "CMD-SHELL",
-          "celery -A hse_prom_prog.tasks.celery_app inspect ping --timeout 10",
+          "CMD",
+          "curl",
+          "-fs",
+          "-o",
+          "/dev/null",
+          "http://localhost:9100/metrics",
         ]
       interval: 30s
-      timeout: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hse-network
+
+  # ──────────────────────────────────────────────────────────────
+  # Celery Beat — scheduler for periodic tasks (Phase 5).
+  # Single-instance only: two beats would double-schedule every job
+  # and we'd reload the Jira CSV twice per slot. Hard-coded
+  # container_name + replicas-of-one (k8s) enforces this in both
+  # deployment topologies. No --pool flag because Beat doesn't
+  # process tasks; it only enqueues them. The scheduled
+  # sync_jira_data / sync_knowledge_base run on celery-worker.
+  # No Prometheus port: tasks emit metrics from the worker that
+  # consumes them, not from Beat itself.
+  # ──────────────────────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hse-prom-prog-celery-beat
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    # ``celery beat`` exits 0 immediately if the schedule file is in
+    # an unwritable location (rare) — we route it to /tmp inside the
+    # container, matching beat_schedule_filename in celery_app.py.
+    command:
+      celery -A hse_prom_prog.tasks.celery_app beat --loglevel=info
+      --schedule=/tmp/celerybeat-schedule
+    healthcheck:
+      # Beat has no metrics endpoint and no inspect-ping; the strongest
+      # liveness signal without packaging extras is "PID 1 is alive".
+      # ``pgrep`` would be cleaner but it lives in ``procps`` which
+      # isn't in python:3.12-slim — same /proc-based probe we use for
+      # the k8s liveness check (k8s/deployments/celery-beat.yaml).
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import os; assert os.path.exists('/proc/1/status')",
+        ]
+      interval: 60s
+      timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - hse-network
+
+  # ──────────────────────────────────────────────────────────────
+  # Celery worker — judge queue (Phase 4: LLM-as-a-Judge)
+  # Same image as celery-worker, separate process listening only on
+  # the ``judge`` queue. Isolation matters because a slow GPT-5.2 call
+  # must never block user-facing workflow tasks. concurrency=2 covers
+  # the realistic enqueue rate (one judge per workflow) without
+  # piling up parallel calls against vsellm rate limits.
+  # ──────────────────────────────────────────────────────────────
+  celery-judge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      # vsellm credentials (judge LLM endpoint).
+      - VSELLM_API_KEY=${VSELLM_API_KEY:-}
+      - VSELLM_BASE_URL=${VSELLM_BASE_URL:-https://api.vsellm.ru/v1}
+      - JUDGE_ENABLED=${JUDGE_ENABLED:-true}
+      # Langfuse — judge writes scores back to the originating trace.
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
+      # Different port than celery-worker (9100) so the two workers can
+      # share a network namespace without colliding on bind. Prometheus
+      # scrape target ``celery-judge:9101`` is wired in prometheus.yml.
+      - PROMETHEUS_PORT=9101
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    expose:
+      - "9101"
+    # --queues=judge isolates the worker from the default queue so a
+    # stuck judge LLM call does not steal capacity from workflow_task.
+    command:
+      celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
+      --pool=threads --concurrency=2 --queues=judge --hostname=judge@%h
+    healthcheck:
+      # Same reasoning as celery-worker: probe the Prometheus side-car
+      # (port 9101 here) instead of running ``inspect ping``, which
+      # paid a 25-30 s import tax on every healthcheck. The metrics
+      # server is bound only after worker_process_init fires, so a
+      # 200 here means "process up + signal handlers wired".
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fs",
+          "-o",
+          "/dev/null",
+          "http://localhost:9101/metrics",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - hse-network
 
@@ -316,12 +706,154 @@ services:
     networks:
       - hse-network
 
+  # ──────────────────────────────────────────────────────────────
+  # Monitoring stack: Prometheus + Grafana + exporters (Phase 1)
+  # ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: hse-prom-prog-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+      # Prometheus owns the /prometheus/ subpath end-to-end: route-prefix
+      # matches the external-url path, so nginx forwards requests as-is
+      # (no prefix stripping). Splitting them causes redirect loops.
+      - "--web.external-url=http://195.209.218.21/prometheus/"
+      - "--web.route-prefix=/prometheus/"
+    # Internal-only — public access goes through nginx /prometheus/
+    # with gzip. Removing the host port mapping shrinks the public
+    # attack surface and forces all traffic through one entrypoint.
+    expose:
+      - "9090"
+    depends_on:
+      - api
+    networks:
+      - hse-network
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: hse-prom-prog-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Subpath behind nginx: SERVE_FROM_SUB_PATH makes Grafana emit
+      # absolute links and asset paths under /grafana/. nginx forwards
+      # the path as-is (proxy_pass without trailing slash).
+      GF_SERVER_ROOT_URL: "http://195.209.218.21/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    # Internal-only — public access via nginx /grafana/ with gzip.
+    expose:
+      - "3000"
+    depends_on:
+      - prometheus
+    networks:
+      - hse-network
+
+  pg-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: hse-prom-prog-pg-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-hse_user}:${POSTGRES_PASSWORD:-hse_password}@postgres:5432/${POSTGRES_DB:-hse_jira_db}?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hse-network
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: hse-prom-prog-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - hse-network
+
+  # ──────────────────────────────────────────────────────────────
+  # Langfuse — LLM tracing (Phase 3)
+  # Self-hosted Next.js app, shares the existing PostgreSQL but uses
+  # its own database (langfuse_db, created by init-langfuse.sql).
+  # ──────────────────────────────────────────────────────────────
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: hse-prom-prog-langfuse
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-hse_user}:${POSTGRES_PASSWORD:-hse_password}@postgres:5432/langfuse_db"
+      NEXTAUTH_SECRET: "${LANGFUSE_NEXTAUTH_SECRET:-changeme-in-production}"
+      # NEXTAUTH_URL MUST match the URL the user types in the browser
+      # (cookies are scoped to host:port). Override via .env on hosts
+      # that aren't localhost — otherwise sign-in / sign-up hang on
+      # callback because the cookie domain doesn't match.
+      NEXTAUTH_URL: "${LANGFUSE_NEXTAUTH_URL:-http://localhost:3001}"
+      SALT: "${LANGFUSE_SALT:-changeme-in-production}"
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+    # 3001 on the host because Grafana already owns 3000. Inside the
+    # docker network Langfuse listens on 3000 (LANGFUSE_HOST default).
+    ports:
+      - "3001:3000"
+    # No healthcheck: the Langfuse v2 image ships without wget/curl,
+    # and the Node-based fetch probe gave false negatives even on a
+    # working server. Real liveness is checked externally via
+    # `curl http://localhost:3001/api/public/health`. tracing.py
+    # degrades gracefully if Langfuse is unreachable, so an absent
+    # healthcheck doesn't risk silent breakage in api/celery-worker.
+    networks:
+      - hse-network
+
+  # One-shot job: download CSVs from S3 and load into PostgreSQL
+  load-data:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-hse_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
+      - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
+      - S3_DATA_BUCKET=${S3_DATA_BUCKET:-database-agile}
+      - S3_DATA_PATH=${S3_DATA_PATH:-data}
+      - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
+    volumes:
+      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./.env:/app/.env
+    command: python -m hse_prom_prog.database.load_csv
+    networks:
+      - hse-network
+
 volumes:
   postgres_data:
   vllm-cache:
   redis_data:
   static_files:
   qdrant_data:
+  prometheus_data:
+  grafana_data:
+  # Shared model snapshots (embedding + reranker), populated by
+  # download-embedding-model + download-reranker-model and consumed by
+  # api / celery-worker via /app/models mount.
+  embedding-models:
 
 networks:
   hse-network:

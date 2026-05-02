@@ -6,8 +6,11 @@ following the FastAPI dependency injection pattern.
 
 from collections.abc import Generator
 
+from fastapi import Depends
+
 from hse_prom_prog.database.connection import DatabaseConnection, get_database
 from hse_prom_prog.database.task_repository import TaskRepository
+from hse_prom_prog.memory.manager import MemoryManager
 
 
 def get_db() -> Generator[DatabaseConnection, None, None]:
@@ -53,3 +56,14 @@ def get_task_repository(
             ...
     """
     return TaskRepository(db)
+
+
+def get_memory_manager(
+    db: DatabaseConnection = Depends(get_db),  # noqa: B008  — FastAPI Depends in default is the standard pattern
+) -> MemoryManager:
+    """Dependency to get a ``MemoryManager`` bound to the request DB.
+
+    The manager is cheap to construct (no connection pool of its own —
+    it reuses ``db.get_session()``) so a per-request instance is fine.
+    """
+    return MemoryManager(db)

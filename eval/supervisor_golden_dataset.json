@@ -1,0 +1,1102 @@
+[
+  {
+    "id": 1,
+    "query": "Расскажи о задаче AL-38787",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "task_regex",
+    "notes": "fast-path: regex must match without LLM"
+  },
+  {
+    "id": 2,
+    "query": "Покажи данные по задаче AL-38799",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38799" }
+    },
+    "category": "task_regex"
+  },
+  {
+    "id": 3,
+    "query": "AL-38787",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "task_regex",
+    "notes": "bare key"
+  },
+  {
+    "id": 4,
+    "query": "Что там с AL-39041?",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-39041" }
+    },
+    "category": "task_regex"
+  },
+  {
+    "id": 5,
+    "query": "Информация о задаче AL-99999",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-99999" }
+    },
+    "category": "task_regex",
+    "notes": "non-existent key, but regex still matches"
+  },
+  {
+    "id": 6,
+    "query": "Выведи задачу DATA-1234",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "DATA-1234" }
+    },
+    "category": "task_regex",
+    "notes": "different project prefix"
+  },
+  {
+    "id": 7,
+    "query": "покажи AL-40001 в подробностях",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-40001" }
+    },
+    "category": "task_regex"
+  },
+  {
+    "id": 8,
+    "query": "задача RND-55",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "RND-55" }
+    },
+    "category": "task_regex"
+  },
+  {
+    "id": 9,
+    "query": "open AL-38787",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "task_regex"
+  },
+  {
+    "id": 10,
+    "query": "Details for AL-38800",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38800" }
+    },
+    "category": "task_regex",
+    "notes": "English query with issue key"
+  },
+
+  {
+    "id": 11,
+    "query": "Все задачи команды cthulhu",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "team_name": "cthulhu" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 12,
+    "query": "Задачи команды lpop в спринте #1 Q1'26",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "team_name": "lpop", "sprint_name": "#1 Q1'26" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 13,
+    "query": "Покажи все баги",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "issue_type": "Bug" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 14,
+    "query": "Баги в кластере Logistics",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "issue_type": "Bug", "cluster": "Logistics" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 15,
+    "query": "Задачи со статусом In Progress",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "status": "In Progress" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 16,
+    "query": "Задачи исполнителя yuvpetrov",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "assignee": "yuvpetrov" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 17,
+    "query": "Закрытые баги команды lpop",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": {
+        "team_name": "lpop",
+        "issue_type": "Bug",
+        "status": "Closed"
+      }
+    },
+    "category": "tasks_filter",
+    "notes": "three filters combined"
+  },
+  {
+    "id": 18,
+    "query": "Сторис команды linehaul в активном спринте",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "team_name": "linehaul", "issue_type": "Story" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 19,
+    "query": "Покажи задачи marketplace",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "team_name": "marketplace" }
+    },
+    "category": "tasks_filter"
+  },
+  {
+    "id": 20,
+    "query": "задачи команды shopping cart в кластере Mobile",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "team_name": "shopping cart", "cluster": "Mobile" }
+    },
+    "category": "tasks_filter"
+  },
+
+  {
+    "id": 21,
+    "query": "Какой scope drop у команды cthulhu?",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 22,
+    "query": "Done total команды lpop",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "lpop", "metric_name": "done_total" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 23,
+    "query": "Velocity команды linehaul",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "linehaul", "metric_name": "velocity" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 24,
+    "query": "Sprint goal команды lpop",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "lpop", "metric_name": "sprint_goal" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 25,
+    "query": "Cancel rate команды marketplace",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "marketplace", "metric_name": "cancel_rate" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 26,
+    "query": "Метрики спринта #1 Q1'26",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "sprint_name": "#1 Q1'26" }
+    },
+    "category": "metric",
+    "notes": "no specific metric named"
+  },
+  {
+    "id": 27,
+    "query": "Среднее значение done total у команды cthulhu",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "cthulhu", "metric_name": "done_total" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 28,
+    "query": "Суммарная velocity команды rint за все спринты",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "rint", "metric_name": "velocity" }
+    },
+    "category": "metric"
+  },
+  {
+    "id": 29,
+    "query": "У какой команды самый высокий done_total?",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "metric_name": "done_total" }
+    },
+    "category": "metric",
+    "notes": "comparative, no team"
+  },
+  {
+    "id": 30,
+    "query": "Топ-5 команд по средней velocity",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "metric_name": "velocity" }
+    },
+    "category": "metric"
+  },
+
+  {
+    "id": 31,
+    "query": "Как рассчитывается Done Total?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 32,
+    "query": "Какой целевой порог метрики Done Total?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 33,
+    "query": "Что такое Scope Drop и каков его целевой порог?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 34,
+    "query": "Как снизить Scope Drop?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 35,
+    "query": "Сколько Sprint Goals оптимально брать в спринт?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 36,
+    "query": "Что такое Definition of Done?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 37,
+    "query": "Какие бейзлайновые значения метрик?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 38,
+    "query": "Что делать если velocity падает?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+  {
+    "id": 39,
+    "query": "Расскажи про метрику scope drop",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag",
+    "notes": "theoretical despite metric name"
+  },
+  {
+    "id": 40,
+    "query": "Как идентифицируется Sprint Goal в JIRA?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "rag"
+  },
+
+  {
+    "id": 41,
+    "query": "Покажи scope drop команды cthulhu и дай рекомендации",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 42,
+    "query": "Done total команды lpop и что можно улучшить",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "lpop", "metric_name": "done_total" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 43,
+    "query": "Velocity linehaul — как её повысить?",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "linehaul", "metric_name": "velocity" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 44,
+    "query": "Cancel rate marketplace и как с этим бороться",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "marketplace", "metric_name": "cancel_rate" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 45,
+    "query": "Посмотри sprint goal команды cthulhu и объясни метрику",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "cthulhu", "metric_name": "sprint_goal" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 46,
+    "query": "Покажи метрики команды shopping cart и дай советы",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "shopping cart" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 47,
+    "query": "scope drop команды rint — это нормально?",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "rint", "metric_name": "scope_drop" }
+    },
+    "category": "hybrid"
+  },
+  {
+    "id": 48,
+    "query": "Что с метриками команды linehaul и как их улучшить",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "linehaul" }
+    },
+    "category": "hybrid"
+  },
+
+  {
+    "id": 49,
+    "query": "Привет",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "simple"
+  },
+  {
+    "id": 50,
+    "query": "Здравствуйте",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "simple"
+  },
+  {
+    "id": 51,
+    "query": "Спасибо!",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "simple"
+  },
+  {
+    "id": 52,
+    "query": "Как дела?",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "simple"
+  },
+  {
+    "id": 53,
+    "query": "Что ты умеешь?",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "simple"
+  },
+  {
+    "id": 54,
+    "query": "Hi there",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "simple"
+  },
+
+  {
+    "id": 55,
+    "query": "Привет, расскажи про AL-38787",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "adversarial",
+    "notes": "issue key priority over greeting"
+  },
+  {
+    "id": 56,
+    "query": "Задачи команды AL-38787",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "adversarial",
+    "notes": "issue key looks like a team name; fast-path regex should still win"
+  },
+  {
+    "id": 57,
+    "query": "DROP TABLE report_agile_dashboard",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "adversarial",
+    "notes": "SQL injection attempt — must not be routed to SQL agent"
+  },
+  {
+    "id": 58,
+    "query": "Задачи по Done Total у команды cthulhu",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "cthulhu", "metric_name": "done_total" }
+    },
+    "category": "adversarial",
+    "notes": "metric term + team — pure metric, not hybrid"
+  },
+  {
+    "id": 59,
+    "query": "How's velocity of linehaul team?",
+    "expected": {
+      "intent": "metric",
+      "query_type": "sql",
+      "entities": { "team_name": "linehaul", "metric_name": "velocity" }
+    },
+    "category": "adversarial",
+    "notes": "English metric query"
+  },
+  {
+    "id": 60,
+    "query": "Scope drop",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "adversarial",
+    "notes": "single metric term without team — should go to rag (explain metric)"
+  },
+  {
+    "id": 61,
+    "query": "Покажи задачи",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": {}
+    },
+    "category": "adversarial",
+    "notes": "tasks without filters — still tasks_filter intent"
+  },
+  {
+    "id": 62,
+    "query": "al-38787",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "adversarial",
+    "notes": "lowercase issue key — regex may NOT match, LLM fallback should handle"
+  },
+  {
+    "id": 63,
+    "query": "задачи cthulhu и сравни с linehaul",
+    "expected": {
+      "intent": "tasks_filter",
+      "query_type": "sql",
+      "entities": { "team_name": ["cthulhu", "linehaul"] }
+    },
+    "category": "adversarial",
+    "notes": "multiple teams mentioned — expect array"
+  },
+  {
+    "id": 64,
+    "query": "AL-38787 это хорошо или плохо?",
+    "expected": {
+      "intent": "task",
+      "query_type": "sql",
+      "entities": { "issue_key": "AL-38787" }
+    },
+    "category": "adversarial",
+    "notes": "fast-path should still fire on issue key"
+  },
+  {
+    "id": 65,
+    "query": "",
+    "expected": { "intent": "general", "query_type": "simple", "entities": {} },
+    "category": "adversarial",
+    "notes": "empty query"
+  },
+  {
+    "id": 66,
+    "query": "расскажи как считается Done Total и покажи значение у cthulhu",
+    "expected": {
+      "intent": "metric",
+      "query_type": "hybrid",
+      "entities": { "team_name": "cthulhu", "metric_name": "done_total" }
+    },
+    "category": "adversarial",
+    "notes": "theory + specific data — hybrid"
+  },
+  {
+    "id": 67,
+    "query": "Расскажи анекдот про программиста",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "entertainment, not work"
+  },
+  {
+    "id": 68,
+    "query": "Напиши мне стихотворение о любви",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "creative writing, not work"
+  },
+  {
+    "id": 69,
+    "query": "Какая погода сегодня в Москве?",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "weather, not work"
+  },
+  {
+    "id": 70,
+    "query": "Как приготовить борщ?",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "recipe, not work"
+  },
+  {
+    "id": 71,
+    "query": "Какой курс доллара сегодня?",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "finance, not work"
+  },
+  {
+    "id": 72,
+    "query": "Посоветуй фильм на вечер",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "entertainment recommendation, not work"
+  },
+  {
+    "id": 73,
+    "query": "Опиши симптомы гриппа",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "medical, not work"
+  },
+  {
+    "id": 74,
+    "query": "Переведи эту фразу на английский",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "translation, not work"
+  },
+  {
+    "id": 75,
+    "query": "Как мотивировать разработчиков?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "fail-open boundary: team motivation IS work-related, must NOT be off_topic"
+  },
+  {
+    "id": 76,
+    "query": "Что делать, если спринт провален?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "fail-open boundary: sprint retro question IS on-topic, must NOT be off_topic"
+  },
+  {
+    "id": 77,
+    "query": "Что такое Scope Drop?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "definition question; embedding-guard blocked this at 0.816, LLM must classify as rag"
+  },
+  {
+    "id": 78,
+    "query": "Как считается метрика Done Total?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "how-is-calculated question; was blocked by embedding at 0.818"
+  },
+  {
+    "id": 79,
+    "query": "Что такое груминг бэклога?",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "Agile practice definition; was blocked by embedding at 0.801"
+  },
+  {
+    "id": 80,
+    "query": "Советы по планированию спринта",
+    "expected": { "intent": "general", "query_type": "rag", "entities": {} },
+    "category": "off_topic_boundary",
+    "notes": "general Agile advice; must be rag, not off_topic"
+  },
+  {
+    "id": 81,
+    "query": "Расскажи анекдот про Scrum-мастера",
+    "expected": {
+      "intent": "general",
+      "query_type": "off_topic",
+      "entities": {}
+    },
+    "category": "off_topic",
+    "notes": "trickiest case: off-topic request (joke) dressed in Agile vocabulary. LLM must recognize intent (entertainment) over surface keywords (Scrum)"
+  },
+  {
+    "id": 82,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Second turn carries team_name via 'у них' anaphora; metric swaps.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А у них scope drop?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 83,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Second turn adds issue_type filter while carrying team.",
+    "turns": [
+      {
+        "query": "Покажи задачи команды lpop",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop" }
+        }
+      },
+      {
+        "query": "А баги у них?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop", "issue_type": "Bug" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 84,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Explicit 'этой команды' anaphora — team must carry, metric swaps.",
+    "turns": [
+      {
+        "query": "Done total у cthulhu?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "done_total" }
+        }
+      },
+      {
+        "query": "А velocity этой команды?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 85,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Team-only carry with no prior sprint — metric flips from scope_drop to velocity.",
+    "turns": [
+      {
+        "query": "Scope drop cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+        }
+      },
+      {
+        "query": "А у них velocity?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 86,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_sprint",
+    "notes": "Sprint name must carry via 'в этом спринте'.",
+    "turns": [
+      {
+        "query": "Покажи задачи спринта #1 Q1'26",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26" }
+        }
+      },
+      {
+        "query": "А баги в этом спринте?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26", "issue_type": "Bug" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 87,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_sprint",
+    "notes": "Sprint carries via 'в том же'; metric specified in turn 2.",
+    "turns": [
+      {
+        "query": "Метрики за спринт #1 Q1'26",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26" }
+        }
+      },
+      {
+        "query": "А в том же velocity?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "sprint_name": "#1 Q1'26", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 88,
+    "category": "multi_turn",
+    "subcategory": "context_switch",
+    "notes": "Turn 2 names a NEW team explicitly; must NOT carry cthulhu.",
+    "turns": [
+      {
+        "query": "Задачи cthulhu",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu" }
+        }
+      },
+      {
+        "query": "А у lpop?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 89,
+    "category": "multi_turn",
+    "subcategory": "context_switch",
+    "notes": "Team switches cthulhu → lpop in turn 2; metric is restated.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А какая velocity у lpop?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop", "metric_name": "velocity" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 90,
+    "category": "multi_turn",
+    "subcategory": "anaphora_intent_change",
+    "notes": "Team carries via 'у них'; intent flips metric → tasks_filter.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А какие задачи у них?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 91,
+    "category": "multi_turn",
+    "subcategory": "anaphora_intent_change",
+    "notes": "Previous task lookup; next is a rag definition — no carry.",
+    "turns": [
+      {
+        "query": "Задача AL-38787",
+        "expected": {
+          "intent": "task",
+          "query_type": "sql",
+          "entities": { "issue_key": "AL-38787" }
+        }
+      },
+      {
+        "query": "Что такое velocity?",
+        "expected": {
+          "intent": "general",
+          "query_type": "rag",
+          "entities": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": 92,
+    "category": "multi_turn",
+    "subcategory": "independent",
+    "notes": "Turn 2 is a pure rag definition — team must NOT carry.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "Что такое Definition of Done?",
+        "expected": {
+          "intent": "general",
+          "query_type": "rag",
+          "entities": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": 93,
+    "category": "multi_turn",
+    "subcategory": "independent",
+    "notes": "Turn 2 is a greeting — routes to simple, no carry-forward.",
+    "turns": [
+      {
+        "query": "Задачи cthulhu",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu" }
+        }
+      },
+      {
+        "query": "Привет!",
+        "expected": {
+          "intent": "general",
+          "query_type": "simple",
+          "entities": {}
+        }
+      }
+    ]
+  },
+  {
+    "id": 94,
+    "category": "multi_turn",
+    "subcategory": "independent",
+    "notes": "Turn 2 is a fast-path task lookup — issue_key overrides everything.",
+    "turns": [
+      {
+        "query": "Метрики команды lpop",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "lpop" }
+        }
+      },
+      {
+        "query": "Расскажи о задаче AL-38787",
+        "expected": {
+          "intent": "task",
+          "query_type": "sql",
+          "entities": { "issue_key": "AL-38787" }
+        }
+      }
+    ]
+  },
+  {
+    "id": 95,
+    "category": "multi_turn",
+    "subcategory": "carry_forward_team",
+    "notes": "Three turns: team persists through two anaphora references.",
+    "turns": [
+      {
+        "query": "Velocity cthulhu?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "velocity" }
+        }
+      },
+      {
+        "query": "А у них scope drop?",
+        "expected": {
+          "intent": "metric",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "metric_name": "scope_drop" }
+        }
+      },
+      {
+        "query": "Какие у них баги?",
+        "expected": {
+          "intent": "tasks_filter",
+          "query_type": "sql",
+          "entities": { "team_name": "cthulhu", "issue_type": "Bug" }
+        }
+      }
+    ]
+  }
+]

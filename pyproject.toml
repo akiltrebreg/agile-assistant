@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 packages = [{include = "hse_prom_prog"}]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "gitpython>=3.1.45",
     "numpy>=2.3.5",
@@ -18,6 +18,7 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "psycopg2-binary>=2.9.10",
     "sqlalchemy>=2.0.36",
+    "sqlglot>=26.0",
     "tabulate>=0.9.0",
     # FastAPI and ASGI server
     "fastapi>=0.115.0",
@@ -32,17 +33,30 @@ dependencies = [
     "streamlit>=1.40.0",
     "requests>=2.32.0",
     # RAG: Qdrant vector store + embeddings
-    "langchain-qdrant>=0.2.0",
     "qdrant-client>=1.12.0",
     "langchain-huggingface>=0.1.0",
     "sentence-transformers>=3.0.0",
+    "transformers>=4.45.0,<5",
     # Document loaders for ingestion
     "pypdf>=5.0.0",
-    # BM25 for hybrid search
-    "rank-bm25>=0.2.2",
+    "pdfplumber>=0.11.0",
+    # BM25 / learned sparse for hybrid search
+    "fastembed>=0.4.0",
+    "FlagEmbedding>=1.2.0",
+    # S3 access for knowledge base
+    "boto3>=1.35.0",
     # RAGAS evaluation framework
     "ragas>=0.2.0",
     "datasets>=3.0.0",
+    # Russian morphological analyzer (lemmatization for anaphora and
+    # fallback enum extraction in the entity sanitizer)
+    "pymorphy3>=2.0.6",
+    "pymorphy3-dicts-ru>=2.4.417150.4580142",
+    # Prometheus monitoring (Phase 1 — custom metrics + FastAPI instrumentation)
+    "prometheus-client>=0.21.0,<0.22",
+    "prometheus-fastapi-instrumentator>=7.0.0,<8",
+    # Langfuse — LLM tracing (Phase 3)
+    "langfuse>=2.50,<3",
 ]
 
 [dependency-groups]
@@ -52,7 +66,67 @@ dev = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.2",
     "pytest-cov>=6.0.0",
+    "coverage[toml]>=7.6.0",
+    "pytest-xdist>=3.6.0",
+    "pytest-timeout>=2.3.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 30
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "unit: pure unit tests with all I/O mocked (no DB, no LLM, no Qdrant, no Redis)",
+    "contract: contract tests on State shape between LangGraph agent pairs",
+    "integration: tests requiring real services (DB/Qdrant/Redis); excluded from default CI run",
+    "slow: tests >1s — gate behind '-m \"not slow\"' for fast feedback loops",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:langfuse.*",
+    "ignore::DeprecationWarning:pydantic.*",
+]
+
+[tool.coverage.run]
+source = ["hse_prom_prog"]
+branch = true
+omit = [
+    # Entrypoint / glue with no logic worth unit-testing.
+    "hse_prom_prog/main.py",
+    "hse_prom_prog/api/app.py",
+    "hse_prom_prog/tasks/celery_app.py",
+    # Long-running ingestion script — its Celery Beat wrapper
+    # (sync_tasks.sync_knowledge_base) IS unit-tested for locking
+    # and retry; the body itself is sequential I/O glue.
+    "hse_prom_prog/rag/ingest.py",
+    "alembic/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 2
+# Phase 7 floor: actual coverage on phases 0-6 is ~77.9%. Set 75 so a
+# normal refactor that grazes uncovered modules (Qdrant retriever,
+# DB repos, judge_task) doesn't trip CI, but a >3% drop fails loud.
+# Bump in lockstep when new tests close the gap.
+fail_under = 75
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [tool.ruff]
 line-length = 100

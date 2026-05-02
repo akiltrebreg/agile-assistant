@@ -1,0 +1,312 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Overall Quality",
+      "id": 100,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "gauge",
+      "title": "Weighted Score (current)",
+      "id": 1,
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.6 },
+              { "color": "green", "value": 0.8 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by () (agile_assistant_judge_weighted_total)",
+          "legendFormat": "Weighted total"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Weighted Score (1h rolling average)",
+      "id": 2,
+      "gridPos": { "x": 8, "y": 1, "w": 16, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.6 },
+              { "color": "green", "value": 0.8 }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": { "mode": "dashed" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_weighted_total[1h]))",
+          "legendFormat": "Weighted total (1h avg)"
+        },
+        {
+          "refId": "B",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_weighted_total[24h]))",
+          "legendFormat": "Weighted total (24h avg)"
+        },
+        {
+          "refId": "C",
+          "expr": "max by () (agile_assistant_judge_weighted_total)",
+          "legendFormat": "Weighted total (current)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Evaluation Rate by Outcome",
+      "id": 3,
+      "gridPos": { "x": 0, "y": 9, "w": 16, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(agile_assistant_judge_evaluations_total{status=\"success\"}[5m]) * 60",
+          "legendFormat": "success/min"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(agile_assistant_judge_evaluations_total{status=\"parse_error\"}[5m]) * 60",
+          "legendFormat": "parse_error/min"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(agile_assistant_judge_evaluations_total{status=\"api_error\"}[5m]) * 60",
+          "legendFormat": "api_error/min"
+        },
+        {
+          "refId": "D",
+          "expr": "rate(agile_assistant_judge_evaluations_total{status=\"skipped\"}[5m]) * 60",
+          "legendFormat": "skipped/min"
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Evaluation Outcomes (1h)",
+      "id": 4,
+      "gridPos": { "x": 16, "y": 9, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (increase(agile_assistant_judge_evaluations_total[1h]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Per-Criterion Breakdown",
+      "id": 200,
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "Scores by Criterion (1h average)",
+      "id": 5,
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h]))",
+          "legendFormat": "Agile-корректность"
+        },
+        {
+          "refId": "B",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h]))",
+          "legendFormat": "Практичность"
+        },
+        {
+          "refId": "C",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h]))",
+          "legendFormat": "Контекст"
+        },
+        {
+          "refId": "D",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h]))",
+          "legendFormat": "Вежливость"
+        },
+        {
+          "refId": "E",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h]))",
+          "legendFormat": "Чистота текста"
+        },
+        {
+          "refId": "F",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h]))",
+          "legendFormat": "Качество языка"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Criterion Trends (24h)",
+      "id": 6,
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"agile_correctness\"}[1h]))",
+          "legendFormat": "agile_correctness"
+        },
+        {
+          "refId": "B",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"practicality\"}[1h]))",
+          "legendFormat": "practicality"
+        },
+        {
+          "refId": "C",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"context_handling\"}[1h]))",
+          "legendFormat": "context_handling"
+        },
+        {
+          "refId": "D",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"politeness\"}[1h]))",
+          "legendFormat": "politeness"
+        },
+        {
+          "refId": "E",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"text_cleanliness\"}[1h]))",
+          "legendFormat": "text_cleanliness"
+        },
+        {
+          "refId": "F",
+          "expr": "max by () (avg_over_time(agile_assistant_judge_criterion_score{criterion=\"language_quality\"}[1h]))",
+          "legendFormat": "language_quality"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Low Score Snapshots (weighted < 0.5)",
+      "id": 7,
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by () (agile_assistant_judge_weighted_total > 0 < 0.5)",
+          "format": "table",
+          "instant": false
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["agile-assistant", "quality", "llm-as-judge"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Agile Assistant — Quality (LLM-as-a-Judge)",
+  "uid": "agile-quality",
+  "version": 1,
+  "weekStart": ""
+}

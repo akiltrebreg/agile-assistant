@@ -10,15 +10,103 @@ a natural language response. Supports four query_types:
 
 import json
 import logging
+import time
 from datetime import datetime
 from typing import Any
 
 from hse_prom_prog.llm.client import LLMClient
+from hse_prom_prog.memory.formatter import format_history
+from hse_prom_prog.memory.token_estimator import estimate_tokens
+from hse_prom_prog.metrics import (
+    RESPONSE_DURATION,
+    RESPONSE_LENGTH_TOKENS,
+    RESPONSE_LLM_TIMEOUTS,
+    RESPONSE_TRUNCATED,
+)
+from hse_prom_prog.models.memory import ConversationContext
+from hse_prom_prog.tracing import langfuse_context
 
 logger = logging.getLogger(__name__)
 
 # Maximum rows to include in the LLM prompt to avoid token overflow
 _MAX_ROWS_IN_PROMPT = 20
+
+# Map (query_type, intent, route) -> branch label for RESPONSE_DURATION /
+# RESPONSE_LENGTH_TOKENS. Mirrors the if-chain in process() so the
+# branch label always reflects which generator actually ran.
+_SQL_INTENT_BRANCHES: dict[str, str] = {
+    "task": "sql_task",
+    "tasks_filter": "sql_tasks_filter",
+    "metric": "sql_metric",
+}
+
+
+def _resolve_branch(state: dict[str, Any]) -> str:
+    """Return the branch label that :meth:`ResponseAgent.process` will land in.
+
+    Mirrors the routing if-chain so Prometheus labels on
+    ``RESPONSE_DURATION`` / ``RESPONSE_LENGTH_TOKENS`` reflect the actual
+    generator that ran.
+    """
+    query_type = state.get("query_type", "sql")
+    intent = state.get("intent", "general")
+    route = state.get("route", "db_query")
+
+    if query_type == "error" or intent == "error":
+        return "error"
+    if route == "direct_response" or query_type == "simple":
+        return "simple"
+
+    validation = state.get("validation_result") or {}
+    use_sql = validation.get("use_sql", True)
+    use_rag = validation.get("use_rag", False)
+    note = validation.get("note")
+
+    # Hybrid/rag with no data → routed to the "both failed" reply, which
+    # is a fixed message; treat it as the error branch for latency tracking.
+    if query_type != "sql" and note and not use_sql and not use_rag:
+        return "error"
+    if query_type == "rag" and use_rag:
+        return "rag"
+    if query_type == "hybrid" and (use_sql or use_rag):
+        return "hybrid"
+    return _SQL_INTENT_BRANCHES.get(intent, "sql_task")
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    """Return ``True`` for any ``TimeoutError``-ish exception.
+
+    Covers ``httpx`` / ``openai`` variants whose class names merely contain
+    ``timeout`` (case-insensitive).
+    """
+    if isinstance(exc, TimeoutError):
+        return True
+    return "timeout" in type(exc).__name__.lower()
+
+
+_SYSTEM_ROLE = (
+    "Ты — ассистент для анализа данных о Jira-задачах и Agile-метриках. "
+    "Отвечай на русском языке, по делу, без воды и без выдумывания данных."
+)
+
+# Per-branch history budget, in tokens, for the short-term memory block
+# injected into the user prompt. The hybrid branch is the tightest because
+# it already carries both SQL payload and RAG context.
+_BRANCH_HISTORY_BUDGET: dict[str, int] = {
+    "sql": 1500,
+    "rag": 1000,
+    "hybrid": 800,
+    "simple": 1500,
+}
+_MIN_HISTORY_BUDGET_TOKENS = 300
+_HISTORY_INSTRUCTION = (
+    "Не повторяй то, что уже было сказано в истории. "
+    "На уточняющий вопрос отвечай кратко, без повторения контекста."
+)
+_BRIEF_PREFERENCE_INSTRUCTION = (
+    "Пользователь предпочитает краткие ответы. "
+    "Давай только ключевые цифры и факты без развёрнутых пояснений.\n\n"
+)
 
 
 class ResponseAgent:
@@ -29,6 +117,11 @@ class ResponseAgent:
     """
 
     def __init__(self, llm_client: LLMClient) -> None:
+        """Initialize the response agent.
+
+        Args:
+            llm_client: LLM client used by every response generator.
+        """
         self.llm_client = llm_client
         logger.info("[Response Agent] Initialized with LLM client")
 
@@ -37,6 +130,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _format_value(self, value: Any) -> str:
+        """Render a single field value as a human-readable Russian string."""
         if value is None:
             return "не указано"
         if isinstance(value, datetime):
@@ -54,7 +148,7 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def _prepare_single_task(self, row: dict[str, Any]) -> str:
-        """Format a single task row with Russian labels."""
+        """Format a single task row with Russian labels as JSON."""
         labels = {
             "issue_key": "Ключ задачи",
             "issue_project": "Проект",
@@ -86,8 +180,21 @@ class ResponseAgent:
                 formatted[label] = self._format_value(val)
         return json.dumps(formatted, ensure_ascii=False, indent=2)
 
-    def _prepare_task_list(self, rows: list[dict[str, Any]]) -> str:
-        """Format a list of tasks as a compact summary."""
+    def _prepare_task_list(self, rows: list[dict[str, Any]], include_assignee: bool = False) -> str:
+        """Format a list of tasks as a compact one-line-per-task summary.
+
+        Truncates to ``_MAX_ROWS_IN_PROMPT`` rows and appends a "и ещё N
+        задач" tail when more rows exist; bumps ``RESPONSE_TRUNCATED`` in
+        that case.
+
+        Args:
+            rows: SQL result rows to summarize.
+            include_assignee: When ``True``, adds the ``assignee_name``
+                column so the model can confirm an assignee filter.
+
+        Returns:
+            Multi-line summary string.
+        """
         total = len(rows)
         shown = rows[:_MAX_ROWS_IN_PROMPT]
         lines = []
@@ -97,15 +204,20 @@ class ResponseAgent:
             status = row.get("issue_status_act", "?")
             team = row.get("feature_teams", "?")
             sp = row.get("storypoints_act", "?")
-            lines.append(f"{i}. {key} | {status} | {team} | SP:{sp} | {summary}")
+            base = f"{i}. {key} | {status} | {team} | SP:{sp}"
+            if include_assignee:
+                assignee = row.get("assignee_name", "?")
+                base += f" | @{assignee}"
+            lines.append(f"{base} | {summary}")
         result = "\n".join(lines)
         if total > _MAX_ROWS_IN_PROMPT:
             extra = total - _MAX_ROWS_IN_PROMPT
             result += f"\n\n... и ещё {extra} задач (показаны первые {_MAX_ROWS_IN_PROMPT})"
+            RESPONSE_TRUNCATED.inc()
         return result
 
     def _prepare_metrics(self, rows: list[dict[str, Any]]) -> str:
-        """Format metric rows as JSON."""
+        """Format metric rows as a JSON list, dropping ``None`` columns."""
         shown = rows[:_MAX_ROWS_IN_PROMPT]
         formatted = []
         for row in shown:
@@ -117,88 +229,171 @@ class ResponseAgent:
         return json.dumps(formatted, ensure_ascii=False, indent=2)
 
     # ------------------------------------------------------------------
+    # Conversation history injection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_history_budget(
+        query_type: str,
+        intent: str,
+        data_length: int,
+    ) -> int:
+        """Return available history tokens for a branch given the data size.
+
+        ``data_length`` is chars of the DB/RAG payload already in the prompt.
+        We subtract its rough token cost from the branch's base budget and
+        floor at ``_MIN_HISTORY_BUDGET_TOKENS`` so some history always fits.
+        """
+        del intent  # kept in signature for future per-intent tuning
+        base = _BRANCH_HISTORY_BUDGET.get(query_type, 1000)
+        # estimate_tokens is char_len // 3, matching what the context
+        # builder used when accounting for the payload upstream.
+        return max(_MIN_HISTORY_BUDGET_TOKENS, base - estimate_tokens(" " * data_length))
+
+    @staticmethod
+    def _profile_instruction(user_profile: dict[str, Any] | None) -> str:
+        """Return the response-style nudge for the LLM, or an empty string.
+
+        ``brief`` → explicit brevity line; ``detailed`` → no-op (the default
+        prompt is already detailed, and the extra line would just eat budget).
+        """
+        if not user_profile:
+            return ""
+        preferences = user_profile.get("preferences") or {}
+        if preferences.get("preferred_detail_level") == "brief":
+            return _BRIEF_PREFERENCE_INSTRUCTION
+        return ""
+
+    @staticmethod
+    def _history_prefix(ctx: ConversationContext | None, budget_tokens: int) -> str:
+        """Format a history prefix that fits within ``budget_tokens``.
+
+        Drops oldest turns from a *copy* of the context until the rendered
+        block is within budget. Returns ``""`` if no turns survive — caller
+        gets a clean prompt in that case.
+        """
+        if ctx is None:
+            return ""
+        turns = list(ctx.get("recent_turns") or [])
+        if not turns:
+            return ""
+
+        while turns:
+            trimmed: ConversationContext = {
+                "summary": ctx.get("summary") or "",
+                "recent_turns": turns,
+                "history_token_count": 0,
+                "needs_summarization": ctx.get("needs_summarization", False),
+            }
+            block = format_history(trimmed)
+            if estimate_tokens(block) <= budget_tokens:
+                return f"{block}\n{_HISTORY_INSTRUCTION}\n\n" if block else ""
+            turns = turns[1:]  # drop the oldest turn and retry
+        return ""
+
+    # ------------------------------------------------------------------
     # LLM response generators
     # ------------------------------------------------------------------
 
-    def _generate_direct_response(self, original_query: str) -> str:
-        """Generate a direct LLM response without external context."""
+    def _generate_direct_response(self, original_query: str, history: str = "") -> str:
+        """Generate a direct LLM response without external SQL/RAG context."""
         prompt = (
-            "Ты — ассистент для анализа данных о Jira-задачах. "
-            "Пользователь задал общий вопрос, не связанный с конкретной задачей "
-            "в базе данных. Ответь на вопрос на русском языке.\n"
-            "\n"
-            f"Вопрос пользователя: {original_query}\n"
-            "\n"
-            "Ответь на вопрос пользователя:"
+            f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
+            "Пользователь задал общий вопрос или поздоровался.\n\n"
+            f"Вопрос: {original_query}\n\n"
+            "Ответь кратко и дружелюбно. Если это приветствие — представься "
+            "и предложи, чем можешь помочь (анализ задач, метрики спринтов, "
+            "рекомендации по Agile-практикам). Не выдумывай данные."
         )
         response = self.llm_client.invoke(prompt)
         logger.info("[Response Agent] Generated direct response")
         return response
 
-    def _generate_task_response(self, original_query: str, data: dict[str, Any]) -> str:
-        """Generate response for a single task lookup."""
+    def _generate_task_response(
+        self,
+        original_query: str,
+        data: dict[str, Any],
+        history: str = "",
+    ) -> str:
+        """Generate the response for a single-task lookup."""
         structured = self._prepare_single_task(data)
         prompt = (
-            "Ты — ассистент для анализа данных о Jira-задачах. "
-            "Пользователь задал вопрос о задаче. Сформируй понятный "
-            "ответ на основе данных.\n\n"
-            f"Вопрос пользователя: {original_query}\n\n"
-            f"Данные о задаче:\n{structured}\n\n"
-            "Инструкции:\n"
-            "1. Выбери только релевантную информацию\n"
-            "2. Ответь на русском языке\n"
-            "3. Если данные не указаны, не акцентируй на этом\n\n"
-            "Ответ:"
+            f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
+            "Пользователь спросил о конкретной задаче. Вот её данные:\n\n"
+            f"{structured}\n\n"
+            f"Вопрос: {original_query}\n\n"
+            "Сформируй краткое описание задачи. Включи:\n"
+            "- Ключ, тип и текущий статус\n"
+            "- Команду и исполнителя (если есть в данных)\n"
+            "- Story Points и спринт\n"
+            "- Другие поля, если они релевантны вопросу\n\n"
+            "Правила:\n"
+            "- Не перечисляй все поля подряд — выбери важное.\n"
+            "- Пропускай поля, значения которых отсутствуют в данных. "
+            "НЕ пиши «не указано», «отсутствует», «нет данных» — "
+            "просто не упоминай эти поля.\n"
+            "- Если в вопросе пользователя названы команда / исполнитель / "
+            "спринт — обязательно упомяни их в ответе."
         )
         return self.llm_client.invoke(prompt)
 
     def _generate_tasks_filter_response(
-        self, original_query: str, rows: list[dict[str, Any]]
-    ) -> str:
-        """Generate response for a filtered task list."""
-        task_list = self._prepare_task_list(rows)
-        prompt = (
-            "Ты — ассистент для анализа данных о Jira-задачах. "
-            "Пользователь запросил список задач по фильтру. "
-            "Сформируй ответ на основе данных.\n\n"
-            f"Вопрос пользователя: {original_query}\n\n"
-            f"Найдено задач: {len(rows)}\n\n"
-            f"Данные:\n{task_list}\n\n"
-            "Инструкции:\n"
-            "1. Кратко опиши результат поиска\n"
-            "2. Перечисли ключевые задачи\n"
-            "3. Ответь на русском языке\n\n"
-            "Ответ:"
-        )
-        return self.llm_client.invoke(prompt)
-
-    def _generate_metric_response(self, original_query: str, rows: list[dict[str, Any]]) -> str:
-        """Generate response for metric queries."""
-        metrics_data = self._prepare_metrics(rows)
-        prompt = (
-            "Ты — ассистент для анализа данных о Jira-задачах. "
-            "Пользователь запросил метрики команды/спринта. "
-            "Сформируй ответ на основе данных.\n\n"
-            f"Вопрос пользователя: {original_query}\n\n"
-            f"Данные метрик:\n{metrics_data}\n\n"
-            "Инструкции:\n"
-            "1. Выдели запрошенные метрики\n"
-            "2. Если есть несколько спринтов, покажи динамику\n"
-            "3. Ответь на русском языке\n\n"
-            "Ответ:"
-        )
-        return self.llm_client.invoke(prompt)
-
-    def _generate_rag_response(
         self,
         original_query: str,
-        rag_response: str,
-        rag_sources: list[str],
+        rows: list[dict[str, Any]],
+        entities: dict[str, Any] | None = None,
+        history: str = "",
     ) -> str:
-        """Format RAG-agent answer with source citations."""
-        sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
-        suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
-        return f"{rag_response}{suffix}"
+        """Generate the response for a filtered task list."""
+        entities = entities or {}
+        include_assignee = bool(entities.get("assignee"))
+        task_list = self._prepare_task_list(rows, include_assignee=include_assignee)
+        total = len(rows)
+        prompt = (
+            f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
+            f"Пользователь запросил список задач. Найдено: {total}.\n\n"
+            f"{task_list}\n\n"
+            f"Вопрос: {original_query}\n\n"
+            "Сформируй ответ:\n"
+            "- Начни с общего количества найденных задач.\n"
+            "- Перечисли задачи (ключ, статус, SP, краткое описание).\n"
+            f"- Если задач больше {_MAX_ROWS_IN_PROMPT}, "
+            f"укажи что показаны первые {_MAX_ROWS_IN_PROMPT}.\n"
+            "- Если в вопросе названы команда / исполнитель / спринт — "
+            "обязательно упомяни их в ответе.\n"
+            "- Если полезно — сгруппируй по статусу или типу."
+        )
+        return self.llm_client.invoke(prompt)
+
+    def _generate_metric_response(
+        self,
+        original_query: str,
+        rows: list[dict[str, Any]],
+        history: str = "",
+    ) -> str:
+        """Generate the response for a metric query."""
+        metrics_data = self._prepare_metrics(rows)
+        prompt = (
+            f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
+            "Пользователь запросил метрики. Вот данные:\n\n"
+            f"{metrics_data}\n\n"
+            f"Вопрос: {original_query}\n\n"
+            "Сформируй ответ:\n"
+            "- Назови конкретные значения метрик.\n"
+            "- Если данные за несколько спринтов — покажи динамику "
+            "(рост/падение/стабильность).\n"
+            "- Если значение одно — просто назови его.\n"
+            "- Не добавляй рекомендации — только факты из данных."
+        )
+        return self.llm_client.invoke(prompt)
+
+    def _generate_rag_response(self, rag_response: str) -> str:
+        """Return the RAG-agent answer as the user-facing response."""
+        return rag_response
 
     def _generate_hybrid_response(
         self,
@@ -206,9 +401,9 @@ class ResponseAgent:
         sql_result: list[dict[str, Any]],
         intent: str,
         rag_response: str,
-        rag_sources: list[str],
+        history: str = "",
     ) -> str:
-        """Combine DB data + RAG context into one answer."""
+        """Combine DB data and RAG context into a single hybrid answer."""
         # Prepare SQL data section
         if intent == "task" and sql_result:
             sql_section = self._prepare_single_task(sql_result[0])
@@ -220,31 +415,31 @@ class ResponseAgent:
             sql_section = ""
 
         prompt = (
-            "Ты — ассистент для анализа Agile-метрик и практик.\n"
-            "Используй данные из БД и контекст из базы знаний, "
-            "чтобы дать развёрнутый ответ.\n\n"
-            f"Вопрос пользователя: {original_query}\n\n"
+            f"{_SYSTEM_ROLE}\n\n"
+            f"{history}"
+            "Пользователь задал вопрос, требующий и данных из БД, "
+            "и контекста из базы знаний.\n\n"
             f"Данные из БД:\n{sql_section}\n\n"
             f"Контекст из базы знаний:\n{rag_response}\n\n"
-            "Инструкции:\n"
-            "1. Сначала приведи фактические данные из БД\n"
-            "2. Затем дай рекомендации на основе базы знаний\n"
-            "3. Укажи источники\n"
-            "4. Ответь на русском языке\n\n"
-            "Ответ:"
+            f"Вопрос: {original_query}\n\n"
+            "Сформируй ответ в два блока:\n"
+            "1. ДАННЫЕ: приведи конкретные числа/факты из БД. "
+            "Обязательно назови команду, спринт и конкретные числа из БД, "
+            "если они есть в данных.\n"
+            "2. АНАЛИЗ: дай рекомендации на основе базы знаний. "
+            "НЕ упоминай названия документов, ссылки, URL или источники "
+            "в тексте ответа. "
+            "Если контекст из базы знаний пуст — напиши "
+            "«Рекомендации из базы знаний недоступны»."
         )
-        answer = self.llm_client.invoke(prompt)
-
-        sources_text = "\n".join(f"- {s}" for s in rag_sources) if rag_sources else ""
-        suffix = f"\n\n---\n**Источники:**\n{sources_text}" if sources_text else ""
-        return f"{answer}{suffix}"
+        return self.llm_client.invoke(prompt)
 
     # ------------------------------------------------------------------
     # SQL-only response
     # ------------------------------------------------------------------
 
     def _process_sql_response(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Handle SQL-only response generation."""
+        """Handle SQL-only response generation, including error and empty cases."""
         error = state.get("error")
         sql_result = state.get("sql_result")
         intent = state.get("intent", "general")
@@ -272,19 +467,36 @@ class ResponseAgent:
                 msg = "По вашему запросу ничего не найдено.\n\n---\n*Попробуйте уточнить фильтры*"
             return {"final_response": msg}
 
+        entities = state.get("entities", {})
+        ctx = state.get("conversation_context")
+        data_chars = sum(len(str(row)) for row in sql_result[:_MAX_ROWS_IN_PROMPT])
+        budget = self._get_history_budget("sql", intent, data_chars)
+        prefix = self._history_prefix(ctx, budget) + self._profile_instruction(
+            state.get("user_profile")
+        )
         try:
             if intent == "task":
-                response = self._generate_task_response(original_query, sql_result[0])
+                response = self._generate_task_response(
+                    original_query, sql_result[0], history=prefix
+                )
             elif intent == "tasks_filter":
-                response = self._generate_tasks_filter_response(original_query, sql_result)
+                response = self._generate_tasks_filter_response(
+                    original_query, sql_result, entities, history=prefix
+                )
             elif intent == "metric":
-                response = self._generate_metric_response(original_query, sql_result)
+                response = self._generate_metric_response(
+                    original_query, sql_result, history=prefix
+                )
             else:
-                response = self._generate_task_response(original_query, sql_result[0])
+                response = self._generate_task_response(
+                    original_query, sql_result[0], history=prefix
+                )
 
             logger.info("[Response Agent] Generated SQL response for intent=%s", intent)
 
         except Exception as e:
+            if _is_timeout(e):
+                RESPONSE_LLM_TIMEOUTS.inc()
             logger.error("[Response Agent] Error generating response: %s", e)
             response = (
                 f"Не удалось сгенерировать ответ: {e}\n\n---\n*Попробуйте переформулировать запрос*"
@@ -297,14 +509,57 @@ class ResponseAgent:
     # ------------------------------------------------------------------
 
     def process(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Generate natural language response based on query_type and data.
+        """Generate the natural-language response.
+
+        Thin wrapper that records latency and length per branch — the
+        routing logic itself lives in :meth:`_process_impl` so the metrics
+        here stay declarative.
+
+        Args:
+            state: Workflow state with ``query_type``, ``intent``,
+                ``sql_result``, ``rag_response``, etc.
+
+        Returns:
+            State update with ``final_response``.
+        """
+        branch = _resolve_branch(state)
+        langfuse_context.update_current_observation(
+            input={
+                "branch": branch,
+                "query_type": state.get("query_type"),
+                "intent": state.get("intent"),
+                "has_sql_data": bool(state.get("sql_result")),
+                "has_rag_data": bool(state.get("rag_response")),
+            },
+        )
+        start = time.time()
+        try:
+            update = self._process_impl(state)
+        finally:
+            RESPONSE_DURATION.labels(branch=branch).observe(time.time() - start)
+        final = (update or {}).get("final_response") or ""
+        if final:
+            RESPONSE_LENGTH_TOKENS.labels(branch=branch).observe(estimate_tokens(final))
+        # Preview only — full final_response is on the parent trace; we
+        # don't want to duplicate it and bloat Langfuse storage.
+        langfuse_context.update_current_observation(
+            output={
+                "branch": branch,
+                "response_length": len(final),
+                "response_preview": final[:500],
+            },
+        )
+        return update
+
+    def _process_impl(self, state: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
+        """Dispatch on ``query_type`` / ``route`` and generate the response.
 
         Args:
             state: Workflow state with intent, entities, sql_result,
-                   rag_response, validation_result, error, etc.
+                rag_response, validation_result, error, etc.
 
         Returns:
-            State update with final_response.
+            State update with ``final_response``.
         """
         logger.info("[Response Agent] Generating response...")
 
@@ -313,12 +568,30 @@ class ResponseAgent:
         intent = state.get("intent", "general")
         original_query = state.get("original_query", "")
 
+        # --- Classifier error (explicit error intent from Supervisor) ---
+        if query_type == "error" or intent == "error":
+            err_msg = state.get("error", "Classifier unavailable")
+            logger.warning("[Response Agent] Error intent: %s", err_msg)
+            return {
+                "final_response": (
+                    "Извините, классификатор запросов временно недоступен. "
+                    "Попробуйте повторить запрос через несколько секунд или "
+                    "переформулировать его."
+                ),
+            }
+
         # --- Direct response (simple) ---
         if route == "direct_response" or query_type == "simple":
             logger.info("[Response Agent] Generating direct response")
+            ctx = state.get("conversation_context")
+            prefix = self._history_prefix(
+                ctx, self._get_history_budget("simple", intent, 0)
+            ) + self._profile_instruction(state.get("user_profile"))
             try:
-                response = self._generate_direct_response(original_query)
+                response = self._generate_direct_response(original_query, history=prefix)
             except Exception as e:
+                if _is_timeout(e):
+                    RESPONSE_LLM_TIMEOUTS.inc()
                 logger.error("[Response Agent] Direct response error: %s", e)
                 response = (
                     f"Не удалось сгенерировать ответ: {e}\n\n"
@@ -334,15 +607,18 @@ class ResponseAgent:
 
         sql_result = state.get("sql_result")
         rag_response = state.get("rag_response")
-        rag_sources = state.get("rag_sources", [])
 
-        # --- Both failed ---
-        if note and not use_sql and not use_rag:
+        # --- Both failed (only hybrid/rag — sql-only handles empty in _process_sql_response) ---
+        if query_type != "sql" and note and not use_sql and not use_rag:
             logger.warning("[Response Agent] Validation note: %s", note)
             return {
                 "final_response": (
-                    f"Ошибка при выполнении запроса:\n\n{note}\n\n"
-                    "---\n*Попробуйте переформулировать запрос*"
+                    "К сожалению, в моей базе знаний нет ответа на этот вопрос.\n\n"
+                    "Я могу помочь с:\n\n"
+                    "• Agile-практиками (Sprint Goal, Velocity, Backlog Grooming)\n\n"
+                    "• Метриками команд (Done Total, Scope Drop, Cancel Rate)\n\n"
+                    "• Деталях о задачах Jira (текущий статус, описание)\n\n"
+                    "Попробуйте переформулировать запрос ближе к этим темам."
                 ),
             }
 
@@ -350,8 +626,10 @@ class ResponseAgent:
         if query_type == "rag" and use_rag:
             logger.info("[Response Agent] RAG-only response")
             try:
-                response = self._generate_rag_response(original_query, rag_response, rag_sources)
+                response = self._generate_rag_response(rag_response)
             except Exception as e:
+                if _is_timeout(e):
+                    RESPONSE_LLM_TIMEOUTS.inc()
                 logger.error("[Response Agent] RAG response error: %s", e)
                 response = f"Не удалось сгенерировать ответ: {e}"
             return {"final_response": response}
@@ -359,15 +637,23 @@ class ResponseAgent:
         # --- Hybrid ---
         if query_type == "hybrid" and (use_sql or use_rag):
             logger.info("[Response Agent] Hybrid response")
+            ctx = state.get("conversation_context")
+            sql_chars = sum(len(str(r)) for r in (sql_result or [])[:_MAX_ROWS_IN_PROMPT])
+            data_chars = sql_chars + len(rag_response or "")
+            prefix = self._history_prefix(
+                ctx, self._get_history_budget("hybrid", intent, data_chars)
+            ) + self._profile_instruction(state.get("user_profile"))
             try:
                 response = self._generate_hybrid_response(
                     original_query,
                     sql_result or [],
                     intent,
                     rag_response or "",
-                    rag_sources,
+                    history=prefix,
                 )
             except Exception as e:
+                if _is_timeout(e):
+                    RESPONSE_LLM_TIMEOUTS.inc()
                 logger.error("[Response Agent] Hybrid response error: %s", e)
                 response = f"Не удалось сгенерировать ответ: {e}"
             return {"final_response": response}

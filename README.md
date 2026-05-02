@@ -1,182 +1,176 @@
-# HSE Prom Prog - Agile AI Assistant (Задание 6)
+# Agile AI Assistant
 
-Multi-agent система для анализа Jira-задач с использованием LangGraph, vLLM,
-PostgreSQL, Qdrant, Celery, Redis, nginx, k8s.
+Multi-agent система для анализа Jira-задач и Agile-практик: LangGraph-роутер из
+пяти агентов (Supervisor / SQL / RAG / Validator / Response), трёхуровневые
+guardrails, двухуровневая память (окно диалога + профиль пользователя),
+полноценный observability-стек и асинхронный API. Работает на двух vLLM-серверах
+поверх PostgreSQL, Qdrant, Celery, Redis, FastAPI, Streamlit, nginx; есть
+deployment в Docker Compose и Kubernetes.
 
 ## Содержание
 
+- [Описание ассистента](#описание-ассистента)
 - [Архитектура](#архитектура)
-  - [Компоненты](#компоненты)
-  - [LLM Backend](#llm-backend)
-  - [База данных](#база-данных)
-  - [Векторное хранилище (Qdrant)](#векторное-хранилище-qdrant)
+- [Возможности (типы запросов)](#возможности-типы-запросов)
+- [Memory Layer](#memory-layer)
+- [Guardrails](#guardrails)
+- [Observability](#observability)
 - [Структура проекта](#структура-проекта)
 - [Быстрый старт с Docker Compose](#быстрый-старт-с-docker-compose)
-  - [Настройка переменных окружения](#настройка-переменных-окружения)
-- [База знаний и RAG](#база-знаний-и-rag)
-  - [Структура knowledge_base/](#структура-knowledge_base)
-  - [Загрузка документов в Qdrant](#загрузка-документов-в-qdrant)
-- [Локальная разработка](#локальная-разработка)
-  - [Требования](#требования)
-  - [Шаг 1: Установка зависимостей](#шаг-1-установка-зависимостей)
-  - [Шаг 2: Настройка PostgreSQL](#шаг-2-настройка-postgresql)
-  - [Шаг 3: Запуск vLLM](#шаг-3-запуск-vllm)
-  - [Шаг 4: Запуск приложения](#шаг-4-запуск-приложения)
-- [Использование](#использование)
-  - [Примеры запросов](#примеры-запросов)
-  - [Пример вывода](#пример-вывода)
-- [Async API (FastAPI + Celery + Redis)](#async-api-fastapi--celery--redis)
-  - [Запуск async-стека](#запуск-async-стека)
-  - [Создание задачи](#создание-задачи)
-  - [Поллинг статуса](#поллинг-статуса)
-  - [Параллельная обработка](#параллельная-обработка)
-  - [Мониторинг](#мониторинг)
-  - [Горизонтальное масштабирование](#горизонтальное-масштабирование)
+- [Использование (CLI)](#использование-cli)
+- [API](#api)
 - [Streamlit UI](#streamlit-ui)
-  - [Возможности](#возможности)
-- [Nginx + Production](#nginx--production)
-  - [Архитектура контейнеров](#архитектура-контейнеров)
-  - [Маршруты nginx](#маршруты-nginx)
-  - [Запуск production-стека](#запуск-production-стека)
-  - [Проверка](#проверка)
-- [Kubernetes (minikube)](#kubernetes-minikube)
-  - [Требования](#требования-1)
-  - [Структура манифестов](#структура-манифестов)
-  - [Архитектурные решения](#архитектурные-решения)
-  - [Шаг 1: Запуск minikube с GPU](#шаг-1-запуск-minikube-с-gpu)
-  - [Шаг 2: Сборка образов в minikube](#шаг-2-сборка-образов-в-minikube)
-  - [Шаг 3: Развёртывание](#шаг-3-развёртывание)
-  - [Шаг 4: Проверка](#шаг-4-проверка)
-  - [Шаг 5: Использование](#шаг-5-использование)
-  - [Маршруты Ingress](#маршруты-ingress)
-  - [Полезные команды](#полезные-команды)
-- [Оценка RAG-пайплайна (RAGAS)](#оценка-rag-пайплайна-ragas)
-  - [Golden Dataset](#golden-dataset)
-  - [Запуск оценки](#запуск-оценки)
-  - [Сравнение экспериментов](#сравнение-экспериментов)
-- [Разработка](#разработка)
-  - [Установка dev-зависимостей](#установка-dev-зависимостей)
-  - [Code Quality](#code-quality)
-  - [Тестирование](#тестирование)
+- [Деплой](#деплой)
+- [Оценка качества](#оценка-качества)
 - [Конфигурация](#конфигурация)
+- [Разработка](#разработка)
 - [Лицензия](#лицензия)
+
+## Описание ассистента
+
+Agile AI Assistant — ассистент, который отвечает на вопросы по данным Jira (одна
+конкретная задача, фильтры по командам/спринтам, метрики команд) и по
+методическим документам компании (Agile-практики, описания метрик, регламенты),
+а также объединяет оба источника в гибридных запросах.
+
+Под капотом — LangGraph-граф из пяти агентов с детерминированной маршрутизацией
+по `query_type`, тремя слоями guardrails (input regex / SQL AST / output
+sanitization) и двухуровневой памятью (sliding window + профиль). Сверху —
+FastAPI/Celery-стек для асинхронной обработки и Streamlit-чат, наблюдаемые через
+Prometheus, Grafana и Langfuse.
 
 ## Архитектура
 
-Приложение построено на основе LangGraph и использует пять агентов с условным
-ветвлением. Supervisor классифицирует запрос пользователя, определяет `intent`,
-`entities` и `query_type`, затем маршрутизирует по одному из четырёх путей:
+Приложение построено на основе LangGraph и использует пять агентов (Supervisor /
+SQL / RAG / Validator / Response) плюс трёхуровневую систему
+[guardrails](#guardrails): regex-фильтр на входе, валидация SQL перед
+выполнением, пост-обработка ответа. Supervisor классифицирует запрос
+пользователя, определяет `intent`, `entities` и `query_type`, затем
+маршрутизирует по одному из пяти путей (включая `off_topic` — запрос не по теме,
+ответ выдаётся заготовленным текстом без вызова остальных агентов). Между
+сообщениями память слоя [Memory Layer](#memory-layer) сохраняет историю диалога
+и профиль пользователя — Supervisor и Response Agent читают короткоживущий
+контекст + долгоживущий профиль из блока `MemoryManager`. Поверх этого работает
+[observability-стек](#observability): Prometheus + Grafana собирают метрики
+latency / throughput / error rate / очередей, а Langfuse получает трейсы каждого
+запроса с полными промптами и токенами:
 
 ```
+  [Memory Layer: conversation history + user profile]
+    │  (ctx + profile)
+    ▼
+  Input Guardrail (L1: regex, prompt injection)
+    │
+    ▼
   Supervisor ──► (conditional routing by query_type)
+    │    ▲
+    │    └── conversation_context + user_profile (anaphora + default_team)
     │
-    ├─ sql     ──► SQL Agent ────────────────────► Validator ──► Response Agent
+    ├─ off_topic ─► OFF_TOPIC_RESPONSE ──────────────────────────► END
     │
-    ├─ rag     ──► RAG Agent ────────────────────► Validator ──► Response Agent
+    ├─ sql       ─► SQL Agent ─────────────► Validator ─► Response Agent ─► Output Guardrail (L3) ─► END
+    │               (L2: SQLGuard в run_query)                  ▲
+    │                                                          ctx + profile
+    ├─ rag       ─► RAG Agent ─────────────► Validator ─► Response Agent ─► Output Guardrail (L3) ─► END
     │
-    ├─ hybrid  ──► SQL Agent ──┐
-    │              RAG Agent ──┴─► Validator ──► Response Agent
+    ├─ hybrid    ─► SQL Agent ──┐
+    │              RAG Agent ──┴► Validator ─► Response Agent ─► Output Guardrail (L3) ─► END
     │
-    └─ simple  ──► Response Agent (прямой ответ через LLM)
+    └─ simple    ─► Response Agent (прямой ответ) ─────────────► Output Guardrail (L3) ─► END
+                                                               │
+                                                               ▼
+                              [Memory Layer writes user + assistant turns,
+                               schedules async profile refresh + summarisation]
+
+  Параллельно для каждого узла:
+    • Prometheus метрики (latency, count, in_progress) — scrape из api:8080/metrics, celery-worker:9100/metrics
+    • Langfuse trace + nested spans (полные промпты + usage) — buffered, flush в конце задачи
 ```
 
-### Компоненты
+**Стек**: LangGraph (роутер) · vLLM × 2 (avibe-gptq-8bit + Qwen3-8B-AWQ) ·
+PostgreSQL 16 (Jira-данные + memory layer + audit) · Qdrant 1.13 (RAG-индекс
+хранит dense+sparse векторы; режим поиска управляется `SEARCH_TYPE`, по
+умолчанию `dense`) · Celery + Redis (асинхронная очередь) · FastAPI (HTTP API) ·
+Streamlit (чат-UI) · nginx (reverse proxy) · Prometheus + Grafana + Langfuse
+(observability) · Alembic (миграции).
 
-**1. Supervisor Agent** (классификатор запросов)
+Подробности по компонентам:
 
-- Классифицирует запрос на один из 4 интентов:
-  - `task` — запрос о конкретной задаче по ключу (например, "AL-38787")
-  - `tasks_filter` — поиск задач по фильтрам (команда, спринт, тип, статус)
-  - `metric` — запрос метрик команды/спринта (done_total, scope_drop и т.д.)
-  - `general` — общий вопрос, не требующий данных из БД
-- Определяет `query_type` для маршрутизации:
-  - `sql` — нужны данные из PostgreSQL (конкретная задача, список, метрики)
-  - `rag` — вопрос о теории, практиках, регламентах (без данных из БД)
-  - `hybrid` — нужны данные из БД **и** рекомендации из базы знаний
-  - `simple` — приветствие, общий вопрос без внешних данных
-- Извлекает структурированные сущности (entities): issue_key, team_name,
-  sprint_name, metric_name, issue_type, status, assignee, cluster
-- **Fast path**: regex находит issue key → `intent=task`, `query_type=sql`, LLM
-  не вызывается
-- **Slow path**: LLM классифицирует запрос и возвращает JSON с intent +
-  entities + query_type
+- [docs/architecture.md](docs/architecture.md) — пять агентов, LLM Backend, БД,
+  Qdrant
+- [docs/memory.md](docs/memory.md) — Memory Layer (полная версия)
+- [docs/guardrails.md](docs/guardrails.md) — L1/L2/L3 + тестирование
+- [docs/observability.md](docs/observability.md) — метрики, дашборды, алерты,
+  трейсы
 
-**2. SQL Agent** (шаблонный SQL)
+## Возможности (типы запросов)
 
-- Получает `intent` + `entities` от Supervisor
-- Строит SQL-запросы **программно из шаблонов** (не генерирует SQL через LLM):
-  - `task` → `SELECT * FROM report_agile_dashboard WHERE issue_key = :key`
-  - `tasks_filter` → динамический `WHERE` с `ILIKE` по entities
-  - `metric` → `SELECT` из `report_agile_dashboard_metrics` с whitelist метрик
-- Автоматический `LIMIT 100` на все запросы
-- Whitelist допустимых метрик (защита от невалидных колонок)
-- Параметризованные запросы через SQLAlchemy `text()` (защита от SQL-инъекций)
+Supervisor определяет `query_type` и маршрутизирует запрос по одной из веток:
 
-**3. RAG Agent** (ответы на основе базы знаний)
+| Тип         | Что делает                                         | Пример                                                    |
+| ----------- | -------------------------------------------------- | --------------------------------------------------------- |
+| `sql`       | Достаёт данные из PostgreSQL через SQL Agent       | «Расскажи о задаче AL-38787», «Velocity команды lpop»     |
+| `rag`       | Ищет ответ в базе знаний через Qdrant              | «Как рассчитывается scope drop?», «Что такое Done Total?» |
+| `hybrid`    | Комбинирует данные из БД + контекст из базы знаний | «Метрики lpop и что можно улучшить»                       |
+| `simple`    | Прямой ответ Response Agent (без БД и RAG)         | «Привет», «Что ты умеешь?»                                |
+| `off_topic` | Заготовленный отказ через `_off_topic_node`        | «Расскажи анекдот», «Какая погода?»                       |
 
-- Использует Qdrant как векторное хранилище для документов из `knowledge_base/`
-- Поиск релевантных фрагментов через HuggingFace-эмбеддинги
-  (`intfloat/multilingual-e5-base`)
-- Ограничение контекста: до 4000 символов из top-4 релевантных чанков
-- Генерирует ответ через LLM строго на основе найденного контекста
-- Возвращает ответ с указанием источников (category/filename)
-- Graceful degradation: если Qdrant недоступен, workflow продолжает работать для
-  SQL-запросов
+Полные CLI-примеры по каждому типу — в разделе
+[Использование (CLI)](#использование-cli).
 
-**4. Validator Agent** (валидация результатов)
+## Memory Layer
 
-- Проверяет выходы SQL Agent и RAG Agent перед передачей в Response Agent
-- Для каждого `query_type` определяет, какие данные доступны:
-  - `sql` — есть ли результат из БД
-  - `rag` — есть ли ответ из базы знаний
-  - `hybrid` — какая комбинация данных доступна (оба, только SQL, только RAG)
-- Формирует `validation_result` с флагами `use_sql`, `use_rag` и `note`
-  (описание ошибки при отсутствии данных)
+Двухуровневая память, целиком в PostgreSQL, без отдельных контейнеров:
 
-**5. Response Agent** (генерация ответа)
+- **Окно диалога** (short-term): sliding window по токен-бюджету
+  (`HISTORY_TOKEN_BUDGET=800`) + rolling summary для всего, что выпало;
+  inactivity rotation после 30 минут простоя; анафорический carry-forward через
+  лемматизацию.
+- **Профиль пользователя** (long-term): детерминированный rule-based
+  `default_team` / `frequent_metrics` / `recent_sprints`. Гейт ≥ 6 сообщений с
+  одной командой — иначе профиль остаётся пустым.
+- **Async refresh**: суммаризация и обновление профиля идут через Celery,
+  никогда не блокируя путь ответа.
 
-- Шесть режимов генерации ответа в зависимости от `query_type` и
-  `validation_result`:
-  - **task**: форматирует одну задачу с русскими лейблами → LLM генерирует ответ
-  - **tasks_filter**: компактный список задач → LLM описывает результат
-  - **metric**: метрики в JSON → LLM анализирует динамику
-  - **rag**: ответ из базы знаний с указанием источников
-  - **hybrid**: данные из БД + контекст из базы знаний → LLM объединяет
-  - **simple (прямой)**: отвечает на общие вопросы без внешних данных
-- Формирует контекстуальный ответ на русском языке
-- Обрабатывает ошибки, пустые результаты и таймауты LLM
+Подробнее: [docs/memory.md](docs/memory.md) (поведение и конфигурация) ·
+[docs/database.md](docs/database.md) (схема + psql-инспекция своих данных).
 
-### LLM Backend
+## Guardrails
 
-- **Модель**: Qwen/Qwen2.5-3B-Instruct
-- **Backend**: vLLM с OpenAI-compatible API
-- **URL**: `http://localhost:8000/v1`
+Трёхуровневая защита, **без** LLM-вызовов (<1 ms на каждый слой):
 
-### База данных
+- **L1 — TopicGuard** (input, regex): блокирует prompt-injection, помечает
+  whitelist fast-path. Off-topic классифицирует Supervisor через отдельный
+  `query_type=off_topic`.
+- **L2 — SQLGuard** (tool-level): 4 слоя fail-fast — limits → regex blacklist →
+  AST через `sqlglot` → complexity (≤5 JOIN). Блокирует всё, что не read-only
+  `SELECT` по whitelist-таблицам.
+- **L3 — ResponseGuard** (output): 6 проверок — пустой/слишком длинный ответ,
+  доля кириллицы, sql_leak, traceback, hallucinated_urls, internal_leak. Режимы
+  BLOCK / sanitize.
 
-- **СУБД**: PostgreSQL 16 (Alpine)
-- **Таблицы** (обе активно используются SQL Agent-ом):
-  - `report_agile_dashboard` — задачи Jira (58 полей): issue_key, feature_teams,
-    sprint_name, issue_status_act, storypoints_act и др. Используется для
-    интентов `task` и `tasks_filter`
-  - `report_agile_dashboard_metrics` — агрегированные метрики команд по спринтам
-    (35 полей): done_total, scope_drop, velocity, sprint_goal и др. Используется
-    для интента `metric`
-- **Индексы**: issue_key, jirasprint_id, sprint_state, assignee_name,
-  feature_teams
-- **Данные**: Загружаются из CSV файлов с использованием команды COPY
+Включается флагом `GUARDRAIL_ENABLED` в `.env` (по умолчанию `True`).
 
-### Векторное хранилище (Qdrant)
+Подробнее: [docs/guardrails.md](docs/guardrails.md).
 
-- **Версия**: Qdrant v1.13.2
-- **Коллекция**: `business_docs` (настраивается через `QDRANT_COLLECTION_NAME`)
-- **Эмбеддинги**: `intfloat/multilingual-e5-base` (768-мерные, мультиязычные —
-  поддержка русского языка)
-- **Метрика**: Cosine similarity
-- **Документы**: PDF и Markdown из `knowledge_base/` (Agile-практики, описания
-  метрик, внутренние регламенты)
-- **Ingestion pipeline**: загрузка → chunking (1000 символов, overlap 200) →
-  эмбеддинг → загрузка в Qdrant
+## Observability
+
+Две плоскости наблюдаемости поверх workflow:
+
+- **Prometheus + Grafana** — ~50 кастомных метрик в неймспейсе
+  `agile_assistant_*` (pipeline / Celery / per-agent / guardrails / sanitizer /
+  memory / quality / data sync); 5 дашбордов в папке «Agile Assistant»; 18
+  алертов в 4 группах.
+- **Langfuse** — трейс каждого запроса с полными промптами LLM-вызовов,
+  входными/выходными токенами и model parameters.
+
+UI:
+
+- Grafana — `http://195.209.218.21/grafana/`
+- Prometheus — `http://195.209.218.21/prometheus/`
+- Langfuse — `http://195.209.218.21:3001/`
+
+Подробнее: [docs/observability.md](docs/observability.md).
 
 ## Структура проекта
 
@@ -186,46 +180,77 @@ hse-prom-prog/
 │   ├── __init__.py
 │   ├── config.py                      # Pydantic settings
 │   ├── main.py                        # CLI entry point
+│   ├── metrics.py                     # Prometheus реестр (~50 метрик в неймспейсе agile_assistant_*)
+│   ├── tracing.py                     # Langfuse singleton + @observe реэкспорт + graceful degradation
 │   ├── agents/
 │   │   ├── __init__.py
 │   │   ├── supervisor.py              # Supervisor (intent + entities + query_type)
-│   │   ├── sql_agent.py               # SQL agent (шаблонный SQL)
+│   │   ├── entity_sanitizer.py        # 7-слойная пост-обработка entities (synonyms, DB validation, hallucination filter, lemma-based anaphora carry-forward, fallback enum extractor)
+│   │   ├── sql_agent.py               # SQL agent (LangGraph + Qwen3 tool calling)
+│   │   ├── sql_tools.py               # run_query tool для LangGraph SQL Agent
+│   │   ├── schema_loader.py           # Загрузка DDL схемы БД для промпта
+│   │   ├── schema_description.py     # Описание схемы БД для Supervisor
 │   │   ├── rag_agent.py               # RAG agent (Qdrant + LLM)
 │   │   ├── validator_agent.py         # Validator (проверка результатов)
-│   │   ├── response_agent.py          # Response agent (LLM)
-│   │   └── schema_description.py      # Описание схемы БД для LLM
+│   │   ├── response_agent.py          # Response agent (LLM, 7 веток)
+│   │   └── guardrails/
+│   │       ├── __init__.py
+│   │       ├── topic_guard.py         # L1: regex — prompt injection + whitelist
+│   │       ├── sql_guard.py           # L2: 4 слоя защиты run_query (limits/regex/AST/joins)
+│   │       └── response_guard.py      # L3: 6 rule-based проверок финального ответа
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── app.py                     # FastAPI application
 │   │   ├── dependencies.py            # DI (DB, repo)
 │   │   ├── routers/
 │   │   │   ├── __init__.py
-│   │   │   └── tasks.py               # POST/GET /tasks endpoints
+│   │   │   ├── tasks.py               # POST/GET /tasks endpoints
+│   │   │   └── conversations.py       # GET /conversations, GET /conversations/{id}/messages, POST /conversations/{id}/close
 │   │   └── schemas/
 │   │       ├── __init__.py
-│   │       └── task.py                # Pydantic request/response
+│   │       ├── task.py                # Pydantic request/response (tasks)
+│   │       └── conversation.py        # Pydantic request/response (memory layer)
 │   ├── database/
 │   │   ├── __init__.py
 │   │   ├── connection.py              # PostgreSQL connection manager
+│   │   ├── load_csv.py                # Load CSV data from S3 into PostgreSQL
 │   │   └── task_repository.py         # Task CRUD (raw SQL)
 │   ├── graph/
 │   │   ├── __init__.py
-│   │   └── workflow.py                # LangGraph StateGraph (5 агентов)
+│   │   └── workflow.py                # LangGraph StateGraph (5 агентов + 2 guardrail-узла + off_topic)
 │   ├── llm/
 │   │   ├── __init__.py
 │   │   └── client.py                  # OpenAI client для vLLM
+│   ├── memory/                         # Memory Layer (short-term + long-term)
+│   │   ├── __init__.py
+│   │   ├── manager.py                  # Фасад: ConversationRepository + ProfileRepository + ContextBuilder
+│   │   ├── context_builder.py          # Sliding window по HISTORY_TOKEN_BUDGET + rolling summary
+│   │   ├── conversation_repo.py        # CRUD conversations + messages (raw SQL)
+│   │   ├── profile_repo.py             # CRUD user_profiles (raw SQL)
+│   │   ├── summary_repo.py             # CRUD conversation_summaries (raw SQL)
+│   │   ├── profile_extractor.py        # Rule-based: default_team, frequent_metrics (no LLM)
+│   │   ├── formatter.py                # <conversation_history> блок для промптов
+│   │   ├── truncator.py                # Обрезка длинных сообщений до 150 токенов
+│   │   └── token_estimator.py          # Деревянная оценка токенов без tiktoken
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── task.py                    # TaskStatus enum, Task model
+│   │   ├── task.py                    # TaskStatus enum, Task model
+│   │   └── memory.py                  # Conversation / Message / UserProfile / ConversationSummary / ConversationContext
 │   ├── rag/
 │   │   ├── __init__.py
-│   │   ├── ingest.py                  # Ingestion pipeline (load → chunk → embed → Qdrant)
-│   │   └── retriever.py               # Qdrant retriever (singleton)
+│   │   ├── embeddings.py              # Shared embedding utils (truncation, Matryoshka)
+│   │   ├── ingest.py                  # Ingestion pipeline (S3 → pdfplumber → Qdrant)
+│   │   ├── reranker.py                # Cross-encoder reranker (bge-reranker-v2-m3)
+│   │   ├── retriever.py               # Multi-mode retriever (dense/sparse/hybrid)
+│   │   └── sparse.py                  # Sparse embeddings (fastembed BM25 / BGE-M3)
 │   └── tasks/
 │       ├── __init__.py
-│       ├── celery_app.py              # Celery application factory
-│       └── workflow_task.py           # Celery task (wraps workflow)
-├── knowledge_base/
+│       ├── celery_app.py              # Celery app factory + Beat schedule (sync_jira_data, sync_knowledge_base)
+│       ├── workflow_task.py           # Celery task (wraps workflow + inactivity rotation)
+│       ├── memory_tasks.py            # Celery: summarize_session, update_profile_async, _refresh_rolling_summary
+│       ├── judge_task.py              # LLM-as-a-Judge async scoring (queue=judge, vsellm)
+│       └── sync_tasks.py              # периодический S3→PostgreSQL и S3→Qdrant sync (Beat-планируется)
+├── knowledge_base/                    # Загружается из S3 (S3_KB_BUCKET)
 │   ├── agile/                         # Agile-практики, дашборды
 │   ├── metrics/                       # Описания метрик
 │   └── internal/                      # Внутренние регламенты
@@ -234,19 +259,45 @@ hse-prom-prog/
 │   ├── script.py.mako
 │   └── versions/
 │       ├── 001_add_tasks_table.py
-│       └── 002_add_cleanup_function.py
+│       ├── 002_add_cleanup_function.py
+│       ├── 003_add_conversations.py       # conversations + messages (short-term memory)
+│       ├── 004_add_user_profiles.py       # user_profiles + conversation_summaries (long-term memory)
+│       └── 005_add_conversation_id_to_tasks.py
 ├── database/
-│   ├── init.sql                       # PostgreSQL schema
-│   └── data/
-│       ├── report_agile_dashboard.csv
-│       └── report_agile_dashboard_metrics.csv
+│   ├── init.sql                       # PostgreSQL schema (данные загружаются из S3)
+│   └── init-langfuse.sql              # Создаёт langfuse_db рядом с основной БД
+├── docs/                              # Подробная документация по разделам
+│   ├── architecture.md
+│   ├── memory.md
+│   ├── database.md
+│   ├── knowledge-base.md
+│   ├── api.md
+│   ├── ui.md
+│   ├── deployment.md
+│   ├── kubernetes.md
+│   ├── local-development.md
+│   ├── guardrails.md
+│   ├── observability.md
+│   ├── evaluation.md
+│   └── configuration.md
+├── monitoring/
+│   ├── prometheus/
+│   │   ├── prometheus.yml             # 9 scrape targets (api, celery-worker, celery-judge, vllm-main, vllm-sql, pg, redis, qdrant, self)
+│   │   └── alerts.yml                 # 18 правил в 4 группах (pipeline / infrastructure / quality / data-freshness)
+│   └── grafana/
+│       ├── provisioning/              # Datasource (Prometheus) + dashboard provider
+│       └── dashboards/                # 5 JSON-дашбордов: overview, infrastructure, agents, guardrails, quality
+├── scripts/
+│   ├── download_model.sh              # Download avibe-gptq-8bit from S3
+│   └── verify_memory.sh               # End-to-end memory layer verification
 ├── streamlit_app/
 │   ├── app.py                         # Streamlit entrypoint (chat UI)
-│   ├── api_client.py                  # HTTP client for FastAPI
+│   ├── api_client.py                  # HTTP client for FastAPI (tasks + conversations)
+│   ├── auth.py                        # Stable uid via ?uid=… (будущий SSO)
 │   ├── config.py                      # Env-based settings
 │   └── components/
 │       ├── __init__.py
-│       ├── sidebar.py                 # Sidebar (status, controls)
+│       ├── sidebar.py                 # Sidebar (status, «Новый диалог», история диалогов)
 │       └── result.py                  # Result/error rendering
 ├── nginx/
 │   ├── nginx.conf                     # Nginx reverse proxy config
@@ -259,14 +310,26 @@ hse-prom-prog/
 │   └── config.toml                    # Streamlit theme
 ├── eval/
 │   ├── __init__.py
-│   ├── golden_dataset.json            # 41 вопрос для оценки RAG
-│   ├── metrics.py                     # RAGAS-метрики (GPT-5.2 as judge)
-│   ├── run_eval.py                    # CLI: запуск оценки
-│   ├── compare.py                     # CLI: сравнение экспериментов
-│   └── results/                       # Результаты (gitignored)
-├── tests/
+│   ├── golden_dataset.json                # 41 вопрос для оценки RAG
+│   ├── sql_golden_dataset.json            # 46 кейсов для SQL Agent
+│   ├── supervisor_golden_dataset.json     # 81 single-turn + 14 multi-turn кейсов (95 всего)
+│   ├── response_golden_dataset.json       # 40 кейсов для Response Agent
+│   ├── metrics.py                         # RAGAS-метрики (GPT-5.2 as judge)
+│   ├── run_eval.py                        # CLI: оценка RAG-пайплайна
+│   ├── run_sql_eval.py                    # CLI: оценка SQL Agent
+│   ├── run_supervisor_eval.py             # CLI: оценка Supervisor (routing + entities, single-turn)
+│   ├── run_multiturn_eval.py              # CLI: multi-turn eval (carry-forward + false carry)
+│   ├── run_response_eval.py               # CLI: оценка Response Agent (format + checks)
+│   ├── compare.py                         # CLI: сравнение RAG-экспериментов
+│   ├── analyze_tokens.py                  # Анализ prompt/completion токенов из логов
+│   ├── spot_check.py                      # Точечная проверка retrieval без RAGAS
+│   └── results/                           # Результаты (gitignored)
+├── k8s/                               # Kubernetes-манифесты (см. docs/kubernetes.md)
+├── tests/                             # 756 тестов (см. раздел «Разработка → Тестирование»)
 │   ├── __init__.py
-│   └── test_workflow.py               # 65 тестов (все агенты + workflow)
+│   ├── conftest.py
+│   ├── contract/                      # Связки агентов и маршрутизация workflow (41)
+│   └── unit/                          # Per-module unit тесты: agents/, memory/, tasks/, api/, database/, observability/, llm/, rag/, agents/guardrails/ (715)
 ├── alembic.ini
 ├── docker-compose.yml
 ├── Dockerfile
@@ -280,86 +343,160 @@ hse-prom-prog/
 
 ## Быстрый старт с Docker Compose
 
-Пошаговая инструкция для запуска полного стека (PostgreSQL + Qdrant + vLLM +
-Redis + FastAPI + Celery + Streamlit + Nginx).
+Пошаговая инструкция для подъёма полного стека с нуля: PostgreSQL + Redis +
+Qdrant + vLLM (×2) + FastAPI + Celery (worker / beat / judge) + Streamlit +
+Nginx + Prometheus + Grafana + Langfuse.
 
-### Шаг 0: Клонирование и настройка
+> Проект разворачивается на сервере `195.209.218.21`. Везде, где в командах
+> встречается `localhost`, имеется в виду сам сервер. Все шаги выполняются из
+> корня репозитория и используют `docker compose` v2.
+
+### Шаг 0: Клонирование и `.env`
 
 ```bash
-# Клонируйте репозиторий
-git clone <repository-url>
+git clone <repository-url> hse-prom-prog
 cd hse-prom-prog
+git checkout main
 
-# Скачайте все ветки
-git fetch --all
-
-# Переключитесь на ветку checkpoint_5
-git checkout checkpoint_5
-
-# Скопируйте файл окружения
 cp .env.example .env
 ```
 
-### Шаг 1: Сборка образа приложения
+Обязательные секреты в `.env`:
+
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Yandex Cloud S3 (модели + база
+  знаний)
+- `VSELLM_API_KEY` — judge / RAGAS
+- При желании `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`
+
+Полный список переменных и их значения по умолчанию —
+[docs/configuration.md](docs/configuration.md).
+
+### Шаг 1: Сборка общего образа приложения
 
 ```bash
 docker compose build app
 ```
 
-Один образ используется для нескольких сервисов: `app`, `api`, `celery-worker`,
-`streamlit`, `migrate`.
+Образ `app` шарится между `api`, `celery-worker`, `celery-beat`, `celery-judge`,
+`streamlit`, `migrate` — собираем один раз.
 
-### Шаг 2: Запуск инфраструктуры
-
-```bash
-docker compose up -d postgres qdrant redis vllm
-```
-
-Дождитесь, пока все сервисы станут healthy (vLLM загружает модель — это может
-занять несколько минут):
+### Шаг 2: Инфраструктура
 
 ```bash
-docker compose ps
+docker compose up -d postgres redis qdrant
 ```
 
-Ожидаемый результат — все четыре сервиса в статусе `healthy`.
+Дождитесь `healthy`:
 
-### Шаг 3: Применение миграций
+```bash
+docker compose ps postgres redis qdrant
+```
+
+### Шаг 3: Скачивание моделей из S3
+
+```bash
+docker compose up download-model download-sql-model download-embedding-model download-reranker-model
+```
+
+Эти job-контейнеры заливают `avibe-gptq-8bit`, `qwen3-8b-awq-4bit`,
+`multilingual-e5-base` и `bge-reranker-v2-m3` в общие Docker volumes. Каждый job
+сам проверяет, что модель уже на диске, и пропускает скачивание — повторный
+запуск идемпотентен.
+
+### Шаг 4: vLLM-серверы
+
+```bash
+docker compose up -d vllm vllm-sql
+```
+
+vLLM при старте загружает модель в GPU — это занимает несколько минут.
+Healthcheck опирается на `/v1/models`. Прогресс старта:
+
+```bash
+docker compose logs -f vllm | grep -E "Application startup|Uvicorn running"
+```
+
+### Шаг 5: Миграции
 
 ```bash
 docker compose run --rm migrate
 ```
 
-Создаёт таблицу `tasks` в PostgreSQL для хранения статусов и результатов
-асинхронных запросов.
-
-### Шаг 4: Загрузка базы знаний в Qdrant
+Накатывает Alembic 001–005: `tasks`, `conversations`, `messages`,
+`user_profiles`, `conversation_summaries`. Быстрый sanity:
 
 ```bash
+docker compose exec postgres psql -U hse_user -d hse_jira_db -c "\dt"
+```
+
+Должны быть все пять таблиц. Подробное описание схемы и инспекция через psql —
+[docs/database.md](docs/database.md).
+
+### Шаг 6: Загрузка данных
+
+```bash
+# 6a. CSV из S3 → PostgreSQL (Jira-задачи, метрики)
+docker compose up load-data
+
+# 6b. PDF / Markdown из S3 → Qdrant (база знаний для RAG)
 docker compose run --rm app python -m hse_prom_prog.rag.ingest
 ```
 
-Загружает PDF и Markdown документы из `knowledge_base/` в Qdrant. Без этого шага
-RAG-запросы (вопросы о метриках, практиках, регламентах) не будут работать.
+`load-data` скачивает CSV из `S3_DATA_BUCKET` и загружает в PostgreSQL. `ingest`
+скачивает документы из `S3_KB_BUCKET` и индексирует в Qdrant. Без этих шагов
+SQL-запросы и RAG-запросы не будут работать.
 
-### Шаг 5: Запуск сервисов приложения
+При первом запуске `ingest` (а также при первом RAG-запросе у поднятого
+celery-worker) дополнительно подтянутся embedding- и reranker-модели из
+`s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/${EMBEDDING_MODEL}/` и
+`.../${RERANKER_MODEL}/` в локальный кэш (`EMBEDDING_MODEL_CACHE_DIR`, по
+умолчанию `/app/models/`). Это runtime-страховка к compose-job'ам
+`download-embedding-model` и `download-reranker-model` (Шаг 3) — если volume
+пустой, модели всё равно появятся перед началом работы. HuggingFace Hub в проде
+не дёргается.
+
+### Шаг 7: API + воркеры + UI
 
 ```bash
-docker compose up -d api celery-worker streamlit nginx
+docker compose up -d api celery-worker celery-beat celery-judge streamlit
 ```
 
-### Шаг 6: Проверка и использование
+### Шаг 8: Nginx и мониторинг
 
 ```bash
-# Проверьте, что все сервисы запущены
+docker compose up -d nginx prometheus grafana pg-exporter redis-exporter langfuse
+```
+
+### Шаг 9: Smoke-проверка
+
+```bash
 docker compose ps
+# все сервисы в Up / healthy
 
-# Откройте в браузере
-open http://localhost
+curl -fsS http://localhost/health
+# {"status":"ok"}
 ```
 
-Streamlit UI доступен по адресу **http://localhost/** — это чат-интерфейс для
-общения с Agile AI Assistant.
+В браузере:
+
+- Streamlit UI — `http://195.209.218.21/`
+- Grafana — `http://195.209.218.21/grafana/`
+- Prometheus — `http://195.209.218.21/prometheus/`
+- Swagger API — `http://195.209.218.21/api/docs`
+
+### Проверка слоя памяти
+
+После того как стек поднят, end-to-end-проверка conversation window, профиля
+пользователя и rotation запускается одной командой:
+
+```bash
+./scripts/verify_memory.sh                # Levels 1–3 (~2 мин)
+./scripts/verify_memory.sh --regression   # + 4 baseline-евала, ~10 мин на RTX 4090
+```
+
+Скрипт сам проверяет healthcheck-и сервисов, прогоняет unit-тесты, multi-turn
+eval и серию E2E-сценариев (anaphora carry-forward, profile gate / injection,
+inactivity rotation, session restore) и печатает агрегированный PASS / FAIL.
 
 ### Примеры запросов в Streamlit UI
 
@@ -369,18 +506,19 @@ Streamlit UI доступен по адресу **http://localhost/** — это
 
 > Расскажи о задаче AL-38787
 
-Supervisor извлекает ключ `AL-38787`, SQL Agent выполняет
-`SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38787'`, Response
-Agent формирует ответ с описанием задачи, статусом, исполнителем, командой,
-story points и другими полями.
+Supervisor извлекает ключ `AL-38787` и маршрутизирует в SQL Agent. LangGraph SQL
+Agent через Qwen3-8B-AWQ генерирует и выполняет
+`SELECT * FROM report_agile_dashboard WHERE issue_key ILIKE '%AL-38787%'`,
+Response Agent формирует ответ с описанием задачи, статусом, исполнителем,
+командой, story points и другими полями.
 
 **2. Запрос метрик по спринту** (таблица `report_agile_dashboard_metrics`):
 
 > Напиши мне Done Total по спринту 26Q1.1 Конь не валялся
 
-Supervisor определяет intent=`metric`, SQL Agent выполняет запрос к таблице
-`report_agile_dashboard_metrics` с фильтром по `sprint_name`, Response Agent
-возвращает значение метрики `done_total` для указанного спринта.
+Supervisor маршрутизирует в SQL Agent. Qwen3 видит схему обеих таблиц в system
+prompt и выбирает `report_agile_dashboard_metrics`, генерирует SELECT с фильтром
+по `sprint_name`, Response Agent возвращает значение `done_total`.
 
 **3. Вопрос по документации компании** (RAG, база знаний в Qdrant):
 
@@ -388,7 +526,7 @@ Supervisor определяет intent=`metric`, SQL Agent выполняет з
 
 Supervisor определяет query_type=`rag`, RAG Agent ищет релевантные фрагменты в
 Qdrant (из `knowledge_base/metrics/team_lead_time.pdf`), Response Agent
-генерирует ответ на основе найденного контекста с указанием источников.
+генерирует ответ на основе найденного контекста.
 
 ### Остановка
 
@@ -396,171 +534,7 @@ Qdrant (из `knowledge_base/metrics/team_lead_time.pdf`), Response Agent
 docker compose down
 ```
 
-### Настройка переменных окружения
-
-Перед запуском создайте файл `.env` на основе `.env.example`:
-
-```bash
-cp .env.example .env
-```
-
-Отредактируйте `.env` файл при необходимости:
-
-```bash
-# vLLM Configuration
-VLLM_BASE_URL=http://localhost:8000/v1
-VLLM_MODEL=Qwen/Qwen2.5-3B-Instruct
-VLLM_API_KEY=EMPTY
-VLLM_TEMPERATURE=0.7
-VLLM_MAX_TOKENS=512
-
-# PostgreSQL Configuration
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=hse_user
-POSTGRES_PASSWORD=hse_password
-POSTGRES_DB=hse_jira_db
-
-# Qdrant Configuration
-QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION_NAME=business_docs
-EMBEDDING_MODEL=intfloat/multilingual-e5-base
-
-# VSELLM (LLM-as-judge для RAGAS evaluation)
-VSELLM_API_KEY=your-vsellm-api-key
-VSELLM_BASE_URL=https://api.vsellm.ru/v1
-
-# Logging
-LOG_LEVEL=INFO
-```
-
-**Примечания:**
-
-- Для Docker Compose используйте `VLLM_BASE_URL=http://vllm:8000/v1`,
-  `POSTGRES_HOST=postgres`, `QDRANT_URL=http://qdrant:6333`
-- Для Kubernetes сервис vLLM называется `vllm-server` (не `vllm`), чтобы
-  избежать конфликта с переменной `VLLM_PORT`, которую Kubernetes создаёт
-  автоматически. Используйте `VLLM_BASE_URL=http://vllm-server:8000/v1`
-- Для локальной разработки используйте `localhost` для всех сервисов
-- Значения по умолчанию подходят для большинства случаев использования
-
-## База знаний и RAG
-
-RAG Agent использует базу знаний для ответов на вопросы о теории, практиках и
-регламентах. Документы хранятся в `knowledge_base/` и загружаются в Qdrant через
-ingestion pipeline.
-
-### Структура knowledge_base/
-
-```
-knowledge_base/
-├── agile/                  # Agile-практики и дашборды
-│   └── agile_dashboard.pdf
-├── metrics/                # Описания метрик
-│   ├── done_total.pdf
-│   ├── scope_drop.pdf
-│   ├── velocity_and_capacity.pdf
-│   ├── sprint_goals.pdf
-│   ├── cancel_rate.pdf
-│   ├── groomed_backlog.pdf
-│   ├── team_lead_time.pdf
-│   ├── team_lead_time_85.pdf
-│   ├── backlog_dynamics.pdf
-│   ├── sprint_tasks_grooming.pdf
-│   ├── sankey_task_issues.pdf
-│   ├── retro_ai.pdf
-│   └── jira_status_mapping.pdf
-└── internal/               # Внутренние регламенты
-```
-
-Поддерживаемые форматы: `.pdf`, `.md`.
-
-### Загрузка документов в Qdrant
-
-После добавления или обновления документов в `knowledge_base/` необходимо
-запустить ingestion pipeline для загрузки в Qdrant:
-
-```bash
-# Через Docker Compose (Qdrant должен быть запущен)
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
-
-# Локально (Qdrant на localhost:6333)
-poetry run python -m hse_prom_prog.rag.ingest
-
-# С указанием пользовательского пути к документам
-poetry run python -m hse_prom_prog.rag.ingest /path/to/docs
-```
-
-Pipeline выполняет:
-
-1. **Загрузка** — читает .pdf (PyPDFLoader) и .md (TextLoader)
-2. **Chunking** — разбивает на фрагменты (1000 символов, overlap 200)
-3. **Эмбеддинг** — `intfloat/multilingual-e5-base` (CPU)
-4. **Загрузка в Qdrant** — пересоздаёт коллекцию и загружает все чанки
-
-При повторном запуске коллекция пересоздаётся (идемпотентность).
-
-## Локальная разработка
-
-### Требования
-
-- Python 3.12+
-- Poetry
-- PostgreSQL 16 (или Docker для PostgreSQL)
-- Qdrant (или Docker для Qdrant)
-- vLLM (или Docker для vLLM)
-- NVIDIA GPU (рекомендуется для vLLM)
-
-### Шаг 1: Установка зависимостей
-
-```bash
-# Клонируйте репозиторий
-git clone <repository-url>
-cd hse-prom-prog
-
-# Установите зависимости через Poetry
-poetry install
-```
-
-### Шаг 2: Настройка PostgreSQL
-
-**Вариант A: Используя Docker**
-
-```bash
-docker run --name hse-postgres \
-    -e POSTGRES_USER=hse_user \
-    -e POSTGRES_PASSWORD=hse_password \
-    -e POSTGRES_DB=hse_jira_db \
-    -p 5432:5432 \
-    -v $(pwd)/database/init.sql:/docker-entrypoint-initdb.d/init.sql \
-    -d postgres:16-alpine
-```
-
-**Вариант B: Локальный PostgreSQL**
-
-```bash
-# Создайте базу данных
-createdb -U postgres hse_jira_db
-
-# Инициализируйте схему и данные
-psql -U postgres -d hse_jira_db -f database/init.sql
-```
-
-### Шаг 3: Запуск vLLM
-
-```bash
-docker run -d --gpus all --name vllm-server -p 8000:8000 \
-    vllm/vllm-openai:v0.8.5 \
-    --model Qwen/Qwen2.5-3B-Instruct
-```
-
-### Шаг 4: Запуск приложения
-
-```bash
-poetry run python -m hse_prom_prog.main "Привет! Выведи данные по задаче AL-38787"
-```
-
-## Использование
+## Использование (CLI)
 
 ### Примеры запросов
 
@@ -589,7 +563,7 @@ poetry run python -m hse_prom_prog.main "Метрики команды lpop"
 poetry run python -m hse_prom_prog.main "Velocity команды linehaul"
 
 # ── query_type=rag (вопросы о практиках и метриках из базы знаний) ──
-poetry run python -m hse_prom_prog.main "Что такое Definition of Done?"
+poetry run python -m hse_prom_prog.main "Что такое Groomed Backlog?"
 poetry run python -m hse_prom_prog.main "Как снизить Scope Drop?"
 poetry run python -m hse_prom_prog.main "Какие бейзлайновые значения метрик?"
 poetry run python -m hse_prom_prog.main "Как рассчитывается velocity?"
@@ -615,8 +589,9 @@ poetry run python -m hse_prom_prog.main "Привет"
 [Supervisor] Извлекаю ключ задачи...
 [Supervisor] Найден ключ: AL-38787
 
-[SQL Agent] Выполняю запрос к PostgreSQL...
-[SQL Agent] Данные успешно получены
+[SQL Agent] Processing: Выведи данные по задаче AL-38787
+[SQL Agent] run_query: SELECT * FROM report_agile_dashboard WHERE issue_key ILIKE '%AL-38787%'
+[SQL Agent] Returned 2 row(s)
 
 [Response Agent] Форматирую ответ...
 
@@ -646,679 +621,84 @@ poetry run python -m hse_prom_prog.main "Привет"
 ============================================================
 ```
 
-## Async API (FastAPI + Celery + Redis)
+## API
 
-Помимо CLI-интерфейса, приложение поддерживает асинхронную обработку задач через
-REST API. Клиент отправляет запрос и получает `task_id` (HTTP 202), а результат
-забирает позже через поллинг.
-
-```
-Client → POST /tasks → FastAPI → Redis Queue → Celery Worker → LangGraph Workflow
-                ↓                                      ↓
-         PostgreSQL (tasks)                   PostgreSQL (tasks)
-                ↑                                      ↓
-Client ← GET /tasks/{id} ←────────────────────────────┘
-```
-
-Celery worker автоматически подключается к Qdrant для RAG-запросов. Если Qdrant
-недоступен, worker продолжает обрабатывать SQL- и simple-запросы.
-
-### Запуск async-стека
+Помимо CLI, приложение выставляет асинхронный REST API. Клиент делает POST,
+получает `task_id` и забирает результат поллингом:
 
 ```bash
-# 1. Поднять инфраструктуру
-docker compose up -d postgres qdrant redis vllm
-
-# 2. Дождаться готовности и применить миграции Alembic
-docker compose run --rm migrate
-
-# 3. (Опционально) Загрузить документы в Qdrant
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
-
-# 4. Запустить API и Celery-воркер
-docker compose up -d api celery-worker
-
-# 5. Проверить, что все сервисы healthy
-docker compose ps
-```
-
-### Создание задачи
-
-```bash
+# Создать задачу
 curl -s -X POST http://localhost/api/tasks \
   -H "Content-Type: application/json" \
   -d '{"query": "Расскажи о задаче AL-38787"}'
-```
 
-Ожидаемый ответ (HTTP 202):
-
-```json
-{
-  "task_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "PENDING",
-  "message": "Task created and queued for processing"
-}
-```
-
-### Поллинг статуса
-
-```bash
-# Подставьте task_id из ответа выше
+# Забрать результат
 curl -s http://localhost/api/tasks/<task_id> | python3 -m json.tool
 ```
 
-Задача проходит через статусы: `PENDING` → `PROCESSING` → `COMPLETED` /
-`FAILED`.
+Задача проходит статусы `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`.
 
-Пример финального ответа (HTTP 200):
-
-```json
-{
-  "task_id": "550e8400-e29b-41d4-a716-446655440000",
-  "query": "Расскажи о задаче AL-38787",
-  "status": "COMPLETED",
-  "result": {
-    "final_response": "Задача AL-38787: проект DeepMind Logistics, статус In Progress...",
-    "issue_key": "AL-38787",
-    "query_type": "sql"
-  },
-  "error": null,
-  "created_at": "2026-02-13T12:00:00Z",
-  "started_at": "2026-02-13T12:00:01Z",
-  "completed_at": "2026-02-13T12:00:15Z"
-}
-```
-
-### Параллельная обработка
-
-Чтобы убедиться, что тяжёлая задача не блокирует остальные, отправьте несколько
-запросов одновременно:
-
-```bash
-for i in 38787 38799 39041; do
-  curl -s -X POST http://localhost/api/tasks \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"Расскажи о задаче AL-\$i\"}" &
-done
-wait
-```
-
-Все три запроса вернут `202 Accepted` **моментально**. Celery-воркер
-обрабатывает до 4 задач параллельно (`--pool=threads --concurrency=4`), поэтому
-каждая задача выполняется в отдельном потоке и не блокирует соседние.
-
-Проверка результатов в PostgreSQL:
-
-```bash
-docker compose exec postgres psql -U hse_user -d hse_jira_db -c \
-  "SELECT task_id, status, created_at, started_at, completed_at FROM tasks ORDER BY created_at;"
-```
-
-### Мониторинг
-
-```bash
-# Логи воркера в реальном времени
-docker compose logs -f celery-worker
-
-# Активные задачи
-docker compose exec celery-worker \
-  celery -A hse_prom_prog.tasks.celery_app inspect active
-
-# Длина очереди в Redis
-docker compose exec redis redis-cli LLEN celery
-```
-
-### Горизонтальное масштабирование
-
-```bash
-# Запустить 3 воркера (= 12 параллельных задач)
-docker compose up --scale celery-worker=3 -d
-
-# Проверить, что все воркеры подключены
-docker compose exec celery-worker \
-  celery -A hse_prom_prog.tasks.celery_app inspect ping
-```
+Подробнее (поллинг, параллельная обработка, мониторинг, scaling) —
+[docs/api.md](docs/api.md).
 
 ## Streamlit UI
 
-Веб-интерфейс для общения с Agile AI Assistant в формате чата. Streamlit
-работает как тонкий клиент и общается **только** с FastAPI по HTTP. Доступен
-через nginx на `http://localhost/`.
-
-### Возможности
-
-- Чат-интерфейс с историей сообщений
-- Поддержка всех типов запросов:
-  - Поиск конкретной задачи по ключу ("Расскажи о задаче AL-38787")
-  - Поиск задач по фильтрам ("Задачи команды cthulhu")
-  - Запрос метрик команд ("Done total из спринта Мандариновый рывок")
-  - Вопросы о практиках из базы знаний ("Как снизить Scope Drop?")
-  - Гибридные запросы ("Метрики lpop и что можно улучшить")
-  - Общие вопросы ("Что такое спринт?", "Привет")
-- Прогресс-индикатор обработки задачи (PENDING -> PROCESSING -> COMPLETED)
-- Индикатор статуса API в сайдбаре (Online / Offline)
-- Обработка ошибок и таймаутов с понятными сообщениями
-- Детали выполнения (timestamps) в раскрывающемся блоке
-- Кнопка очистки чата
-
-## Nginx + Production
-
-Nginx выступает единой точкой входа (порт 80). FastAPI и Streamlit не имеют
-внешних портов и доступны только через reverse proxy.
-
-### Архитектура контейнеров
-
-```
-                          ┌─────────────────────────────────────┐
-                          │        Docker Compose network       │
-  Browser ──► :80 ──►     │                                     │
-                          │  ┌─────────┐                        │
-                          │  │  nginx  │ (Image 1)              │
-                          │  └────┬────┘                        │
-                          │       │                             │
-                ┌─────────┼───────┼──────────┐                  │
-                │         │       │          │                  │
-          /static/        │   /api/*       / (default)          │
-                │         │       │          │                  │
-          ┌─────▼───┐     │ ┌─────▼───┐ ┌───▼──────┐           │
-          │ static  │     │ │   api   │ │streamlit │           │
-          │(Image 3)│     │ │(Image 2)│ │          │           │
-          │ volume  │     │ │gunicorn │ │          │           │
-          └─────────┘     │ └─────────┘ └──────────┘           │
-                          └─────────────────────────────────────┘
-```
-
-| Контейнер  | Образ                 | Роль                                            |
-| ---------- | --------------------- | ----------------------------------------------- |
-| **nginx**  | `nginx:1.27-alpine`   | Reverse proxy, единственный открытый порт (80)  |
-| **api**    | Dockerfile + gunicorn | FastAPI в production (gunicorn + UvicornWorker) |
-| **static** | `busybox` + volume    | Хранит статические файлы, шарит volume с nginx  |
-| **qdrant** | `qdrant:v1.13.2`      | Векторное хранилище для RAG Agent               |
-
-### Маршруты nginx
-
-| Путь              | Куда проксирует  | Особенности                                        |
-| ----------------- | ---------------- | -------------------------------------------------- |
-| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (`/api/tasks` -> `/tasks`) |
-| `/static/*`       | Диск / Streamlit | Сначала volume, затем fallback на Streamlit        |
-| `/docs`, `/redoc` | `api:8080`       | Swagger UI                                         |
-| `/_stcore/stream` | `streamlit:8501` | WebSocket (Upgrade + Connection headers)           |
-| `/` (default)     | `streamlit:8501` | Streamlit UI с WebSocket-поддержкой                |
-
-### Запуск production-стека
-
-```bash
-# 1. Запустить всё
-docker compose up -d
-
-# 2. (Опционально) Загрузить документы в Qdrant для RAG
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
-
-# 3. Открыть в браузере
-open http://localhost
-
-# FastAPI доступен через /api/:
-curl http://localhost/api/tasks -X POST -H "Content-Type: application/json" \
-  -d '{"query": "Расскажи о задаче AL-38787"}'
-
-# Swagger UI:
-open http://localhost/docs
-
-# Статика:
-curl http://localhost/static/style.css
-```
-
-### Проверка
-
-```bash
-# Статус всех сервисов
-docker compose ps
-
-# Логи nginx
-docker compose logs nginx
-
-# Проверить, что статика отдаётся напрямую
-curl -I http://localhost/static/favicon.svg
-# Должен вернуть Content-Type: image/svg+xml и Cache-Control: public
-
-# Проверить, что FastAPI работает через gunicorn
-docker compose exec api ps aux | grep gunicorn
-
-# Проверить Qdrant
-curl http://localhost:6333/healthz
-```
-
-## Kubernetes (minikube)
-
-Проект можно развернуть в Kubernetes с помощью minikube. Все манифесты находятся
-в `k8s/`.
-
-### Требования
-
-- [minikube](https://minikube.sigs.k8s.io/) v1.38+
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- Docker (driver для minikube)
-- NVIDIA GPU + драйверы (для vLLM)
-- [CloudNativePG](https://cloudnative-pg.io/) v1.25+ (устанавливается на шаге 1)
-
-### Структура манифестов
-
-```
-k8s/
-├── namespace.yaml                # Namespace agile-assistant
-├── ingress.yaml                  # Ingress (API rewrite, static MIME fix, Streamlit/WebSocket)
-├── configmaps/
-│   ├── app-config.yaml           # Env vars (DNS names, credentials)
-│   └── postgres-init.yaml        # init.sql (schema + COPY)
-├── jobs/
-│   ├── migrate.yaml              # Job: Alembic migrations (backoffLimit: 3)
-│   ├── qdrant-ingest.yaml        # Job: load knowledge base into Qdrant
-│   └── postgres-load-data.yaml   # Job: load CSV data into HA PostgreSQL
-├── secrets/
-│   ├── app-secrets.yaml          # Opaque Secret (POSTGRES_PASSWORD, VLLM_API_KEY)
-│   └── postgres-credentials.yaml # basic-auth Secret для CloudNativePG (username/password)
-│   # registry-credentials и basic-auth создаются через kubectl (шаг 2)
-├── statefulsets/
-│   └── postgres-cluster.yaml     # CloudNativePG Cluster (1 primary + 2 standby)
-├── storage/
-│   ├── qdrant-pvc.yaml           # PVC 2Gi
-│   └── vllm-cache-pvc.yaml      # PVC 10Gi (HuggingFace model cache)
-├── deployments/
-│   ├── qdrant.yaml               # Qdrant v1.13.2
-│   ├── redis.yaml                # Redis 7 (ephemeral)
-│   ├── vllm.yaml                 # vLLM (Qwen2.5-3B, GPU)
-│   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
-│   ├── celery-worker.yaml        # Celery worker (threads, concurrency=4)
-│   └── streamlit.yaml            # Streamlit UI
-└── services/
-    ├── qdrant-svc.yaml           # ClusterIP :6333, :6334
-    ├── redis-svc.yaml            # ClusterIP :6379
-    ├── vllm-svc.yaml             # ClusterIP :8000 (name: vllm-server)
-    ├── api-svc.yaml              # ClusterIP :8080
-    └── streamlit-svc.yaml        # ClusterIP :8501
-```
-
-### Архитектурные решения
-
-- **PostgreSQL HA** — управляется оператором CloudNativePG. Кластер из 3
-  инстансов (1 primary + 2 standby) со streaming replication и автоматическим
-  failover. Оператор создаёт Service-ы `postgres-cluster-rw` (запись) и
-  `postgres-cluster-ro` (чтение). Приложение подключается через
-  `postgres-cluster-rw`.
-- **Secrets** — пароли (`POSTGRES_PASSWORD`, `VLLM_API_KEY`) хранятся в
-  `k8s/secrets/app-secrets.yaml` (Secret типа Opaque), а не в ConfigMap.
-  `registry-credentials` (docker-registry) — аутентификация в GHCR. `basic-auth`
-  — защита Ingress паролем (Basic Auth).
-- **Docker Registry** — образы публикуются в GitHub Container Registry
-  (`ghcr.io/akiltrebreg/agile-assistant`). Deployment-ы и Job-ы используют
-  `imagePullPolicy: IfNotPresent` с `imagePullSecrets` вместо локальной сборки
-  через `minikube docker-env`.
-- **Basic Auth** — все Ingress-ресурсы защищены HTTP Basic Authentication. При
-  открытии в браузере запрашивается логин и пароль.
-- **Jobs** — миграции Alembic и загрузка данных (CSV в PostgreSQL, чанки в
-  Qdrant) запускаются как Job-ы с `backoffLimit` для автоматического повтора при
-  ошибках и `ttlSecondsAfterFinished: 3600` для автоочистки.
-- **Ingress** — snippet-аннотации для корректных MIME-типов статических файлов
-  (SVG, CSS). Требуют включения `allow-snippet-annotations` в
-  ingress-controller.
-- **vLLM** — Service называется `vllm-server` (не `vllm`), чтобы избежать
-  конфликта с переменной `VLLM_PORT`, которую Kubernetes автоматически создаёт
-  из имени Service.
-
-### Шаг 1: Запуск minikube с GPU
-
-```bash
-minikube start --driver=docker --gpus=all --cpus=8 --memory=13000 --disk-size=40g
-```
-
-Включите необходимые аддоны:
-
-```bash
-minikube addons enable ingress
-minikube addons enable metrics-server
-minikube addons enable nvidia-device-plugin
-```
-
-Настройте snippet-аннотации для ingress-controller (нужны для корректных
-MIME-типов статических файлов):
-
-```bash
-kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=120s
-kubectl -n ingress-nginx patch configmap ingress-nginx-controller \
-  --type merge \
-  -p '{"data":{"allow-snippet-annotations":"true","annotations-risk-level":"Critical"}}'
-kubectl -n ingress-nginx rollout restart deployment ingress-nginx-controller
-kubectl -n ingress-nginx rollout status deployment ingress-nginx-controller
-```
-
-Установите CloudNativePG оператор для PostgreSQL HA:
-
-```bash
-kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
-kubectl -n cnpg-system wait --for=condition=ready pod -l app.kubernetes.io/name=cloudnative-pg --timeout=120s
-```
-
-### Шаг 2: Сборка и публикация образа
-
-Соберите и запушьте образ в GitHub Container Registry:
-
-```bash
-docker build -t ghcr.io/akiltrebreg/agile-assistant:latest .
-docker push ghcr.io/akiltrebreg/agile-assistant:latest
-```
-
-> **Для minikube** — образ ~2GB (CPU-only PyTorch, без CUDA). Чтобы ускорить
-> деплой, можно загрузить образ напрямую из локального Docker в minikube вместо
-> pull из GHCR:
->
-> ```bash
-> minikube image load ghcr.io/akiltrebreg/agile-assistant:latest
-> ```
-
-> **Аутентификация в GHCR** (обязательна для push и pull):
->
-> ```bash
-> echo "<GHCR_PAT>" | docker login ghcr.io -u <github-username> --password-stdin
-> ```
->
-> Создайте Personal Access Token (classic) с правами `read:packages` /
-> `write:packages`: https://github.com/settings/tokens → Generate new token
-> (classic). Контрибьюторы репозитория могут pull-ить образ, залогинившись со
-> своим PAT.
-
-Создайте Secret для аутентификации в registry:
-
-```bash
-kubectl create namespace agile-assistant 2>/dev/null || true
-kubectl -n agile-assistant create secret docker-registry registry-credentials \
-  --docker-server=ghcr.io \
-  --docker-username=akiltrebreg \
-  --docker-password=<GHCR_PAT> \
-  --docker-email=<ваш-email>
-```
-
-Создайте Secret для Basic Auth (защита UI/API паролем):
-
-```bash
-sudo apt install apache2-utils -y    # если ещё не установлен
-htpasswd -c auth admin               # введите пароль дважды
-kubectl -n agile-assistant create secret generic basic-auth --from-file=auth
-rm auth                              # локальный файл больше не нужен
-```
-
-### Шаг 3: Развёртывание
-
-Применяйте манифесты строго в указанном порядке — каждый следующий шаг зависит
-от предыдущего.
-
-**3.1. Базовые ресурсы** — конфигурация, секреты, PVC:
-
-```bash
-# Namespace уже создан на шаге 2, но на всякий случай:
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmaps/             # app-config (env vars) + postgres-init (SQL схема)
-kubectl apply -f k8s/secrets/                # app-secrets + postgres-credentials (для CloudNativePG)
-# registry-credentials и basic-auth уже созданы на шаге 2
-kubectl apply -f k8s/storage/                # PVC для Qdrant (2Gi) и vLLM model cache (10Gi)
-```
-
-**3.2. Service-ы** — создают DNS-имена для межсервисного взаимодействия:
-
-```bash
-kubectl apply -f k8s/services/               # qdrant, redis, vllm-server, api, streamlit
-```
-
-> Service-ы применяются до Deployment-ов, чтобы DNS-имена были доступны при
-> старте контейнеров. PostgreSQL Service создаётся автоматически оператором
-> CloudNativePG.
-
-**3.3. Инфраструктура** — БД, векторное хранилище, кеш, LLM:
-
-```bash
-kubectl apply -f k8s/statefulsets/postgres-cluster.yaml   # CloudNativePG: 1 primary + 2 standby
-kubectl apply -f k8s/deployments/qdrant.yaml              # Qdrant v1.13.2
-kubectl apply -f k8s/deployments/redis.yaml               # Redis 7 (брокер Celery)
-kubectl apply -f k8s/deployments/vllm.yaml                # vLLM + Qwen2.5-3B (GPU)
-```
-
-**3.4. Ожидание готовности инфраструктуры:**
-
-```bash
-# PostgreSQL HA: 3 пода поднимаются, настраивается replication (2-3 мин)
-kubectl -n agile-assistant wait --for=condition=ready cluster/postgres-cluster --timeout=300s
-
-kubectl -n agile-assistant wait --for=condition=ready pod -l app=qdrant --timeout=120s
-kubectl -n agile-assistant wait --for=condition=ready pod -l app=redis --timeout=60s
-```
-
-> vLLM не ждём — он загружает модель 10-15 минут при первом запуске (скачивание
-> ~6.5GB + компиляция CUDA-графов). При повторных запусках модель берётся из
-> PVC.
-
-**3.5. Инициализация данных** — три Job-а выполняются последовательно:
-
-```bash
-# Загрузка CSV-данных в PostgreSQL (report_agile_dashboard, report_agile_dashboard_metrics)
-kubectl apply -f k8s/jobs/postgres-load-data.yaml
-kubectl -n agile-assistant wait --for=condition=complete job/postgres-load-data --timeout=120s
-kubectl -n agile-assistant logs job/postgres-load-data
-
-# Alembic миграции (создаёт таблицу tasks для API)
-kubectl apply -f k8s/jobs/migrate.yaml
-kubectl -n agile-assistant wait --for=condition=complete job/migrate --timeout=120s
-kubectl -n agile-assistant logs job/migrate
-
-# Загрузка базы знаний в Qdrant (embedding-модель ~500MB + индексация 82 чанков, ~3-4 мин)
-kubectl apply -f k8s/jobs/qdrant-ingest.yaml
-kubectl -n agile-assistant wait --for=condition=complete job/qdrant-ingest --timeout=300s
-kubectl -n agile-assistant logs job/qdrant-ingest
-```
-
-> Все Job-ы имеют `backoffLimit` для автоповтора при ошибках и
-> `ttlSecondsAfterFinished: 3600` — автоудаление через 1 час после завершения.
-
-**3.6. Приложение:**
-
-```bash
-kubectl apply -f k8s/deployments/api.yaml            # FastAPI (2 реплики, gunicorn + uvicorn)
-kubectl apply -f k8s/deployments/celery-worker.yaml   # Celery worker (embedding-модель, 4Gi RAM)
-kubectl apply -f k8s/deployments/streamlit.yaml        # Streamlit UI
-```
-
-**3.7. Ingress** — маршрутизация внешнего трафика:
-
-```bash
-kubectl apply -f k8s/ingress.yaml    # 4 Ingress-ресурса: API, static-svg, static-css, UI
-```
-
-### Шаг 4: Проверка
-
-```bash
-# Статус всех подов
-kubectl -n agile-assistant get pods
-
-# Ожидаемый результат: все поды Running, READY 1/1
-# PostgreSQL HA: 3 пода (postgres-cluster-1, -2, -3)
-# vLLM может загружаться 10-15 минут при первом запуске (скачивание модели ~6.5GB + компиляция CUDA-графов)
-# При последующих запусках модель берётся из PVC (vllm-cache)
-
-# Статус PostgreSQL HA кластера
-kubectl -n agile-assistant get cluster postgres-cluster
-```
-
-### Шаг 5: Использование
-
-Узнайте IP minikube:
-
-```bash
-minikube ip
-```
-
-Откройте в браузере (при первом входе появится окно Basic Auth — логин `admin`):
-
-```bash
-# Streamlit UI
-open http://$(minikube ip)
-
-# Swagger UI
-open http://$(minikube ip)/docs
-```
-
-Создайте задачу через API (Basic Auth обязателен):
-
-```bash
-# Создание задачи
-curl -s -u admin:<пароль> -X POST http://$(minikube ip)/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Расскажи о задаче AL-38787"}'
-
-# Проверка статуса (подставьте task_id)
-curl -s -u admin:<пароль> http://$(minikube ip)/api/tasks/<task_id> | python3 -m json.tool
-```
-
-### Маршруты Ingress
-
-| Путь              | Сервис           | Особенности                                         |
-| ----------------- | ---------------- | --------------------------------------------------- |
-| `/api/*`          | `api:8080`       | Prefix `/api` удаляется (rewrite-target)            |
-| `/static/*.svg`   | `streamlit:8501` | Content-Type: image/svg+xml (configuration-snippet) |
-| `/static/*.css`   | `streamlit:8501` | Content-Type: text/css (configuration-snippet)      |
-| `/docs`, `/redoc` | `api:8080`       | Swagger UI                                          |
-| `/_stcore`        | `streamlit:8501` | WebSocket-эндпоинт Streamlit                        |
-| `/` (default)     | `streamlit:8501` | Streamlit UI                                        |
-
-### Полезные команды
-
-```bash
-# Логи конкретного сервиса
-kubectl -n agile-assistant logs -l app=vllm --tail=50
-kubectl -n agile-assistant logs -l app=celery-worker --tail=50
-
-# Перезапуск деплоймента
-kubectl -n agile-assistant rollout restart deployment/api
-
-# Масштабирование API
-kubectl -n agile-assistant scale deployment/api --replicas=3
-
-# PostgreSQL HA: проверка кластера
-kubectl -n agile-assistant get cluster postgres-cluster
-
-# PostgreSQL HA: тест failover (удалить primary — standby промоутится)
-kubectl -n agile-assistant delete pod postgres-cluster-1
-
-# Остановка всего
-minikube stop
-
-# Удаление кластера
-minikube delete
-```
-
-## Оценка RAG-пайплайна (RAGAS)
-
-Модуль `eval/` реализует автоматическую оценку качества RAG-пайплайна с помощью
-фреймворка [RAGAS](https://docs.ragas.io/). В качестве LLM-as-judge используется
-GPT-5.2 через OpenAI-compatible API (vsellm).
-
-### Метрики
-
-| Метрика              | Что оценивает                                | Категория  |
-| -------------------- | -------------------------------------------- | ---------- |
-| `context_precision`  | Точность найденных чанков                    | Retrieval  |
-| `context_recall`     | Полнота найденных чанков                     | Retrieval  |
-| `faithfulness`       | Верность ответа контексту (без галлюцинаций) | Generation |
-| `answer_relevancy`   | Релевантность ответа вопросу                 | Generation |
-| `answer_correctness` | Корректность ответа (vs ground truth)        | End-to-end |
-
-### Golden Dataset
-
-Файл `eval/golden_dataset.json` содержит 41 вопрос с эталонными ответами,
-составленными строго по документам из `knowledge_base/`:
-
-| Категория | Вопросов | Описание                                                    |
-| --------- | -------- | ----------------------------------------------------------- |
-| metrics   | 25       | Вопросы по описаниям метрик (done_total, scope_drop и т.д.) |
-| agile     | 6        | Agile-практики, дашборды                                    |
-| cross_doc | 5        | Вопросы, требующие информации из нескольких документов      |
-| negative  | 5        | Вопросы, на которые в базе знаний **нет** ответа            |
-
-Негативные примеры прогоняются через пайплайн, но исключаются из RAGAS-оценки
-(нет ground truth для сравнения).
-
-### Запуск оценки
-
-```bash
-# Запуск с дефолтным именем эксперимента (baseline)
-poetry run python -m eval.run_eval
-
-# Запуск с пользовательским именем
-poetry run python -m eval.run_eval --experiment semantic_v2
-```
-
-Скрипт выполняет:
-
-1. Загружает `golden_dataset.json`
-2. Прогоняет каждый вопрос через RAG-пайплайн (retrieve → generate)
-3. Вычисляет RAGAS-метрики (LLM-as-judge: GPT-5.2 через vsellm)
-4. Сохраняет результаты в `eval/results/{experiment}_{timestamp}.json`
-5. Выводит сводную таблицу в консоль
-
-Формат результата:
-
-```json
-{
-  "experiment": "baseline",
-  "timestamp": "20260310_143000",
-  "config": {
-    "vllm_model": "Qwen/Qwen2.5-3B-Instruct",
-    "embedding_model": "intfloat/multilingual-e5-base",
-    "chunk_size": 1000,
-    "chunk_overlap": 200,
-    "retriever_top_k": 4
-  },
-  "aggregate": {
-    "context_precision": 0.82,
-    "faithfulness": 0.91,
-    "answer_correctness": 0.75
-  },
-  "per_question": [...]
-}
-```
-
-**Требования**: переменные `VSELLM_API_KEY` и `VSELLM_BASE_URL` должны быть
-заданы в `.env` (см. [Конфигурация](#конфигурация)). Qdrant должен быть запущен
-с загруженной базой знаний.
-
-### Сравнение экспериментов
-
-```bash
-# Сравнение двух экспериментов
-poetry run python -m eval.compare \
-  eval/results/baseline_20260310_143000.json \
-  eval/results/semantic_v2_20260310_150000.json
-
-# Сравнение трёх и более
-poetry run python -m eval.compare eval/results/*.json
-```
-
-Выводит:
-
-- Таблицу метрик с дельтами (зелёный — улучшение, красный — деградация)
-- Различия в конфигурациях пайплайна между экспериментами
-
-```
-Metric             baseline           semantic_v2        delta (last − first)
------------------  -----------------  -----------------  --------------------
-context_precision  0.8200             0.8900             +0.0700
-faithfulness       0.9100             0.9300             +0.0200
-answer_correctness 0.7500             0.7200             -0.0300
-
-Config differences
-param         baseline                 semantic_v2
-------------  -----------------------  -----------------------
-chunk_size    1000                     512
-chunk_overlap 200                      100
-```
+Streamlit-чат на `http://localhost/`. Тонкий клиент, ходит **только** в FastAPI
+по HTTP. Поддерживает все 5 типов запросов, прогресс-индикатор, историю диалогов
+в сайдбаре, восстановление сессии при F5, авто-ротацию диалога после 30 минут
+простоя.
+
+Подробнее: [docs/ui.md](docs/ui.md).
+
+## Деплой
+
+| Способ                                       | Когда использовать                                                                      | Документация                                           |
+| -------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Docker Compose**                           | Основной путь, dev/staging/prod                                                         | [Шаги 0–9 выше](#быстрый-старт-с-docker-compose)       |
+| **Production (nginx + gunicorn + Langfuse)** | docker-compose, но с nginx как единой точкой входа и упорядоченным запуском мониторинга | [docs/deployment.md](docs/deployment.md)               |
+| **Kubernetes (minikube)**                    | k8s + CloudNativePG HA + Prometheus Operator                                            | [docs/kubernetes.md](docs/kubernetes.md)               |
+| **Локально (Poetry)**                        | разработка под CLI, без Docker                                                          | [docs/local-development.md](docs/local-development.md) |
+
+## Оценка качества
+
+Четыре независимых eval-пайплайна — по одному для каждого агента. Результаты
+пишутся в `eval/results/{experiment}_{timestamp}.json`.
+
+| Eval           | Dataset (кейсов)                      | Метрики                                                                                                                        |
+| -------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| RAG-пайплайн   | `golden_dataset.json` (41)            | RAGAS (GPT-5.2 as judge): context_precision, context_recall, faithfulness, answer_relevancy, answer_correctness                |
+| SQL Agent      | `sql_golden_dataset.json` (46)        | Rule-based: exact_match_fields, row_count_exact, value_exact, exact_match_grouped                                              |
+| Supervisor     | `supervisor_golden_dataset.json` (81) | Routing accuracy, intent match, entity match (soft substring), confusion matrix, deploy gate (off_topic / boundary / baseline) |
+| Response Agent | `response_golden_dataset.json` (40)   | Rule-based: must_contain / must_contain_any / must_not_contain / language / length / sources                                   |
+
+Подробнее: [docs/evaluation.md](docs/evaluation.md).
+
+## Конфигурация
+
+Все настройки управляются через переменные окружения (см.
+[.env.example](.env.example)). Полный справочник по 17 группам переменных —
+[docs/configuration.md](docs/configuration.md). Самые важные:
+
+- **vLLM**: `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_TEMPERATURE`, `VLLM_MAX_TOKENS`
+- **Search/RAG**: `SEARCH_TYPE` (`dense`/`sparse`/`hybrid`), `EMBEDDING_MODEL`,
+  `RERANKER_ENABLED`
+- **Memory Layer**: `HISTORY_TOKEN_BUDGET`, `SESSION_TIMEOUT_MINUTES`,
+  `MAX_CONVERSATION_TURNS`
+- **Langfuse**: `LANGFUSE_ENABLED`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
+
+### Текущая лучшая конфигурация RAG
+
+Все эксперименты сравниваются с этой конфигурацией:
+
+| Параметр                          | Значение                                      |
+| --------------------------------- | --------------------------------------------- |
+| LLM (Supervisor / RAG / Response) | avibe-8b, GPTQ 8-bit                          |
+| LLM (SQL Agent)                   | qwen3-8b, AWQ 4-bit                           |
+| `SEARCH_TYPE`                     | `dense` (multilingual-e5-base)                |
+| `chunk_size / overlap`            | 500 / 200                                     |
+| `RETRIEVER_INITIAL_K`             | 20                                            |
+| Reranker                          | `bge-reranker-v2-m3`, top_n=4, threshold=0.01 |
+| `VLLM_MAX_TOKENS`                 | 600                                           |
 
 ## Разработка
 
@@ -1332,10 +712,10 @@ poetry install --with dev
 
 Это установит:
 
-- `ruff` - линтер и форматтер кода
-- `pre-commit` - хуки для git
-- `pytest` и `pytest-asyncio` - тестирование
-- `pytest-cov` - покрытие кода тестами
+- `ruff` — линтер и форматтер кода
+- `pre-commit` — хуки для git
+- `pytest` и `pytest-asyncio` — тестирование
+- `pytest-cov` — покрытие кода тестами
 
 ### Code Quality
 
@@ -1364,17 +744,21 @@ poetry run pre-commit run --all-files
 
 ### Тестирование
 
-65 тестов покрывают все компоненты системы:
+Тесты разнесены по слою (unit/contract) и по модулю — всего **756 тестов**:
 
-| Компонент      | Тестов | Что покрыто                                       |
-| -------------- | ------ | ------------------------------------------------- |
-| Supervisor     | 14     | regex, LLM-классификация, query_type, fallback    |
-| SQL Agent      | 11     | шаблоны SQL, ошибки БД, пустые результаты         |
-| RAG Agent      | 6      | retrieval, генерация, ошибки, truncation, sources |
-| Validator      | 9      | sql/rag/hybrid/both-failed сценарии               |
-| Response Agent | 12     | direct, sql, rag, hybrid, ошибки LLM              |
-| Workflow       | 5      | все 4 маршрута + workflow без retriever           |
-| Параметризация | 8      | issue key extraction, general queries             |
+| Каталог                             | Тестов | Что покрыто                                                                                  |
+| ----------------------------------- | -----: | -------------------------------------------------------------------------------------------- |
+| `tests/contract/`                   |     41 | Связки агентов: Supervisor → SQL/RAG, SQL/RAG → Validator → Response, маршрутизация workflow |
+| `tests/unit/agents/`                |    191 | Supervisor, SQL Agent, RAG Agent, Validator, Response Agent, EntitySanitizer                 |
+| `tests/unit/agents/guardrails/`     |     58 | TopicGuard (L1), SQLGuard (L2), ResponseGuard (L3)                                           |
+| `tests/unit/memory/`                |     74 | ContextBuilder, ProfileExtractor, MemoryManager, token_estimator, truncator                  |
+| `tests/unit/tasks/`                 |     58 | workflow_task (Celery + inactivity rotation), memory_tasks, sync_tasks                       |
+| `tests/unit/api/`                   |     28 | Роутеры `/tasks` и `/conversations`                                                          |
+| `tests/unit/database/`              |     33 | Подключение к PostgreSQL, load_csv                                                           |
+| `tests/unit/observability/`         |     46 | Реестр Prometheus + Langfuse tracing (no-op + real SDK)                                      |
+| `tests/unit/llm/`                   |     26 | OpenAI-совместимый клиент vLLM                                                               |
+| `tests/unit/rag/`                   |     20 | Embeddings utilities (truncation, normalisation)                                             |
+| `tests/unit/test_conftest_smoke.py` |      7 | Smoke-тесты на работоспособность фикстур                                                     |
 
 ```bash
 # Запустите тесты
@@ -1386,78 +770,6 @@ poetry run pytest tests/ -v
 # С покрытием кода
 poetry run pytest tests/ --cov=hse_prom_prog
 ```
-
-## Конфигурация
-
-Все настройки управляются через переменные окружения (см.
-[.env.example](.env.example)):
-
-### vLLM Configuration
-
-| Переменная         | Описание              | По умолчанию               |
-| ------------------ | --------------------- | -------------------------- |
-| `VLLM_BASE_URL`    | URL vLLM API endpoint | `http://localhost:8000/v1` |
-| `VLLM_MODEL`       | Название модели       | `Qwen/Qwen2.5-3B-Instruct` |
-| `VLLM_API_KEY`     | API ключ для vLLM     | `EMPTY`                    |
-| `VLLM_TEMPERATURE` | Temperature для LLM   | `0.7`                      |
-| `VLLM_MAX_TOKENS`  | Максимум токенов      | `512`                      |
-
-### PostgreSQL Configuration
-
-| Переменная          | Описание        | По умолчанию   |
-| ------------------- | --------------- | -------------- |
-| `POSTGRES_HOST`     | Хост PostgreSQL | `localhost`    |
-| `POSTGRES_PORT`     | Порт PostgreSQL | `5432`         |
-| `POSTGRES_USER`     | Пользователь БД | `hse_user`     |
-| `POSTGRES_PASSWORD` | Пароль БД       | `hse_password` |
-| `POSTGRES_DB`       | Название БД     | `hse_jira_db`  |
-
-### Qdrant Configuration
-
-| Переменная               | Описание           | По умолчанию                    |
-| ------------------------ | ------------------ | ------------------------------- |
-| `QDRANT_URL`             | URL Qdrant сервера | `http://localhost:6333`         |
-| `QDRANT_COLLECTION_NAME` | Название коллекции | `business_docs`                 |
-| `EMBEDDING_MODEL`        | Модель эмбеддингов | `intfloat/multilingual-e5-base` |
-
-### Redis Configuration
-
-| Переменная       | Описание         | По умолчанию |
-| ---------------- | ---------------- | ------------ |
-| `REDIS_HOST`     | Хост Redis       | `localhost`  |
-| `REDIS_PORT`     | Порт Redis       | `6379`       |
-| `REDIS_DB`       | Номер базы Redis | `0`          |
-| `REDIS_PASSWORD` | Пароль Redis     | —            |
-
-### Celery Configuration
-
-| Переменная                    | Описание                    | По умолчанию |
-| ----------------------------- | --------------------------- | ------------ |
-| `CELERY_BROKER_URL`           | URL брокера (авто из Redis) | —            |
-| `CELERY_TASK_TIME_LIMIT`      | Hard timeout задачи (сек)   | `600`        |
-| `CELERY_TASK_SOFT_TIME_LIMIT` | Soft timeout задачи (сек)   | `300`        |
-
-### FastAPI Configuration
-
-| Переменная     | Описание                 | По умолчанию |
-| -------------- | ------------------------ | ------------ |
-| `FASTAPI_HOST` | Хост FastAPI сервера     | `0.0.0.0`    |
-| `FASTAPI_PORT` | Порт FastAPI сервера     | `8080`       |
-| `CORS_ORIGINS` | Разрешённые CORS origins | `*`          |
-
-### VSELLM Configuration (LLM-as-judge)
-
-| Переменная        | Описание                    | По умолчанию               |
-| ----------------- | --------------------------- | -------------------------- |
-| `VSELLM_API_KEY`  | API ключ для vsellm (RAGAS) | —                          |
-| `VSELLM_BASE_URL` | URL vsellm API endpoint     | `https://api.vsellm.ru/v1` |
-
-### Other
-
-| Переменная  | Описание                              | По умолчанию |
-| ----------- | ------------------------------------- | ------------ |
-| `DEBUG`     | Debug-режим (hot-reload, verbose log) | `false`      |
-| `LOG_LEVEL` | Уровень логирования                   | `INFO`       |
 
 ## Лицензия
 

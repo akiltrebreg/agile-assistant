@@ -10,7 +10,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from hse_prom_prog.api.dependencies import get_db
+from hse_prom_prog.api.dependencies import get_db, get_memory_manager
 from hse_prom_prog.api.schemas.task import (
     TaskCreateRequest,
     TaskCreateResponse,
@@ -18,6 +18,7 @@ from hse_prom_prog.api.schemas.task import (
 )
 from hse_prom_prog.database.connection import DatabaseConnection
 from hse_prom_prog.database.task_repository import TaskRepository
+from hse_prom_prog.memory.manager import MemoryManager
 from hse_prom_prog.tasks.workflow_task import execute_workflow
 
 logger = logging.getLogger(__name__)
@@ -36,47 +37,68 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 def create_task(
     request: TaskCreateRequest,
     db: DatabaseConnection = Depends(get_db),
+    memory: MemoryManager = Depends(get_memory_manager),
 ) -> TaskCreateResponse:
     """Create and queue a new workflow task.
 
-    This endpoint:
-    1. Creates a task record in PostgreSQL with PENDING status
-    2. Sends the task to Celery for async processing
-    3. Returns immediately with HTTP 202 Accepted
-
-    The client can then poll GET /tasks/{task_id} to check status.
+    When ``user_id`` or ``conversation_id`` are provided, the memory layer
+    is engaged: the user profile is resolved (or created), and either the
+    existing conversation is looked up or a fresh one is created and
+    returned in the response. The Celery task then replays this id.
 
     Args:
-        request: Task creation request with user query.
+        request: Task creation request with user query and optional
+            memory-layer identifiers.
         db: Database connection (injected dependency).
+        memory: Memory manager (injected dependency).
 
     Returns:
-        TaskCreateResponse with task_id and initial status.
+        TaskCreateResponse with task_id, conversation_id, and initial status.
 
     Raises:
         HTTPException: 500 if task creation fails.
     """
     try:
-        # Create task repository
-        repo = TaskRepository(db)
+        # Resolve user id: external → internal UUID. Anonymous sessions pass
+        # None all the way through — conversation is still created but has
+        # no user_id FK, so it never shows up in any sidebar.
+        internal_user_id: UUID | None = None
+        if request.user_id:
+            profile = memory.profile_repo.get_or_create(request.user_id)
+            internal_user_id = profile.id
 
-        # Create task in database with PENDING status
-        task = repo.create_task(query=request.query)
+        conv = memory.get_or_create_conversation(request.conversation_id, internal_user_id)
 
-        # Send task to Celery for async execution
+        task_repo = TaskRepository(db)
+        task = task_repo.create_task(
+            query=request.query,
+            conversation_id=conv.id,
+        )
+
         celery_task = execute_workflow.apply_async(
             args=[str(task.task_id), request.query],
-            task_id=None,  # Let Celery generate its own ID
+            kwargs={
+                "conversation_id": str(conv.id),
+                "user_external_id": request.user_id,
+                # Wallclock at enqueue: the worker subtracts this from
+                # its own clock to record queue wait time. UTC-aware so
+                # the math survives across container timezones.
+                "created_at_ts": task.created_at.timestamp() if task.created_at else None,
+            },
+            task_id=None,
         )
 
         logger.info(
-            f"[API] Created task {task.task_id}, "
-            f"Celery task {celery_task.id}, "
-            f"query: {request.query[:50]}..."
+            "[API] Created task %s (celery=%s, conversation=%s, user=%s)",
+            task.task_id,
+            celery_task.id,
+            conv.id,
+            request.user_id,
         )
 
         return TaskCreateResponse(
             task_id=task.task_id,
+            conversation_id=conv.id,
             status=task.status.value,
             message="Task created and queued for processing",
         )
@@ -139,4 +161,5 @@ def get_task(
         created_at=task.created_at,
         started_at=task.started_at,
         completed_at=task.completed_at,
+        conversation_id=task.conversation_id,
     )

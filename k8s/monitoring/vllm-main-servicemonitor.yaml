@@ -1,0 +1,29 @@
+# ServiceMonitor for the main vLLM (avibe-gptq-8bit) — exposes vLLM's
+# native /metrics on its OpenAI-compatible HTTP port (8000).
+# Job label kept as ``vllm-main`` so the Infrastructure dashboard's
+# {job="vllm-main"} filter continues to match.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm-main
+  namespace: agile-assistant
+  labels:
+    app: vllm
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      app: vllm
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: vllm-main

@@ -1,0 +1,767 @@
+[
+  {
+    "id": 1,
+    "question": "Расскажи о задаче AL-38787",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38787'",
+    "expected_result": {
+      "row_count": 1,
+      "key_fields": {
+        "issue_key": "AL-38787",
+        "feature_teams": "lpop",
+        "issue_status_act": "In Progress",
+        "issue_type": "Improvement",
+        "sprint_name": "#1 Q1'26",
+        "storypoints_act": 5.0,
+        "assignee_name": "yuvpetrov"
+      }
+    },
+    "category": "single_task",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_fields"
+  },
+  {
+    "id": 2,
+    "question": "Покажи данные по задаче AL-38799",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-38799'",
+    "expected_result": {
+      "row_count": 1,
+      "key_fields": {
+        "issue_key": "AL-38799",
+        "feature_teams": "lpop",
+        "issue_status_act": "Resolved",
+        "issue_type": "Improvement",
+        "storypoints_act": 3.0
+      }
+    },
+    "category": "single_task",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_fields"
+  },
+  {
+    "id": 3,
+    "question": "Информация о задаче AL-99999",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-99999'",
+    "expected_result": {
+      "row_count": 0
+    },
+    "category": "negative",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 4,
+    "question": "Все задачи команды cthulhu",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%cthulhu%'",
+    "expected_result": {
+      "row_count": 70
+    },
+    "category": "tasks_filter",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 5,
+    "question": "Задачи команды lpop в спринте #1 Q1'26",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%lpop%' AND sprint_name ILIKE '%#1 Q1''26%'",
+    "expected_result": {
+      "row_count": 57
+    },
+    "category": "tasks_filter",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 6,
+    "question": "Покажи все баги",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE issue_type ILIKE '%Bug%'",
+    "expected_result": {
+      "row_count": 118
+    },
+    "category": "tasks_filter",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 7,
+    "question": "Баги в кластере Logistics",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE issue_type ILIKE '%Bug%' AND cluster ILIKE '%Logistics%'",
+    "expected_result": {
+      "row_count": 13
+    },
+    "category": "tasks_filter",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 8,
+    "question": "Задачи со статусом In Progress",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE issue_status_act ILIKE '%In Progress%'",
+    "expected_result": {
+      "row_count": 78
+    },
+    "category": "tasks_filter",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 9,
+    "question": "Задачи исполнителя yuvpetrov",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE assignee_name ILIKE '%yuvpetrov%'",
+    "expected_result": {
+      "row_count": 19
+    },
+    "category": "tasks_filter",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 10,
+    "question": "Закрытые баги команды lpop",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%lpop%' AND issue_type ILIKE '%Bug%' AND issue_status_act ILIKE '%Closed%'",
+    "expected_result": {
+      "row_count": 0
+    },
+    "category": "tasks_filter",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 11,
+    "question": "Какой scope drop у команды cthulhu?",
+    "expected_sql": "SELECT scope_drop, sprint_name FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%cthulhu%'",
+    "expected_result": {
+      "row_count": 2,
+      "rows": [
+        {
+          "scope_drop": 6.0,
+          "sprint_name": "172. Нюхлер"
+        },
+        {
+          "scope_drop": 0.0,
+          "sprint_name": "173. Пятиног"
+        }
+      ]
+    },
+    "category": "metric",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_rows"
+  },
+  {
+    "id": 12,
+    "question": "Done total команды lpop",
+    "expected_sql": "SELECT done_total, sprint_name FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%lpop%'",
+    "expected_result": {
+      "row_count": 2,
+      "rows": [
+        {
+          "done_total": 82.0,
+          "sprint_name": "#1 Q1'26"
+        },
+        {
+          "done_total": 96.0,
+          "sprint_name": "#2 Q1'26"
+        }
+      ]
+    },
+    "category": "metric",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_rows"
+  },
+  {
+    "id": 13,
+    "question": "Метрики спринта #1 Q1'26",
+    "expected_sql": "SELECT * FROM report_agile_dashboard_metrics WHERE sprint_name ILIKE '%#1 Q1''26%'",
+    "expected_result": {
+      "row_count": 2
+    },
+    "category": "metric",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 14,
+    "question": "Velocity команды linehaul",
+    "expected_sql": "SELECT complete_sp, sprint_name FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%linehaul%'",
+    "expected_result": {
+      "row_count": 3,
+      "rows": [
+        {
+          "complete_sp": 38.0,
+          "sprint_name": "#1 Q1'26 at Linehaul"
+        },
+        {
+          "complete_sp": 30.5,
+          "sprint_name": "#2 Q1'26 at Linehaul"
+        },
+        {
+          "complete_sp": 27.0,
+          "sprint_name": "#6 Q4'25 at Linehaul"
+        }
+      ]
+    },
+    "category": "metric",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_rows"
+  },
+  {
+    "id": 15,
+    "question": "Sprint goal команды lpop",
+    "expected_sql": "SELECT sprint_goal, sprint_name FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%lpop%'",
+    "expected_result": {
+      "row_count": 2,
+      "rows": [
+        {
+          "sprint_goal": 100.0,
+          "sprint_name": "#1 Q1'26"
+        },
+        {
+          "sprint_goal": 100.0,
+          "sprint_name": "#2 Q1'26"
+        }
+      ]
+    },
+    "category": "metric",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_rows"
+  },
+  {
+    "id": 16,
+    "question": "Cancel rate команды marketplace",
+    "expected_sql": "SELECT cancel_rate, sprint_name FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%marketplace%'",
+    "expected_result": {
+      "row_count": 3,
+      "rows": [
+        {
+          "cancel_rate": 3.33,
+          "sprint_name": "144 ???"
+        },
+        {
+          "cancel_rate": 0.0,
+          "sprint_name": "145 ???"
+        },
+        {
+          "cancel_rate": 3.33,
+          "sprint_name": "146 ???"
+        }
+      ]
+    },
+    "category": "metric",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_rows"
+  },
+  {
+    "id": 17,
+    "question": "Сколько всего story points у команды cthulhu?",
+    "expected_sql": "SELECT SUM(storypoints_act) FROM report_agile_dashboard WHERE feature_teams ILIKE '%cthulhu%'",
+    "expected_result": {
+      "value": 185.0
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "value_exact"
+  },
+  {
+    "id": 18,
+    "question": "Сколько задач каждого типа у команды lpop?",
+    "expected_sql": "SELECT issue_type, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%lpop%' GROUP BY issue_type",
+    "expected_result": {
+      "row_count": 6,
+      "data": {
+        "Bug": 1,
+        "Epic": 1,
+        "Improvement": 82,
+        "Retro AI": 6,
+        "Sprint Goal": 5,
+        "Technical Research": 1
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 19,
+    "question": "Распределение задач по статусам у команды cthulhu",
+    "expected_sql": "SELECT issue_status_act, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%cthulhu%' GROUP BY issue_status_act",
+    "expected_result": {
+      "row_count": 5,
+      "data": {
+        "Done": 45,
+        "Groomed": 15,
+        "In Progress": 4,
+        "Open": 4,
+        "To Do": 2
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 20,
+    "question": "У какой команды самый высокий done_total?",
+    "expected_sql": "SELECT feature_teams, AVG(done_total) as avg_done FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_done DESC LIMIT 1",
+    "expected_result": {
+      "feature_teams_any": ["legal tech", "shuttle"],
+      "value": 100.0
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_fields"
+  },
+  {
+    "id": 21,
+    "question": "У какой команды самый большой scope drop?",
+    "expected_sql": "SELECT feature_teams, AVG(scope_drop) as avg_sd FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_sd DESC LIMIT 1",
+    "expected_result": {
+      "feature_teams": "horizontal ml technologies",
+      "value": 53.0
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_fields"
+  },
+  {
+    "id": 22,
+    "question": "Топ-3 команды по количеству задач",
+    "expected_sql": "SELECT feature_teams, COUNT(*) as cnt FROM report_agile_dashboard GROUP BY feature_teams ORDER BY cnt DESC LIMIT 3",
+    "expected_result": {
+      "data": {
+        "shopping cart": 196,
+        "testops": 151,
+        "rint": 131
+      }
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 23,
+    "question": "Покажи scope drop команды cthulhu и их задачи со статусом Cancelled",
+    "expected_sql": "metrics: SELECT scope_drop FROM ... ; dashboard: SELECT * ... WHERE status=Cancelled",
+    "expected_result": {
+      "metrics_scope_drop": [6.0, 0.0],
+      "cancelled_count": 0
+    },
+    "category": "cross_table",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard", "report_agile_dashboard_metrics"],
+    "eval_strategy": "composite"
+  },
+  {
+    "id": 24,
+    "question": "Задачи команды несуществующая_команда",
+    "expected_sql": "SELECT * FROM report_agile_dashboard WHERE feature_teams ILIKE '%несуществующая_команда%'",
+    "expected_result": {
+      "row_count": 0
+    },
+    "category": "negative",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "row_count_exact"
+  },
+  {
+    "id": 25,
+    "question": "Среднее значение done total у команды cthulhu",
+    "expected_sql": "SELECT AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%cthulhu%'",
+    "expected_result": {
+      "value": 97.0
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_approx"
+  },
+  {
+    "id": 26,
+    "question": "Среднее done total команды marketplace за все спринты",
+    "expected_sql": "SELECT AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%marketplace%'",
+    "expected_result": {
+      "value": 83.67
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_approx"
+  },
+  {
+    "id": 27,
+    "question": "Средняя velocity команды linehaul",
+    "expected_sql": "SELECT AVG(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%linehaul%'",
+    "expected_result": {
+      "value": 31.83
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_approx"
+  },
+  {
+    "id": 28,
+    "question": "Средний scope drop у команды shopping cart",
+    "expected_sql": "SELECT AVG(scope_drop) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%shopping cart%'",
+    "expected_result": {
+      "value": 34.0
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_approx"
+  },
+  {
+    "id": 29,
+    "question": "Средний done total по каждой команде",
+    "expected_sql": "SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics GROUP BY feature_teams",
+    "expected_result": {
+      "row_count": 22,
+      "data": {
+        "aoe": 84.0,
+        "cthulhu": 97.0,
+        "dataset collector": 92.33,
+        "design system": 92.0,
+        "ditto": 83.5,
+        "honey badger": 95.5,
+        "horizontal ml technologies": 42.5,
+        "incident mitigation": 51.5,
+        "legal tech": 100.0,
+        "linehaul": 98.0,
+        "lpop": 89.0,
+        "marketplace": 83.67,
+        "ml platform": 79.5,
+        "mobile archops": 96.33,
+        "on-call x": 69.5,
+        "plov": 94.5,
+        "recruitment tech": 90.0,
+        "rint": 98.0,
+        "shopping cart": 66.25,
+        "shuttle": 100.0,
+        "smith": 84.5,
+        "testops": 88.5
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 30,
+    "question": "Средний scope drop по каждой команде",
+    "expected_sql": "SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics GROUP BY feature_teams",
+    "expected_result": {
+      "row_count": 22,
+      "data": {
+        "aoe": 16.5,
+        "cthulhu": 3.0,
+        "dataset collector": 19.0,
+        "design system": 8.0,
+        "ditto": 17.5,
+        "honey badger": 8.5,
+        "horizontal ml technologies": 53.0,
+        "incident mitigation": 10.5,
+        "legal tech": 0.0,
+        "linehaul": 2.0,
+        "lpop": 12.5,
+        "marketplace": 12.67,
+        "ml platform": 23.0,
+        "mobile archops": 3.67,
+        "on-call x": 32.5,
+        "plov": 15.5,
+        "recruitment tech": 12.0,
+        "rint": 2.0,
+        "shopping cart": 34.0,
+        "shuttle": 2.0,
+        "smith": 14.0,
+        "testops": 11.5
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 31,
+    "question": "Какой максимальный story points у одной задачи?",
+    "expected_sql": "SELECT MAX(storypoints_act) FROM report_agile_dashboard",
+    "expected_result": {
+      "value": 29.0
+    },
+    "category": "aggregation",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "value_exact"
+  },
+  {
+    "id": 32,
+    "question": "Какой минимальный done total среди всех команд и спринтов?",
+    "expected_sql": "SELECT feature_teams, sprint_name, done_total FROM report_agile_dashboard_metrics ORDER BY done_total ASC LIMIT 1",
+    "expected_result": {
+      "feature_teams": "shopping cart",
+      "sprint_name": "26Q1-3",
+      "value": 10.0
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_fields"
+  },
+  {
+    "id": 33,
+    "question": "В каком спринте был самый большой scope drop?",
+    "expected_sql": "SELECT feature_teams, sprint_name, scope_drop FROM report_agile_dashboard_metrics ORDER BY scope_drop DESC LIMIT 1",
+    "expected_result": {
+      "feature_teams": "shopping cart",
+      "sprint_name": "26Q1-3",
+      "value": 90.0
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_fields"
+  },
+  {
+    "id": 34,
+    "question": "Сколько задач в каждом кластере?",
+    "expected_sql": "SELECT cluster, COUNT(*) FROM report_agile_dashboard GROUP BY cluster",
+    "expected_result": {
+      "row_count": 12,
+      "data": {
+        "AI Lab": 238,
+        "Architecture": 152,
+        "FinTech": 113,
+        "Internal Automation": 226,
+        "Logistics": 249,
+        "Marketplace": 288,
+        "Mobile": 202,
+        "Quality": 161,
+        "RRE Classified": 4,
+        "RRE TRX Hub": 291,
+        "Tech Operations": 45,
+        "Travel": 93
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 35,
+    "question": "Сколько задач со статусом Done в каждом кластере?",
+    "expected_sql": "SELECT cluster, COUNT(*) FROM report_agile_dashboard WHERE issue_status_act ILIKE '%Done%' GROUP BY cluster",
+    "expected_result": {
+      "row_count": 11,
+      "data": {
+        "AI Lab": 121,
+        "Architecture": 14,
+        "FinTech": 3,
+        "Internal Automation": 176,
+        "Logistics": 79,
+        "Marketplace": 155,
+        "Mobile": 141,
+        "Quality": 45,
+        "RRE TRX Hub": 229,
+        "Tech Operations": 7,
+        "Travel": 2
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 36,
+    "question": "Сколько задач у команды shopping cart в каждом спринте?",
+    "expected_sql": "SELECT sprint_name, COUNT(*) FROM report_agile_dashboard WHERE feature_teams ILIKE '%shopping cart%' GROUP BY sprint_name",
+    "expected_result": {
+      "row_count": 3,
+      "data": {
+        "25Q4-136": 97,
+        "26Q1-1": 21,
+        "26Q1-2": 78
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 37,
+    "question": "Суммарная velocity команды rint за все спринты",
+    "expected_sql": "SELECT SUM(complete_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%rint%'",
+    "expected_result": {
+      "value": 249.0
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_exact"
+  },
+  {
+    "id": 38,
+    "question": "Сколько всего SP было добавлено в спринты команды shopping cart?",
+    "expected_sql": "SELECT SUM(added_work_sp) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%shopping cart%'",
+    "expected_result": {
+      "value": 7.5
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_exact"
+  },
+  {
+    "id": 39,
+    "question": "Какие команды имеют средний done total ниже 80%?",
+    "expected_sql": "SELECT feature_teams, AVG(done_total) FROM report_agile_dashboard_metrics GROUP BY feature_teams HAVING AVG(done_total) < 80",
+    "expected_result": {
+      "row_count": 5,
+      "data": {
+        "horizontal ml technologies": 42.5,
+        "incident mitigation": 51.5,
+        "ml platform": 79.5,
+        "on-call x": 69.5,
+        "shopping cart": 66.25
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 40,
+    "question": "Команды со средним scope drop больше 25%",
+    "expected_sql": "SELECT feature_teams, AVG(scope_drop) FROM report_agile_dashboard_metrics GROUP BY feature_teams HAVING AVG(scope_drop) > 25",
+    "expected_result": {
+      "row_count": 3,
+      "data": {
+        "horizontal ml technologies": 53.0,
+        "on-call x": 32.5,
+        "shopping cart": 34.0
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 41,
+    "question": "Кластеры, в которых больше 100 задач",
+    "expected_sql": "SELECT cluster, COUNT(*) FROM report_agile_dashboard GROUP BY cluster HAVING COUNT(*) > 100",
+    "expected_result": {
+      "row_count": 9,
+      "data": {
+        "AI Lab": 238,
+        "Architecture": 152,
+        "FinTech": 113,
+        "Internal Automation": 226,
+        "Logistics": 249,
+        "Marketplace": 288,
+        "Mobile": 202,
+        "Quality": 161,
+        "RRE TRX Hub": 291
+      }
+    },
+    "category": "aggregation",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 42,
+    "question": "Средний размер Story в story points",
+    "expected_sql": "SELECT AVG(storypoints_act) FROM report_agile_dashboard WHERE issue_type ILIKE '%Story%'",
+    "expected_result": {
+      "value": 4.24
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "value_approx"
+  },
+  {
+    "id": 43,
+    "question": "Средний размер бага в story points",
+    "expected_sql": "SELECT AVG(storypoints_act) FROM report_agile_dashboard WHERE issue_type ILIKE '%Bug%'",
+    "expected_result": {
+      "value": 1.99
+    },
+    "category": "aggregation",
+    "difficulty": "medium",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "value_approx"
+  },
+  {
+    "id": 44,
+    "question": "Топ-5 команд по средней velocity",
+    "expected_sql": "SELECT feature_teams, AVG(complete_sp) as avg_vel FROM report_agile_dashboard_metrics GROUP BY feature_teams ORDER BY avg_vel DESC LIMIT 5",
+    "expected_result": {
+      "data": {
+        "recruitment tech": 97.0,
+        "design system": 88.0,
+        "ditto": 73.5,
+        "honey badger": 66.5,
+        "rint": 62.25
+      }
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 45,
+    "question": "Топ-3 команды по количеству багов",
+    "expected_sql": "SELECT feature_teams, COUNT(*) as cnt FROM report_agile_dashboard WHERE issue_type ILIKE '%Bug%' GROUP BY feature_teams ORDER BY cnt DESC LIMIT 3",
+    "expected_result": {
+      "data": {
+        "honey badger": 14,
+        "recruitment tech": 11,
+        "shuttle": 10
+      }
+    },
+    "category": "comparative",
+    "difficulty": "hard",
+    "tables": ["report_agile_dashboard"],
+    "eval_strategy": "exact_match_grouped"
+  },
+  {
+    "id": 46,
+    "question": "Средний done total команды несуществующая_команда",
+    "expected_sql": "SELECT AVG(done_total) FROM report_agile_dashboard_metrics WHERE feature_teams ILIKE '%несуществующая_команда%'",
+    "expected_result": {
+      "value": null
+    },
+    "category": "negative",
+    "difficulty": "easy",
+    "tables": ["report_agile_dashboard_metrics"],
+    "eval_strategy": "value_null"
+  }
+]

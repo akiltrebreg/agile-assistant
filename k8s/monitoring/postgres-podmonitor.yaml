@@ -1,0 +1,46 @@
+# PodMonitor for CloudNativePG (CNPG) Postgres pods.
+#
+# In docker-compose we run a separate prometheuscommunity/postgres-exporter
+# container. In k8s the project uses CNPG (statefulsets/postgres-cluster.yaml),
+# which already exposes /metrics on every primary/replica pod via the
+# ``metrics`` port — there's nothing to add, just to discover.
+#
+# PodMonitor (vs. ServiceMonitor) targets pods directly, which is the
+# canonical CNPG pattern: replicas come and go on failover and we want
+# every instance scraped, not just whatever ends up behind the rw / ro
+# Service. Selector keys on cnpg.io/cluster — the label CNPG applies
+# to every pod it manages.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-cluster
+  namespace: agile-assistant
+  labels:
+    app: postgres-cluster
+    app.kubernetes.io/part-of: agile-assistant
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - agile-assistant
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-cluster
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        # Surface the CNPG-assigned role (primary / replica) as a label
+        # so PromQL can filter on it (e.g. write throughput on primary
+        # only, replication lag on replicas only).
+        - sourceLabels: [__meta_kubernetes_pod_label_cnpg_io_instanceRole]
+          action: replace
+          targetLabel: cnpg_role
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          action: replace
+          targetLabel: instance
+        - action: replace
+          targetLabel: job
+          replacement: postgresql

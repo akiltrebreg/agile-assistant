@@ -4,7 +4,9 @@ This module contains Pydantic settings for configuring the application,
 including vLLM API endpoints and model parameters.
 """
 
-from pydantic import Field
+from typing import Literal
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,24 +51,40 @@ class Settings(BaseSettings):
         description="Base URL for vLLM OpenAI-compatible endpoint",
     )
     vllm_model: str = Field(
-        default="Qwen/Qwen2.5-3B-Instruct",
-        description="Model name to use with vLLM",
+        default="/models/avibe-gptq-8bit",
+        description="Model name to use with vLLM (local path or HuggingFace ID)",
     )
     vllm_api_key: str = Field(
         default="EMPTY",
         description="API key for vLLM (use 'EMPTY' for local deployments)",
     )
     vllm_temperature: float = Field(
-        default=0.7,
+        default=0.00,  # 0.05
         ge=0.0,
         le=2.0,
         description="Temperature for LLM generation",
     )
     vllm_max_tokens: int = Field(
-        default=512,
+        default=600,
         ge=1,
         le=4096,
         description="Maximum tokens for LLM responses",
+    )
+    vllm_repetition_penalty: float = Field(
+        default=1.1,
+        ge=1.0,
+        le=2.0,
+        description="Repetition penalty to avoid generation loops",
+    )
+
+    # SQL LLM (arctic-7b text2sql, separate from main vLLM)
+    sql_vllm_base_url: str = Field(
+        default="http://localhost:8001/v1",
+        description="Base URL for text2sql vLLM endpoint (arctic-7b)",
+    )
+    sql_vllm_model: str = Field(
+        default="/models/qwen3-8b-awq-4bit",
+        description="Text2SQL model name (Qwen3-8B-AWQ)",
     )
 
     # PostgreSQL Configuration
@@ -93,6 +111,40 @@ class Settings(BaseSettings):
         description="PostgreSQL database name",
     )
 
+    # S3 Knowledge Base (Yandex Cloud Object Storage)
+    s3_kb_bucket: str | None = Field(
+        default="knowledge-base",
+        description="S3 bucket for knowledge base. None = use local knowledge_base/ dir.",
+    )
+    s3_kb_path: str = Field(
+        default="knowledge_base",
+        description="Path prefix inside S3 bucket (e.g. 'knowledge_base')",
+    )
+    s3_data_bucket: str | None = Field(
+        default="database-agile",
+        description="S3 bucket for CSV data. None = use local database/data/ dir.",
+    )
+    s3_data_path: str = Field(
+        default="data",
+        description="Path prefix inside S3 data bucket",
+    )
+    s3_endpoint: str = Field(
+        default="https://storage.yandexcloud.net",
+        description="S3 endpoint URL (Yandex Cloud Object Storage)",
+    )
+    s3_models_bucket: str | None = Field(
+        default="quant-models-agile",
+        description=(
+            "S3 bucket containing ML model snapshots (embedding, reranker). "
+            "None disables S3 download — embedding model must then be present "
+            "locally under embedding_model_cache_dir or be a HuggingFace ID."
+        ),
+    )
+    s3_models_path: str = Field(
+        default="models",
+        description="Path prefix inside s3_models_bucket (e.g. 'models')",
+    )
+
     # Qdrant Configuration
     qdrant_url: str = Field(
         default="http://localhost:6333",
@@ -103,8 +155,116 @@ class Settings(BaseSettings):
         description="Qdrant collection name for RAG documents",
     )
     embedding_model: str = Field(
-        default="intfloat/multilingual-e5-base",
-        description="HuggingFace embedding model for RAG",
+        default="multilingual-e5-base",
+        description=(
+            "Embedding model identifier. When s3_models_bucket is set, this is "
+            "the folder name inside s3://{s3_models_bucket}/{s3_models_path}/ "
+            "and the snapshot is downloaded on first use. When the bucket is "
+            "None (or empty), the value is passed straight to HuggingFace as "
+            "a Hub ID (back-compat fallback)."
+        ),
+    )
+    embedding_model_cache_dir: str = Field(
+        default="/app/models",
+        description=(
+            "Local directory under which S3-downloaded model snapshots are "
+            "cached. The embedding model lands at "
+            "{embedding_model_cache_dir}/{embedding_model}/."
+        ),
+    )
+    embedding_sparse_model: str | None = Field(
+        default=None,
+        description="Sparse embedding model (e.g. 'BAAI/bge-m3'). None = fastembed BM25.",
+    )
+    embedding_dimension: int | None = Field(
+        default=None,
+        description="Truncate embeddings to this dimension (Matryoshka). None = full model dim.",
+    )
+
+    @field_validator("embedding_dimension")
+    @classmethod
+    def _check_embedding_dimension(cls, v: int | None) -> int | None:
+        allowed = {64, 128, 256, 512, 768, 1024}
+        if v is not None and v not in allowed:
+            msg = f"embedding_dimension must be one of {sorted(allowed)}, got {v}"
+            raise ValueError(msg)
+        return v
+
+    retriever_top_k: int = Field(
+        default=4,
+        ge=1,
+        description="Final number of chunks after reranking",
+    )
+    retriever_initial_k: int = Field(
+        default=20,
+        ge=1,
+        description="Number of chunks fetched before reranking",
+    )
+
+    # Chunking Configuration
+    chunk_size: int = Field(
+        default=500,
+        ge=100,
+        description="Chunk size for RecursiveCharacterTextSplitter",
+    )
+    chunk_overlap: int = Field(
+        default=200,
+        ge=0,
+        description="Chunk overlap for RecursiveCharacterTextSplitter",
+    )
+    max_context_chars: int = Field(
+        default=4000,
+        ge=500,
+        description="Max characters of context passed to LLM",
+    )
+
+    # Search Configuration
+    search_type: Literal["dense", "sparse", "hybrid"] = Field(
+        default="dense",
+        description="Retrieval mode: 'dense' (cosine), 'sparse' (BM25), 'hybrid' (RRF fusion)",
+    )
+    rrf_k: int = Field(
+        default=60,
+        ge=1,
+        description="RRF fusion parameter k (used only when search_type='hybrid')",
+    )
+
+    # Reranker Configuration
+    reranker_enabled: bool = Field(
+        default=True,
+        description="Enable cross-encoder reranking stage",
+    )
+    reranker_model: str = Field(
+        default="bge-reranker-v2-m3",
+        description=(
+            "Cross-encoder model for reranking. When s3_models_bucket is set, "
+            "this is the folder name inside s3://{s3_models_bucket}/{s3_models_path}/ "
+            "and the snapshot is downloaded on first use (cached under "
+            "embedding_model_cache_dir). When the bucket is None (or empty), the "
+            "value is passed straight to HuggingFace as a Hub ID (back-compat "
+            "fallback). Default folder corresponds to BAAI/bge-reranker-v2-m3."
+        ),
+    )
+    reranker_threshold: float = Field(
+        default=0.01,
+        ge=0.0,
+        le=1.0,
+        description="Minimum reranker score to keep a document",
+    )
+    reranker_top_n: int = Field(
+        default=4,
+        ge=1,
+        description="Max documents to keep after reranking",
+    )
+
+    # Input Guardrail (TopicGuard) — regex-only pre-filter
+    guardrail_enabled: bool = Field(
+        default=True,
+        description=(
+            "Enable the regex-only Input Guardrail node "
+            "(prompt-injection + whitelist). Off-topic detection itself "
+            "is handled by Supervisor."
+        ),
     )
 
     # Application mode
@@ -180,6 +340,46 @@ class Settings(BaseSettings):
     cors_origins: str = Field(
         default="*",
         description="Comma-separated list of allowed CORS origins, or '*' for all",
+    )
+
+    # Langfuse (LLM tracing, Phase 3)
+    langfuse_public_key: str = Field(
+        default="",
+        description="Langfuse project public key (pk-lf-...). Empty = disabled.",
+    )
+    langfuse_secret_key: str = Field(
+        default="",
+        description="Langfuse project secret key (sk-lf-...). Empty = disabled.",
+    )
+    langfuse_host: str = Field(
+        default="http://langfuse:3000",
+        description="Langfuse server URL (in-docker default).",
+    )
+    langfuse_enabled: bool = Field(
+        default=True,
+        description=(
+            "Master kill-switch for Langfuse tracing. "
+            "When False, all @observe decorators become no-ops."
+        ),
+    )
+
+    # LLM-as-a-Judge (Phase 4) — async response evaluation via GPT-5.2.
+    # vsellm credentials are reused from the existing RAGAS eval setup.
+    vsellm_api_key: str = Field(
+        default="",
+        description="API key for vsellm (GPT-5.2 endpoint). Empty = judge disabled.",
+    )
+    vsellm_base_url: str = Field(
+        default="https://api.vsellm.ru/v1",
+        description="vsellm OpenAI-compatible base URL (judge LLM endpoint).",
+    )
+    judge_enabled: bool = Field(
+        default=True,
+        description=(
+            "Master kill-switch for LLM-as-a-Judge. When False, "
+            "evaluate_response_async returns 'skipped' without calling GPT-5.2. "
+            "Independent of LANGFUSE_ENABLED — tracing and judging toggle separately."
+        ),
     )
 
     @property
