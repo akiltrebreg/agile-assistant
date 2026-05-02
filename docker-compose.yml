@@ -484,10 +484,14 @@ services:
     # Internal-only — Prometheus scrapes celery-worker:9100 over the docker network.
     expose:
       - "9100"
-    # --pool=threads: I/O-bound tasks (waiting for vLLM HTTP), not CPU-bound
+    # --pool=threads: I/O-bound tasks (waiting for vLLM HTTP), not CPU-bound.
+    # --concurrency=1: parallelism comes from k8s horizontal scaling (multiple
+    # replicas with concurrency=1 each), not from in-process threads. Keeps
+    # Compose and k8s deployments behaviourally identical and avoids GIL /
+    # shared-memory contention on the single-GPU vLLM bottleneck.
     command:
       celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
-      --pool=threads --concurrency=4
+      --pool=threads --concurrency=1
     healthcheck:
       # ``inspect ping`` was previously used here but the cold Python
       # import inside the probe (langgraph + qdrant + tokenizers,
