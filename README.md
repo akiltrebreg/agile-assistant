@@ -455,15 +455,6 @@ celery-worker) дополнительно подтянутся embedding- и rer
 пустой, модели всё равно появятся перед началом работы. HuggingFace Hub в проде
 не дёргается.
 
-> **Важно** — контракт `EMBEDDING_MODEL` (и точно так же `RERANKER_MODEL`):
-> когда `S3_MODELS_BUCKET` задан, это **имя папки в S3 / локальном кэше**, а не
-> HuggingFace Hub ID. Правильные значения — `multilingual-e5-base` и
-> `bge-reranker-v2-m3`. Если поставить Hub ID с org-префиксом
-> (`intfloat/multilingual-e5-base`, `BAAI/bge-reranker-v2-m3`), runtime полезет
-> в `s3://${S3_MODELS_BUCKET}/${S3_MODELS_PATH}/<org>/<name>/`, где снапшота
-> нет, и упадёт с `RuntimeError: No objects found ...`. Hub ID допустим только в
-> fallback-режиме (`S3_MODELS_BUCKET=` пустой).
-
 ### Шаг 7: API + воркеры + UI
 
 ```bash
@@ -490,6 +481,7 @@ curl -fsS http://localhost/health
 
 - Streamlit UI — `http://195.209.218.21/`
 - Grafana — `http://195.209.218.21/grafana/`
+- Prometheus — `http://195.209.218.21/prometheus/`
 - Swagger API — `http://195.209.218.21/api/docs`
 
 ### Проверка слоя памяти
