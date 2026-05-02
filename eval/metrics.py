@@ -75,14 +75,22 @@ def _build_judge_llm():
 
 
 def _build_embeddings():
-    """Build embeddings for the answer_relevancy metric."""
+    """Build embeddings for the answer_relevancy metric.
+
+    Uses the same S3-aware resolver as the production retriever
+    (``ensure_embedding_model_downloaded``) so the local snapshot under
+    ``/app/models/{embedding_model}/`` is reused. ``settings.embedding_model``
+    holds a folder name (not a HF Hub ID) when ``S3_MODELS_BUCKET`` is set,
+    so passing it directly to ``HuggingFaceEmbeddings`` would force a Hub
+    lookup at ``sentence-transformers/<folder>`` and fail with 401.
+    """
     from langchain_huggingface import HuggingFaceEmbeddings
     from ragas.embeddings import LangchainEmbeddingsWrapper
 
-    from hse_prom_prog.config import settings
+    from hse_prom_prog.rag.embeddings import ensure_embedding_model_downloaded
 
     emb = HuggingFaceEmbeddings(
-        model_name=settings.embedding_model,
+        model_name=ensure_embedding_model_downloaded(),
         model_kwargs={"device": "cpu", "trust_remote_code": True},
         encode_kwargs={"normalize_embeddings": True},
     )
