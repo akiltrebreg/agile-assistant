@@ -11,7 +11,7 @@
 #                              [--regression] [-h|--help]
 #
 # Levels:
-#   1. Unit       — pytest tests/test_memory.py + tests/test_api_memory.py
+#   1. Unit       — pytest tests/unit/memory + tests/unit/api/test_conversations_router.py
 #                   (mocks only, no live stack).
 #   2. Eval       — eval/run_multiturn_eval.py against live vllm.
 #                   Requires: postgres + vllm healthy.
@@ -263,12 +263,12 @@ run_unit_tests() {
     section "Level 1 — Unit tests (mocks only, no live stack)"
     if (( RUN_UNIT == 0 )); then skip "unit tests"; return; fi
 
-    note "pytest tests/test_memory.py + tests/test_api_memory.py"
+    note "pytest tests/unit/memory + tests/unit/api/test_conversations_router.py"
     if docker compose run --rm --no-deps \
         -v "$ROOT/tests:/app/tests" app \
-        python -m pytest tests/test_memory.py tests/test_api_memory.py -q \
+        python -m pytest tests/unit/memory tests/unit/api/test_conversations_router.py -q \
         >> "$LOG_FILE" 2>&1; then
-        pass "unit tests (test_memory + test_api_memory)"
+        pass "unit tests (memory + conversations router)"
     else
         fail "unit tests — see $LOG_FILE"
     fi
