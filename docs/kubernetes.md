@@ -42,7 +42,7 @@ k8s/
 │   ├── vllm.yaml                 # vLLM main (avibe-gptq-8bit, GPU, S3 init)
 │   ├── vllm-sql.yaml             # vLLM SQL (Qwen3-8B-AWQ, GPU, S3 init)
 │   ├── api.yaml                  # FastAPI (gunicorn, 2 replicas)
-│   ├── celery-worker.yaml        # Celery main worker (threads, concurrency=4, side-car :9100)
+│   ├── celery-worker.yaml        # Celery main worker (threads, concurrency=1, side-car :9100)
 │   ├── celery-judge.yaml         # Celery judge worker (queue=judge, side-car :9101)
 │   ├── celery-beat.yaml          # Celery Beat scheduler (replicas:1 + Recreate)
 │   └── streamlit.yaml            # Streamlit UI
