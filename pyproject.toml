@@ -68,6 +68,7 @@ pytest-cov = ">=6.0.0"
 coverage = {extras = ["toml"], version = ">=7.6.0"}
 pytest-xdist = ">=3.6.0"
 pytest-timeout = ">=2.3.0"
+locust = ">=2.31.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -168,8 +169,9 @@ select = [
 
 pycodestyle = { max-doc-length = 105 }
 
-# RUF001: ambiguous unicode — project uses Russian (Cyrillic) strings intentionally
-ignore = ["RUF001"]
+# RUF001/RUF002/RUF003: ambiguous unicode in literals/docstrings/comments —
+# project uses Russian (Cyrillic) strings, docstrings, and comments intentionally.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
 # B008: FastAPI Depends() in function defaults is the standard pattern

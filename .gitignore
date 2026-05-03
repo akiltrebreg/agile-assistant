@@ -1,6 +1,9 @@
 # Data directory
 /data
 
+# Load test results (per-run CSVs/HTML are large and not reproducible)
+loadtest/results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
