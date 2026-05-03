@@ -476,13 +476,15 @@ services:
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
       - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse:3000}
       - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-true}
-      # S3 credentials for sync_knowledge_base (boto3 reads from process env,
-      # not from /app/.env mount).
+      # S3 credentials and buckets for sync_knowledge_base + sync_jira_data
+      # (boto3 reads from process env, not from /app/.env mount).
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ru-central1}
       - S3_KB_BUCKET=${S3_KB_BUCKET:-knowledge-base}
       - S3_KB_PATH=${S3_KB_PATH:-knowledge_base}
+      - S3_DATA_BUCKET=${S3_DATA_BUCKET:-database-agile}
+      - S3_DATA_PATH=${S3_DATA_PATH:-data}
       - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
