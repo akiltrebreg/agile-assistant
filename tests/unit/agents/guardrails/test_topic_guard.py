@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from hse_prom_prog.agents.guardrails.topic_guard import (
+from agile_assistant.agents.guardrails.topic_guard import (
     OFF_TOPIC_RESPONSE,
     GuardResult,
     TopicGuard,

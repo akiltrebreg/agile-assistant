@@ -1,8 +1,8 @@
 [project]
-name = "hse-prom-prog"
+name = "agile-assistant"
 version = "0.1.0"
 description = "Add your description here"
-packages = [{include = "hse_prom_prog"}]
+packages = [{include = "agile_assistant"}]
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
 dependencies = [
@@ -90,17 +90,17 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["hse_prom_prog"]
+source = ["agile_assistant"]
 branch = true
 omit = [
     # Entrypoint / glue with no logic worth unit-testing.
-    "hse_prom_prog/main.py",
-    "hse_prom_prog/api/app.py",
-    "hse_prom_prog/tasks/celery_app.py",
+    "agile_assistant/main.py",
+    "agile_assistant/api/app.py",
+    "agile_assistant/tasks/celery_app.py",
     # Long-running ingestion script — its Celery Beat wrapper
     # (sync_tasks.sync_knowledge_base) IS unit-tested for locking
     # and retry; the body itself is sequential I/O glue.
-    "hse_prom_prog/rag/ingest.py",
+    "agile_assistant/rag/ingest.py",
     "alembic/*",
 ]
 
@@ -175,12 +175,12 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
 # B008: FastAPI Depends() in function defaults is the standard pattern
-"hse_prom_prog/api/routers/*.py" = ["B008"]
+"agile_assistant/api/routers/*.py" = ["B008"]
 # PLR2004: magic values like `len(sys.argv) < 2` are standard CLI patterns
-"hse_prom_prog/main.py" = ["PLR2004"]
+"agile_assistant/main.py" = ["PLR2004"]
 # PLR2004, PLC0415: tests use magic values in assertions and local imports with @patch
 "tests/*.py" = ["PLR2004", "PLC0415"]
 "eval/*.py" = ["PLC0415", "PLR2004"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["hse_prom_prog", "streamlit_app", "eval"]
+known-first-party = ["agile_assistant", "streamlit_app", "eval"]

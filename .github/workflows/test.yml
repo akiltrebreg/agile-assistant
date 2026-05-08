@@ -79,7 +79,7 @@ jobs:
         # Qdrant, and Redis (see pyproject.toml markers section).
         run: |
           poetry run pytest tests/unit tests/contract \
-            --cov=hse_prom_prog \
+            --cov=agile_assistant \
             --cov-report=term \
             --cov-report=xml \
             --cov-report=html \

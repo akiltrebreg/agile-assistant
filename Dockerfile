@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for HSE Prom Prog
+# Multi-stage Dockerfile for Agile Assistant
 
 FROM python:3.12-slim AS base
 
@@ -41,7 +41,7 @@ RUN poetry config virtualenvs.create false && \
     rm -rf /root/.cache/pip /root/.cache/pypoetry
 
 # Copy application code
-COPY hse_prom_prog ./hse_prom_prog
+COPY agile_assistant ./agile_assistant
 
 # Copy Streamlit app and config
 COPY streamlit_app ./streamlit_app
@@ -51,9 +51,9 @@ COPY .streamlit ./.streamlit
 COPY static ./static
 RUN ln -s /app/static /app/streamlit_app/static
 
-# Knowledge base is downloaded from S3 at ingestion time (see hse_prom_prog/rag/ingest.py)
+# Knowledge base is downloaded from S3 at ingestion time (see agile_assistant/rag/ingest.py)
 
-# CSV data is downloaded from S3 by hse_prom_prog/database/load_csv.py
+# CSV data is downloaded from S3 by agile_assistant/database/load_csv.py
 
 # Copy eval module (RAGAS evaluation)
 COPY eval ./eval
@@ -69,4 +69,4 @@ COPY README.md ./
 RUN poetry install --no-interaction --no-ansi --only-root
 
 # Default command
-CMD ["python", "-m", "hse_prom_prog.main", "Привет! Выведи данные по задаче ABC-123"]
+CMD ["python", "-m", "agile_assistant.main", "Привет! Выведи данные по задаче ABC-123"]

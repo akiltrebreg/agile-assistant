@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.llm.client``.
+"""Unit tests for ``agile_assistant.llm.client``.
 
 The LLMClient is a thin wrapper around LangChain's ``ChatOpenAI``. We test:
 
@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hse_prom_prog.llm import client as llm_client
+from agile_assistant.llm import client as llm_client
 
 # --------------------------------------------------------------------- #
 # Fixtures
@@ -60,7 +60,7 @@ class TestLLMClientConstruction:
     def test_defaults_read_from_settings(self, fake_chat_openai: MagicMock) -> None:
         client = llm_client.LLMClient()
         # Settings come from config.py; pin only that they were USED.
-        from hse_prom_prog.config import settings
+        from agile_assistant.config import settings
 
         assert client.base_url == settings.vllm_base_url
         assert client.model == settings.vllm_model
@@ -317,7 +317,7 @@ class TestObserveDecorator:
         # Pin the import path: client.py imports observe from tracing
         # (the kill-switch + no-op layer) — NOT directly from langfuse.
         # A regression here would bypass the kill-switch.
-        from hse_prom_prog import tracing
+        from agile_assistant import tracing
 
         assert llm_client.observe is tracing.observe
 

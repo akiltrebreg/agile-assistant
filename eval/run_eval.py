@@ -79,8 +79,8 @@ def _load_golden_dataset() -> list[dict]:
 
 def _pipeline_config() -> dict:
     """Snapshot of current pipeline parameters."""
-    from hse_prom_prog.config import settings
-    from hse_prom_prog.rag.ingest import CHUNK_OVERLAP, CHUNK_SIZE
+    from agile_assistant.config import settings
+    from agile_assistant.rag.ingest import CHUNK_OVERLAP, CHUNK_SIZE
 
     return {
         "vllm_model": settings.vllm_model,
@@ -107,7 +107,7 @@ def _chunk_stats() -> dict:
     """Collect chunk-level statistics from Qdrant collection."""
     from qdrant_client import QdrantClient
 
-    from hse_prom_prog.config import settings
+    from agile_assistant.config import settings
 
     client = QdrantClient(url=settings.qdrant_url)
     collection = settings.qdrant_collection_name
@@ -145,9 +145,9 @@ def _chunk_stats() -> dict:
 
 
 def _build_pipeline():
-    from hse_prom_prog.config import settings
-    from hse_prom_prog.llm.client import LLMClient
-    from hse_prom_prog.rag.retriever import get_retriever
+    from agile_assistant.config import settings
+    from agile_assistant.llm.client import LLMClient
+    from agile_assistant.rag.retriever import get_retriever
 
     global _MAX_CONTEXT_CHARS  # noqa: PLW0603
     _MAX_CONTEXT_CHARS = settings.max_context_chars
@@ -156,7 +156,7 @@ def _build_pipeline():
     retriever = get_retriever()
     reranker = None
     if settings.reranker_enabled:
-        from hse_prom_prog.rag.reranker import get_reranker
+        from agile_assistant.rag.reranker import get_reranker
 
         reranker = get_reranker()
     return retriever, reranker, llm_client

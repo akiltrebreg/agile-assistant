@@ -21,9 +21,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from hse_prom_prog.memory.context_builder import SUMMARY_RESERVE_TOKENS, ContextBuilder
-from hse_prom_prog.memory.token_estimator import CHARS_PER_TOKEN, estimate_tokens
-from hse_prom_prog.models.memory import Conversation, Message
+from agile_assistant.memory.context_builder import SUMMARY_RESERVE_TOKENS, ContextBuilder
+from agile_assistant.memory.token_estimator import CHARS_PER_TOKEN, estimate_tokens
+from agile_assistant.models.memory import Conversation, Message
 
 # --------------------------------------------------------------------- #
 # Local helpers

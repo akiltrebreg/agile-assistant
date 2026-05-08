@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.agents import entity_sanitizer as es
+from agile_assistant.agents import entity_sanitizer as es
 
 # --------------------------------------------------------------------- #
 # Local fixtures

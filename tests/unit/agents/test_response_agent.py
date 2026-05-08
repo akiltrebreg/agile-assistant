@@ -22,7 +22,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.agents.response_agent import ResponseAgent
+from agile_assistant.agents.response_agent import ResponseAgent
 
 
 @pytest.fixture
@@ -369,7 +369,7 @@ class TestFormatHelpers:
         assert agent._format_value(value) == expected
 
     def test_prepare_task_list_truncates_at_max_rows(self, agent: ResponseAgent) -> None:
-        from hse_prom_prog.agents.response_agent import _MAX_ROWS_IN_PROMPT
+        from agile_assistant.agents.response_agent import _MAX_ROWS_IN_PROMPT
 
         rows = [{"issue_key": f"AL-{i}", "summary": "x"} for i in range(_MAX_ROWS_IN_PROMPT + 5)]
         out = agent._prepare_task_list(rows)

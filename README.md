@@ -175,8 +175,8 @@ UI:
 ## Структура проекта
 
 ```
-hse-prom-prog/
-├── hse_prom_prog/
+agile-assistant/
+├── agile_assistant/
 │   ├── __init__.py
 │   ├── config.py                      # Pydantic settings
 │   ├── main.py                        # CLI entry point
@@ -354,8 +354,8 @@ Nginx + Prometheus + Grafana + Langfuse.
 ### Шаг 0: Клонирование и `.env`
 
 ```bash
-git clone <repository-url> hse-prom-prog
-cd hse-prom-prog
+git clone <repository-url> agile-assistant
+cd agile-assistant
 git checkout main
 
 cp .env.example .env
@@ -439,7 +439,7 @@ docker compose exec postgres psql -U hse_user -d hse_jira_db -c "\dt"
 docker compose up load-data
 
 # 6b. PDF / Markdown из S3 → Qdrant (база знаний для RAG)
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
+docker compose run --rm app python -m agile_assistant.rag.ingest
 ```
 
 `load-data` скачивает CSV из `S3_DATA_BUCKET` и загружает в PostgreSQL. `ingest`
@@ -540,42 +540,42 @@ docker compose down
 
 ```bash
 # Через Docker Compose
-docker compose run --rm app python -m hse_prom_prog.main "Выведи данные по задаче AL-38787"
+docker compose run --rm app python -m agile_assistant.main "Выведи данные по задаче AL-38787"
 
 # Локально
-poetry run python -m hse_prom_prog.main "Выведи данные по задаче AL-38787"
+poetry run python -m agile_assistant.main "Выведи данные по задаче AL-38787"
 
 # ── query_type=sql, intent=task (конкретная задача по ключу) ──
-poetry run python -m hse_prom_prog.main "Информация о задаче AL-38799"
-poetry run python -m hse_prom_prog.main "Покажи мне что там с AL-39041"
-poetry run python -m hse_prom_prog.main "AL-39043"
+poetry run python -m agile_assistant.main "Информация о задаче AL-38799"
+poetry run python -m agile_assistant.main "Покажи мне что там с AL-39041"
+poetry run python -m agile_assistant.main "AL-39043"
 
 # ── query_type=sql, intent=tasks_filter (поиск задач по фильтрам) ──
-poetry run python -m hse_prom_prog.main "Все задачи команды cthulhu"
-poetry run python -m hse_prom_prog.main "Задачи команды lpop в спринте #1 Q1'26"
-poetry run python -m hse_prom_prog.main "Баги в кластере Logistics"
-poetry run python -m hse_prom_prog.main "Задачи со статусом In Progress"
+poetry run python -m agile_assistant.main "Все задачи команды cthulhu"
+poetry run python -m agile_assistant.main "Задачи команды lpop в спринте #1 Q1'26"
+poetry run python -m agile_assistant.main "Баги в кластере Logistics"
+poetry run python -m agile_assistant.main "Задачи со статусом In Progress"
 
 # ── query_type=sql, intent=metric (метрики команд/спринтов) ──
-poetry run python -m hse_prom_prog.main "Done total из спринта Мандариновый рывок"
-poetry run python -m hse_prom_prog.main "Какой scope drop у команды cthulhu"
-poetry run python -m hse_prom_prog.main "Метрики команды lpop"
-poetry run python -m hse_prom_prog.main "Velocity команды linehaul"
+poetry run python -m agile_assistant.main "Done total из спринта Мандариновый рывок"
+poetry run python -m agile_assistant.main "Какой scope drop у команды cthulhu"
+poetry run python -m agile_assistant.main "Метрики команды lpop"
+poetry run python -m agile_assistant.main "Velocity команды linehaul"
 
 # ── query_type=rag (вопросы о практиках и метриках из базы знаний) ──
-poetry run python -m hse_prom_prog.main "Что такое Groomed Backlog?"
-poetry run python -m hse_prom_prog.main "Как снизить Scope Drop?"
-poetry run python -m hse_prom_prog.main "Какие бейзлайновые значения метрик?"
-poetry run python -m hse_prom_prog.main "Как рассчитывается velocity?"
+poetry run python -m agile_assistant.main "Что такое Groomed Backlog?"
+poetry run python -m agile_assistant.main "Как снизить Scope Drop?"
+poetry run python -m agile_assistant.main "Какие бейзлайновые значения метрик?"
+poetry run python -m agile_assistant.main "Как рассчитывается velocity?"
 
 # ── query_type=hybrid (данные из БД + рекомендации из базы знаний) ──
-poetry run python -m hse_prom_prog.main "Покажи scope drop команды cthulhu и дай рекомендации"
-poetry run python -m hse_prom_prog.main "Метрики lpop и что можно улучшить"
+poetry run python -m agile_assistant.main "Покажи scope drop команды cthulhu и дай рекомендации"
+poetry run python -m agile_assistant.main "Метрики lpop и что можно улучшить"
 
 # ── query_type=simple (общие вопросы, без обращения к БД и RAG) ──
-poetry run python -m hse_prom_prog.main "Что такое спринт в Agile?"
-poetry run python -m hse_prom_prog.main "Как рассчитываются story points?"
-poetry run python -m hse_prom_prog.main "Привет"
+poetry run python -m agile_assistant.main "Что такое спринт в Agile?"
+poetry run python -m agile_assistant.main "Как рассчитываются story points?"
+poetry run python -m agile_assistant.main "Привет"
 ```
 
 ### Пример вывода
@@ -768,7 +768,7 @@ poetry run pytest tests/
 poetry run pytest tests/ -v
 
 # С покрытием кода
-poetry run pytest tests/ --cov=hse_prom_prog
+poetry run pytest tests/ --cov=agile_assistant
 ```
 
 ## Лицензия

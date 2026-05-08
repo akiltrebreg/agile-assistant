@@ -19,8 +19,8 @@ from uuid import uuid4
 
 import pytest
 
-from hse_prom_prog.models.memory import ConversationSummary, Message
-from hse_prom_prog.tasks import memory_tasks as mt
+from agile_assistant.models.memory import ConversationSummary, Message
+from agile_assistant.tasks import memory_tasks as mt
 
 # --------------------------------------------------------------------- #
 # Helpers

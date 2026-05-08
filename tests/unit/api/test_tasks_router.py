@@ -26,10 +26,10 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from hse_prom_prog.api.app import app
-from hse_prom_prog.api.dependencies import get_db, get_memory_manager
-from hse_prom_prog.models.memory import Conversation
-from hse_prom_prog.models.task import Task, TaskStatus
+from agile_assistant.api.app import app
+from agile_assistant.api.dependencies import get_db, get_memory_manager
+from agile_assistant.models.memory import Conversation
+from agile_assistant.models.task import Task, TaskStatus
 
 # --------------------------------------------------------------------- #
 # Fixtures
@@ -94,7 +94,7 @@ def client(memory: MagicMock, task_repo: MagicMock) -> TestClient:
     patched at import site so the router never touches a real DB."""
     app.dependency_overrides[get_db] = lambda: MagicMock()
     app.dependency_overrides[get_memory_manager] = lambda: memory
-    with patch("hse_prom_prog.api.routers.tasks.TaskRepository", return_value=task_repo):
+    with patch("agile_assistant.api.routers.tasks.TaskRepository", return_value=task_repo):
         yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -103,7 +103,7 @@ def client(memory: MagicMock, task_repo: MagicMock) -> TestClient:
 def mock_celery_apply(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Patch ``execute_workflow.apply_async`` so POST /tasks returns
     immediately without enqueuing a real Celery task."""
-    import hse_prom_prog.api.routers.tasks as tasks_module
+    import agile_assistant.api.routers.tasks as tasks_module
 
     fake = MagicMock(return_value=MagicMock(id="celery-job-1"))
     monkeypatch.setattr(tasks_module.execute_workflow, "apply_async", fake)

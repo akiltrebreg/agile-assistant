@@ -1,4 +1,4 @@
-"""Unit tests for the small pure helpers in ``hse_prom_prog.memory``.
+"""Unit tests for the small pure helpers in ``agile_assistant.memory``.
 
 Three modules here, all stateless and dependency-free:
   * ``token_estimator.estimate_tokens`` — char-based upper-bound
@@ -16,9 +16,9 @@ from typing import Any
 
 import pytest
 
-from hse_prom_prog.memory.formatter import format_history
-from hse_prom_prog.memory.token_estimator import CHARS_PER_TOKEN, estimate_tokens
-from hse_prom_prog.memory.truncator import ELLIPSIS, truncate_message
+from agile_assistant.memory.formatter import format_history
+from agile_assistant.memory.token_estimator import CHARS_PER_TOKEN, estimate_tokens
+from agile_assistant.memory.truncator import ELLIPSIS, truncate_message
 
 # ===================================================================== #
 # TokenEstimator

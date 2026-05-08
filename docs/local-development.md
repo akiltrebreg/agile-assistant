@@ -16,7 +16,7 @@
 ```bash
 # Клонируйте репозиторий
 git clone <repository-url>
-cd hse-prom-prog
+cd agile-assistant
 
 # Установите зависимости через Poetry
 poetry install
@@ -70,7 +70,7 @@ docker run -d --gpus all --name vllm-server -p 8000:8000 \
 ## Шаг 4: Запуск приложения
 
 ```bash
-poetry run python -m hse_prom_prog.main "Привет! Выведи данные по задаче AL-38787"
+poetry run python -m agile_assistant.main "Привет! Выведи данные по задаче AL-38787"
 ```
 
 ## Связанные разделы

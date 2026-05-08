@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.tracing``.
+"""Unit tests for ``agile_assistant.tracing``.
 
 The tracing module is the kill-switch + graceful-degradation layer for
 the Langfuse SDK. The pieces under test:
@@ -29,7 +29,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog import tracing
+from agile_assistant import tracing
 
 # ===================================================================== #
 # _NoopContext — every method must accept any kwargs and return None
@@ -233,7 +233,7 @@ class TestModuleLevelExports:
 
     def test_module_exports_pinned(self) -> None:
         # Pin __all__ — downstream code does
-        # ``from hse_prom_prog.tracing import langfuse_client, observe, langfuse_context``
+        # ``from agile_assistant.tracing import langfuse_client, observe, langfuse_context``
         # and a missing export would silently shadow with None at attribute access.
         assert "langfuse_client" in tracing.__all__
         assert "langfuse_context" in tracing.__all__

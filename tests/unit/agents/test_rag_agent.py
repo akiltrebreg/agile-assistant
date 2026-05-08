@@ -20,9 +20,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.documents import Document
 
-from hse_prom_prog.agents import rag_agent
-from hse_prom_prog.agents.rag_agent import RAGAgent
-from hse_prom_prog.rag.reranker import Reranker
+from agile_assistant.agents import rag_agent
+from agile_assistant.agents.rag_agent import RAGAgent
+from agile_assistant.rag.reranker import Reranker
 
 # --------------------------------------------------------------------- #
 # Helpers
@@ -194,7 +194,7 @@ def _build_reranker(scores: list[float], *, threshold: float = 0.0, top_n: int =
     """Construct a Reranker with the heavy CrossEncoder model swapped out."""
     fake_model = MagicMock()
     fake_model.predict = MagicMock(return_value=scores)
-    with patch("hse_prom_prog.rag.reranker.CrossEncoder", return_value=fake_model):
+    with patch("agile_assistant.rag.reranker.CrossEncoder", return_value=fake_model):
         return Reranker("fake-model", threshold=threshold, top_n=top_n)
 
 

@@ -30,9 +30,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from hse_prom_prog.models.memory import Conversation
-from hse_prom_prog.models.task import TaskStatus
-from hse_prom_prog.tasks import workflow_task as wt
+from agile_assistant.models.memory import Conversation
+from agile_assistant.models.task import TaskStatus
+from agile_assistant.tasks import workflow_task as wt
 
 # --------------------------------------------------------------------- #
 # Helpers
@@ -174,7 +174,7 @@ class TestMaybeRotateStaleConversation:
         old = _conv(updated_at=datetime.now(UTC) - timedelta(hours=2))
         user_uuid = uuid4()
 
-        with patch("hse_prom_prog.tasks.memory_tasks.summarize_session") as fake_sum:
+        with patch("agile_assistant.tasks.memory_tasks.summarize_session") as fake_sum:
             out = wt._maybe_rotate_stale_conversation(memory, old, user_uuid)
 
         # Old closed, new created, summariser enqueued with both ids.
@@ -193,7 +193,7 @@ class TestMaybeRotateStaleConversation:
         task_repo = MagicMock()
         task_uuid = uuid4()
 
-        with patch("hse_prom_prog.tasks.memory_tasks.summarize_session"):
+        with patch("agile_assistant.tasks.memory_tasks.summarize_session"):
             wt._maybe_rotate_stale_conversation(
                 memory,
                 _conv(updated_at=datetime.now(UTC) - timedelta(hours=2)),
@@ -213,7 +213,7 @@ class TestMaybeRotateStaleConversation:
         new_conv = _conv()
         memory.conversation_repo.create.return_value = new_conv
 
-        with patch("hse_prom_prog.tasks.memory_tasks.summarize_session"):
+        with patch("agile_assistant.tasks.memory_tasks.summarize_session"):
             out = wt._maybe_rotate_stale_conversation(
                 memory,
                 _conv(updated_at=datetime.now(UTC) - timedelta(hours=2)),
@@ -320,14 +320,14 @@ class TestPersistTurnSafe:
 class TestEnqueueProfileRefresh:
     def test_enqueues_with_string_uuids(self) -> None:
         user, conv = uuid4(), uuid4()
-        with patch("hse_prom_prog.tasks.memory_tasks.update_profile_async") as fake:
+        with patch("agile_assistant.tasks.memory_tasks.update_profile_async") as fake:
             wt._enqueue_profile_refresh(user, conv)
         fake.apply_async.assert_called_once_with(args=[str(user), str(conv)])
 
     def test_enqueue_failure_is_swallowed(self) -> None:
         # If the import or apply_async fails, the workflow must not crash
         # (the response is already saved at this point).
-        with patch("hse_prom_prog.tasks.memory_tasks.update_profile_async") as fake:
+        with patch("agile_assistant.tasks.memory_tasks.update_profile_async") as fake:
             fake.apply_async.side_effect = RuntimeError("broker down")
             wt._enqueue_profile_refresh(uuid4(), uuid4())  # must not raise
 

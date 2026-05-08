@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.rag.reranker.ensure_reranker_model_downloaded``.
+"""Unit tests for ``agile_assistant.rag.reranker.ensure_reranker_model_downloaded``.
 
 The reranker snapshot is mirrored from Yandex Cloud Object Storage at
 ``s3://{s3_models_bucket}/{s3_models_path}/{reranker_model}/`` to
@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.rag import reranker as rr
+from agile_assistant.rag import reranker as rr
 
 
 @pytest.fixture

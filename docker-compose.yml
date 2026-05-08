@@ -5,7 +5,7 @@ services:
   # ──────────────────────────────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
-    container_name: hse-prom-prog-nginx
+    container_name: agile-assistant-nginx
     depends_on:
       api:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # ──────────────────────────────────────────────────────────────
   # Image 3: Static files container — shares volume with nginx
@@ -48,18 +48,18 @@ services:
     build:
       context: .
       dockerfile: nginx/Dockerfile.static
-    container_name: hse-prom-prog-static
+    container_name: agile-assistant-static
     volumes:
       - static_files:/var/www/static
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # ──────────────────────────────────────────────────────────────
   # Qdrant — vector store for RAG Agent
   # ──────────────────────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:v1.13.2
-    container_name: hse-prom-prog-qdrant
+    container_name: agile-assistant-qdrant
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -71,12 +71,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
-    container_name: hse-prom-prog-db
+    container_name: agile-assistant-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-hse_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hse_password}
@@ -96,7 +96,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Download avibe-gptq-8bit model from Yandex Cloud S3 into shared volume
   download-model:
@@ -124,7 +124,7 @@ services:
     volumes:
       - vllm-cache:/models
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Download Qwen3-8B-AWQ from S3 into shared volume
   download-sql-model:
@@ -152,7 +152,7 @@ services:
     volumes:
       - vllm-cache:/models
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Download embedding model (multilingual-e5-base) from Yandex Cloud S3
   # into the shared volume that the API and Celery workers mount at
@@ -184,7 +184,7 @@ services:
     volumes:
       - embedding-models:/models
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Download cross-encoder reranker (BAAI/bge-reranker-v2-m3) from Yandex Cloud
   # S3 into the same shared volume as the embedding model. Matches the
@@ -216,7 +216,7 @@ services:
     volumes:
       - embedding-models:/models
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # vLLM for SQL Agent (Qwen3-8B-AWQ, port 8001)
   vllm-sql:
@@ -255,7 +255,7 @@ services:
       retries: 10
       start_period: 300s
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # vLLM service for serving the main LLM (avibe-gptq-8bit from S3)
   vllm:
@@ -295,14 +295,14 @@ services:
       retries: 10
       start_period: 300s
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Application service (CLI)
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hse-prom-prog-app
+    container_name: agile-assistant-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -335,18 +335,18 @@ services:
       - S3_DATA_PATH=${S3_DATA_PATH:-data}
       - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./eval:/app/eval
       - ./.env:/app/.env
     stdin_open: true
     tty: true
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Redis for Celery broker
   redis:
     image: redis:7-alpine
-    container_name: hse-prom-prog-redis
+    container_name: agile-assistant-redis
     ports:
       - "6380:6379"
     volumes:
@@ -358,7 +358,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # ──────────────────────────────────────────────────────────────
   # Image 2: FastAPI (Producer) — production mode behind nginx
@@ -368,7 +368,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hse-prom-prog-api
+    container_name: agile-assistant-api
     depends_on:
       postgres:
         condition: service_healthy
@@ -412,17 +412,17 @@ services:
     expose:
       - "8080"
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./.env:/app/.env
       - embedding-models:/app/models
       # App logs: RotatingFileHandler writes here, Promtail reads it.
       - ./logs:/app/logs
     # Production: gunicorn with uvicorn workers (no --reload)
     command:
-      gunicorn hse_prom_prog.api.app:app -k uvicorn.workers.UvicornWorker --bind
-      0.0.0.0:8080 --workers 2 --timeout 300 --access-logfile -
+      gunicorn agile_assistant.api.app:app -k uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8080 --workers 2 --timeout 300 --access-logfile -
     networks:
-      - hse-network
+      - agile-assistant-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -496,7 +496,7 @@ services:
       - S3_DATA_PATH=${S3_DATA_PATH:-data}
       - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./.env:/app/.env
       - embedding-models:/app/models
       # App logs: RotatingFileHandler writes here, Promtail reads it.
@@ -511,7 +511,7 @@ services:
     # Compose and k8s deployments behaviourally identical and avoids GIL /
     # shared-memory contention on the single-GPU vLLM bottleneck.
     command:
-      celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
+      celery -A agile_assistant.tasks.celery_app worker --loglevel=info
       --pool=threads --concurrency=1
     healthcheck:
       # ``inspect ping`` was previously used here but the cold Python
@@ -537,7 +537,7 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - hse-network
+      - agile-assistant-network
     logging:
       driver: json-file
       options:
@@ -559,7 +559,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hse-prom-prog-celery-beat
+    container_name: agile-assistant-celery-beat
     depends_on:
       redis:
         condition: service_healthy
@@ -577,7 +577,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_DB=0
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./.env:/app/.env
       # App logs: RotatingFileHandler writes here, Promtail reads it.
       - ./logs:/app/logs
@@ -585,7 +585,7 @@ services:
     # an unwritable location (rare) — we route it to /tmp inside the
     # container, matching beat_schedule_filename in celery_app.py.
     command:
-      celery -A hse_prom_prog.tasks.celery_app beat --loglevel=info
+      celery -A agile_assistant.tasks.celery_app beat --loglevel=info
       --schedule=/tmp/celerybeat-schedule
     healthcheck:
       # Beat has no metrics endpoint and no inspect-ping; the strongest
@@ -605,7 +605,7 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - hse-network
+      - agile-assistant-network
     logging:
       driver: json-file
       options:
@@ -654,7 +654,7 @@ services:
       # scrape target ``celery-judge:9101`` is wired in prometheus.yml.
       - PROMETHEUS_PORT=9101
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./.env:/app/.env
       # App logs: RotatingFileHandler writes here, Promtail reads it.
       - ./logs:/app/logs
@@ -663,7 +663,7 @@ services:
     # --queues=judge isolates the worker from the default queue so a
     # stuck judge LLM call does not steal capacity from workflow_task.
     command:
-      celery -A hse_prom_prog.tasks.celery_app worker --loglevel=info
+      celery -A agile_assistant.tasks.celery_app worker --loglevel=info
       --pool=threads --concurrency=2 --queues=judge --hostname=judge@%h
     healthcheck:
       # Same reasoning as celery-worker: probe the Prometheus side-car
@@ -685,7 +685,7 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - hse-network
+      - agile-assistant-network
     logging:
       driver: json-file
       options:
@@ -697,7 +697,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hse-prom-prog-streamlit
+    container_name: agile-assistant-streamlit
     depends_on:
       api:
         condition: service_healthy
@@ -721,7 +721,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # Alembic migration runner (one-shot: docker compose run --rm migrate)
   migrate:
@@ -738,20 +738,20 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hse_password}
       - POSTGRES_DB=${POSTGRES_DB:-hse_jira_db}
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
       - ./.env:/app/.env
     command: alembic upgrade head
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # ──────────────────────────────────────────────────────────────
   # Monitoring stack: Prometheus + Grafana + exporters (Phase 1)
   # ──────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.53.0
-    container_name: hse-prom-prog-prometheus
+    container_name: agile-assistant-prometheus
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -773,11 +773,11 @@ services:
     depends_on:
       - api
     networks:
-      - hse-network
+      - agile-assistant-network
 
   grafana:
     image: grafana/grafana:11.1.0
-    container_name: hse-prom-prog-grafana
+    container_name: agile-assistant-grafana
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -797,29 +797,29 @@ services:
       - prometheus
       - loki
     networks:
-      - hse-network
+      - agile-assistant-network
 
   pg-exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
-    container_name: hse-prom-prog-pg-exporter
+    container_name: agile-assistant-pg-exporter
     environment:
       DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-hse_user}:${POSTGRES_PASSWORD:-hse_password}@postgres:5432/${POSTGRES_DB:-hse_jira_db}?sslmode=disable"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - hse-network
+      - agile-assistant-network
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.62.0
-    container_name: hse-prom-prog-redis-exporter
+    container_name: agile-assistant-redis-exporter
     environment:
       REDIS_ADDR: "redis://redis:6379"
     depends_on:
       redis:
         condition: service_healthy
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # ──────────────────────────────────────────────────────────────
   # Langfuse — LLM tracing (Phase 3)
@@ -828,7 +828,7 @@ services:
   # ──────────────────────────────────────────────────────────────
   langfuse:
     image: langfuse/langfuse:2
-    container_name: hse-prom-prog-langfuse
+    container_name: agile-assistant-langfuse
     depends_on:
       postgres:
         condition: service_healthy
@@ -854,7 +854,7 @@ services:
     # degrades gracefully if Langfuse is unreachable, so an absent
     # healthcheck doesn't risk silent breakage in api/celery-worker.
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # One-shot job: download CSVs from S3 and load into PostgreSQL
   load-data:
@@ -877,11 +877,11 @@ services:
       - S3_DATA_PATH=${S3_DATA_PATH:-data}
       - S3_ENDPOINT=${S3_ENDPOINT:-https://storage.yandexcloud.net}
     volumes:
-      - ./hse_prom_prog:/app/hse_prom_prog
+      - ./agile_assistant:/app/agile_assistant
       - ./.env:/app/.env
-    command: python -m hse_prom_prog.database.load_csv
+    command: python -m agile_assistant.database.load_csv
     networks:
-      - hse-network
+      - agile-assistant-network
 
   # ──────────────────────────────────────────────────────────────
   # Loki — log aggregation (single-binary, filesystem store).
@@ -890,7 +890,7 @@ services:
   # ──────────────────────────────────────────────────────────────
   loki:
     image: grafana/loki:3.2.0
-    container_name: hse-prom-prog-loki
+    container_name: agile-assistant-loki
     user: "0" # root inside container so it can chown /loki on first boot
     volumes:
       - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
@@ -915,7 +915,7 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - hse-network
+      - agile-assistant-network
     logging:
       driver: json-file
       options:
@@ -930,7 +930,7 @@ services:
   # ──────────────────────────────────────────────────────────────
   promtail:
     image: grafana/promtail:3.2.0
-    container_name: hse-prom-prog-promtail
+    container_name: agile-assistant-promtail
     depends_on:
       loki:
         condition: service_healthy
@@ -944,7 +944,7 @@ services:
     expose:
       - "9080"
     networks:
-      - hse-network
+      - agile-assistant-network
     logging:
       driver: json-file
       options:
@@ -971,5 +971,5 @@ volumes:
   promtail_positions:
 
 networks:
-  hse-network:
+  agile-assistant-network:
     driver: bridge

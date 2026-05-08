@@ -36,7 +36,7 @@ spec:
           command:
             - celery
             - -A
-            - hse_prom_prog.tasks.celery_app
+            - agile_assistant.tasks.celery_app
             - beat
             - --loglevel=info
             - --schedule=/tmp/celerybeat-schedule

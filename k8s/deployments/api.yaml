@@ -24,7 +24,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command:
             - gunicorn
-            - hse_prom_prog.api.app:app
+            - agile_assistant.api.app:app
             - -k
             - uvicorn.workers.UvicornWorker
             - --bind

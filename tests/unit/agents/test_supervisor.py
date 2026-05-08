@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.agents.supervisor import SupervisorAgent
+from agile_assistant.agents.supervisor import SupervisorAgent
 
 
 @pytest.fixture

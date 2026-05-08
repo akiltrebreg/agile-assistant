@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.tasks import sync_tasks as st
+from agile_assistant.tasks import sync_tasks as st
 
 # --------------------------------------------------------------------- #
 # Helpers

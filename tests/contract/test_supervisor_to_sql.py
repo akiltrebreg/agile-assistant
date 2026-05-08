@@ -29,8 +29,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.agents.sql_agent import SQLAgent
-from hse_prom_prog.agents.supervisor import SupervisorAgent
+from agile_assistant.agents.sql_agent import SQLAgent
+from agile_assistant.agents.supervisor import SupervisorAgent
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def sql_agent_with_mocked_graph(mock_db: MagicMock, monkeypatch: pytest.MonkeyPa
     ``get_schema_compact`` is patched so we don't need a live DB engine
     on the mock — the test focuses on contract surface, not DDL parsing.
     """
-    from hse_prom_prog.agents import sql_agent as sa
+    from agile_assistant.agents import sql_agent as sa
 
     monkeypatch.setattr(sa, "get_schema_compact", lambda _engine: "FAKE_SCHEMA_DDL")
     monkeypatch.setattr(sa, "set_db", lambda _db: None)
@@ -172,7 +172,7 @@ class TestSupervisorSlowPathToSql:
             {"intent": "metric", "query_type": "sql", "entities": {}},
         )
         captured: dict[str, str] = {}
-        from hse_prom_prog.agents import sql_agent as sa
+        from agile_assistant.agents import sql_agent as sa
 
         original = sa.SQL_AGENT_DURATION
 

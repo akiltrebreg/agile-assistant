@@ -169,9 +169,9 @@ def _classify_carry_forward(
 
 
 def _build_supervisor() -> Any:
-    from hse_prom_prog.agents.supervisor import SupervisorAgent
-    from hse_prom_prog.database.connection import get_database
-    from hse_prom_prog.llm.client import LLMClient
+    from agile_assistant.agents.supervisor import SupervisorAgent
+    from agile_assistant.database.connection import get_database
+    from agile_assistant.llm.client import LLMClient
 
     client = LLMClient()
     try:

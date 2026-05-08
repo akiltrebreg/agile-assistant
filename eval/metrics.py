@@ -87,7 +87,7 @@ def _build_embeddings():
     from langchain_huggingface import HuggingFaceEmbeddings
     from ragas.embeddings import LangchainEmbeddingsWrapper
 
-    from hse_prom_prog.rag.embeddings import ensure_embedding_model_downloaded
+    from agile_assistant.rag.embeddings import ensure_embedding_model_downloaded
 
     emb = HuggingFaceEmbeddings(
         model_name=ensure_embedding_model_downloaded(),

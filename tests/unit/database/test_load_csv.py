@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.database.load_csv``.
+"""Unit tests for ``agile_assistant.database.load_csv``.
 
 The module is the S3 → PostgreSQL bridge for the Beat-scheduled
 ``sync_jira_data`` task. Key behaviours:
@@ -25,7 +25,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.database import load_csv as lc
+from agile_assistant.database import load_csv as lc
 
 # --------------------------------------------------------------------- #
 # Fixtures

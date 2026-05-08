@@ -39,11 +39,11 @@ knowledge_base/
 
 ```bash
 # Через Docker Compose (скачивает из S3, Qdrant должен быть запущен)
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
+docker compose run --rm app python -m agile_assistant.rag.ingest
 
 # С указанием локальной папки (вместо S3)
 docker compose run --rm -e S3_KB_BUCKET= \
-  app python -m hse_prom_prog.rag.ingest /path/to/docs
+  app python -m agile_assistant.rag.ingest /path/to/docs
 ```
 
 Pipeline выполняет:

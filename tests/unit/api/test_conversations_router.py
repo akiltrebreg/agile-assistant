@@ -22,9 +22,9 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from hse_prom_prog.api.app import app
-from hse_prom_prog.api.dependencies import get_db, get_memory_manager
-from hse_prom_prog.models.memory import Conversation, Message
+from agile_assistant.api.app import app
+from agile_assistant.api.dependencies import get_db, get_memory_manager
+from agile_assistant.models.memory import Conversation, Message
 
 # --------------------------------------------------------------------- #
 # Helpers
@@ -207,7 +207,7 @@ class TestCloseConversation:
         memory.conversation_repo.get.return_value = conv
 
         # Patch the lazy-imported summarize_session.apply_async to avoid Celery.
-        with patch("hse_prom_prog.tasks.memory_tasks.summarize_session") as fake_task:
+        with patch("agile_assistant.tasks.memory_tasks.summarize_session") as fake_task:
             fake_task.apply_async.return_value = MagicMock(id="celery-sum-1")
             resp = client.post(f"/conversations/{conv.id}/close")
 
@@ -230,7 +230,7 @@ class TestCloseConversation:
         anon.user_id = None  # _conv() forces a uuid; override.
         memory.conversation_repo.get.return_value = anon
 
-        with patch("hse_prom_prog.tasks.memory_tasks.summarize_session") as fake_task:
+        with patch("agile_assistant.tasks.memory_tasks.summarize_session") as fake_task:
             resp = client.post(f"/conversations/{anon.id}/close")
 
         assert resp.status_code == 200

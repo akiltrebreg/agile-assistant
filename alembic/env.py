@@ -1,14 +1,14 @@
 """Alembic environment configuration.
 
-Reads database URL from application settings (hse_prom_prog.config).
+Reads database URL from application settings (agile_assistant.config).
 """
 
 from logging.config import fileConfig
 
 from sqlalchemy import create_engine
 
+from agile_assistant.config import settings
 from alembic import context
-from hse_prom_prog.config import settings
 
 # Alembic Config object
 config = context.config

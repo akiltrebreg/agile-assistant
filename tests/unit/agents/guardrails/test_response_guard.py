@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import pytest
 
-from hse_prom_prog.agents.guardrails.response_guard import (
+from agile_assistant.agents.guardrails.response_guard import (
     BLOCKED_RESPONSE,
     OutputGuardResult,
     ResponseGuard,

@@ -49,14 +49,14 @@ def _load_ground_truths() -> dict[str, str]:
 
 
 def main() -> None:
-    from hse_prom_prog.config import settings
-    from hse_prom_prog.rag.retriever import get_retriever
+    from agile_assistant.config import settings
+    from agile_assistant.rag.retriever import get_retriever
 
     max_context = settings.max_context_chars
 
     reranker = None
     if settings.reranker_enabled:
-        from hse_prom_prog.rag.reranker import get_reranker
+        from agile_assistant.rag.reranker import get_reranker
 
         reranker = get_reranker()
 

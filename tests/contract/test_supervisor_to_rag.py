@@ -29,8 +29,8 @@ from unittest.mock import MagicMock
 import pytest
 from langchain_core.documents import Document
 
-from hse_prom_prog.agents.rag_agent import RAGAgent
-from hse_prom_prog.agents.supervisor import SupervisorAgent
+from agile_assistant.agents.rag_agent import RAGAgent
+from agile_assistant.agents.supervisor import SupervisorAgent
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def disabled_reranker(monkeypatch: pytest.MonkeyPatch) -> None:
 
     Same pattern as the unit tests for RAG Agent.
     """
-    from hse_prom_prog.agents import rag_agent
+    from agile_assistant.agents import rag_agent
 
     monkeypatch.setattr(rag_agent.settings, "reranker_enabled", False)
 
@@ -143,7 +143,7 @@ class TestHybridStateMerging:
         # The hybrid node merges state as ``{**state, **sql_out, **rag_out}``;
         # if SQL ever returned ``"original_query": None`` we'd silently
         # send an empty query into Qdrant retrieval.
-        from hse_prom_prog.agents.sql_agent import SQLAgent
+        from agile_assistant.agents.sql_agent import SQLAgent
 
         _llm_returns(
             mock_llm_client,
@@ -154,7 +154,7 @@ class TestHybridStateMerging:
         # We only inspect SQL Agent's output dict here.
         from unittest.mock import patch
 
-        from hse_prom_prog.agents import sql_agent as sa
+        from agile_assistant.agents import sql_agent as sa
 
         with (
             patch.object(sa, "get_schema_compact", return_value="DDL"),

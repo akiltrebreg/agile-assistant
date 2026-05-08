@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from hse_prom_prog.agents import schema_loader, sql_agent, sql_tools
+from agile_assistant.agents import schema_loader, sql_agent, sql_tools
 
 # ===================================================================== #
 # _strip_think — remove <think>...</think> from AI message content

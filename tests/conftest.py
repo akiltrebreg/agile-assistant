@@ -58,11 +58,11 @@ def mock_llm_client() -> MagicMock:
     in with ``monkeypatch.setattr``:
 
         monkeypatch.setattr(
-            "hse_prom_prog.agents.supervisor.LLMClient",
+            "agile_assistant.agents.supervisor.LLMClient",
             lambda **_: mock_llm_client,
         )
     """
-    from hse_prom_prog.llm.client import LLMClient
+    from agile_assistant.llm.client import LLMClient
 
     client = MagicMock(spec=LLMClient)
     client.invoke = MagicMock(return_value="")
@@ -92,7 +92,7 @@ def mock_db() -> MagicMock:
     actually touches. ``test_connection`` and ``get_session`` are also
     spec'd in case a test needs them.
     """
-    from hse_prom_prog.database.connection import DatabaseConnection
+    from agile_assistant.database.connection import DatabaseConnection
 
     db = MagicMock(spec=DatabaseConnection)
     db.execute_query = MagicMock(return_value=[])
@@ -144,8 +144,8 @@ def mock_celery(monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
     only — the task object itself remains intact, so call sites that do
     ``workflow_task.s(...)`` or read ``.name`` keep working.
     """
-    from hse_prom_prog.tasks import memory_tasks, sync_tasks
-    from hse_prom_prog.tasks import workflow_task as workflow_task_mod
+    from agile_assistant.tasks import memory_tasks, sync_tasks
+    from agile_assistant.tasks import workflow_task as workflow_task_mod
 
     targets: dict[str, Any] = {
         "execute_workflow": workflow_task_mod.execute_workflow,
@@ -193,8 +193,8 @@ def mock_memory_manager() -> MagicMock:
         ctx = ConversationContext(summary="prev", recent_turns=[...], ...)
         mock_memory_manager.get_context.return_value = ctx
     """
-    from hse_prom_prog.memory.manager import MemoryManager
-    from hse_prom_prog.models.memory import Conversation, ConversationContext
+    from agile_assistant.memory.manager import MemoryManager
+    from agile_assistant.models.memory import Conversation, ConversationContext
 
     now = datetime.now(UTC)
     fresh_conversation = Conversation(

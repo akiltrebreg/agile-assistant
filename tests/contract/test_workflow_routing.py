@@ -32,8 +32,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.agents.guardrails import OFF_TOPIC_RESPONSE
-from hse_prom_prog.graph.workflow import AgileWorkflow
+from agile_assistant.agents.guardrails import OFF_TOPIC_RESPONSE
+from agile_assistant.graph.workflow import AgileWorkflow
 
 # --------------------------------------------------------------------- #
 # Fixture: AgileWorkflow with all agents replaced by MagicMocks.
@@ -52,7 +52,7 @@ def mocked_workflow(
     leaf nodes (agents) are mocked. That way the *routing logic* is
     under test, not the agents.
     """
-    from hse_prom_prog.agents import sql_agent as sa
+    from agile_assistant.agents import sql_agent as sa
 
     # Stub schema loader and DB-side helpers so the SQLAgent ctor runs
     # without a live DB engine.

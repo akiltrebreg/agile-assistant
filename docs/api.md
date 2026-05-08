@@ -28,7 +28,7 @@ docker compose run --rm migrate
 
 # 3. Загрузить данные из S3
 docker compose run --rm load-data                              # CSV → PostgreSQL
-docker compose run --rm app python -m hse_prom_prog.rag.ingest # база знаний → Qdrant
+docker compose run --rm app python -m agile_assistant.rag.ingest # база знаний → Qdrant
 
 # 4. Запустить API и Celery-воркер
 docker compose up -d api celery-worker
@@ -121,7 +121,7 @@ docker compose logs -f celery-worker
 
 # Активные задачи
 docker compose exec celery-worker \
-  celery -A hse_prom_prog.tasks.celery_app inspect active
+  celery -A agile_assistant.tasks.celery_app inspect active
 
 # Длина очереди в Redis
 docker compose exec redis redis-cli LLEN celery
@@ -135,7 +135,7 @@ docker compose up --scale celery-worker=3 -d
 
 # Проверить, что все воркеры подключены
 docker compose exec celery-worker \
-  celery -A hse_prom_prog.tasks.celery_app inspect ping
+  celery -A agile_assistant.tasks.celery_app inspect ping
 ```
 
 ## Связанные разделы

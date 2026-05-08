@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_metrics_feature_teams ON report_agile_dashboard_m
 CREATE INDEX IF NOT EXISTS idx_metrics_launch_id ON report_agile_dashboard_metrics(launch_id);
 CREATE INDEX IF NOT EXISTS idx_metrics_sprint_state ON report_agile_dashboard_metrics(sprint_state);
 
--- CSV data is loaded from S3 by hse_prom_prog/database/load_csv.py
+-- CSV data is loaded from S3 by agile_assistant/database/load_csv.py
 -- (run via: docker compose run --rm load-data)
 
 -- ═══════════════════════════════════════════════════════════════

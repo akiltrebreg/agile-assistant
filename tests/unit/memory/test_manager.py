@@ -23,14 +23,14 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from hse_prom_prog.memory.manager import (
+from agile_assistant.memory.manager import (
     BOT_TRUNCATE_TOKENS,
     SAVE_TURN_MAX_RETRIES,
     TITLE_MAX_CHARS,
     MemoryManager,
 )
-from hse_prom_prog.memory.truncator import truncate_message
-from hse_prom_prog.models.memory import Conversation, Message
+from agile_assistant.memory.truncator import truncate_message
+from agile_assistant.models.memory import Conversation, Message
 
 # --------------------------------------------------------------------- #
 # Local helpers / fixtures
@@ -414,11 +414,11 @@ class TestDefaultWiring:
         # bound to the supplied db. We don't exercise those helpers here —
         # just confirm the manager doesn't crash when only `db` is passed.
         # This is the path used by workflow_task / API.
-        from hse_prom_prog.memory.context_builder import ContextBuilder
-        from hse_prom_prog.memory.conversation_repo import ConversationRepository
-        from hse_prom_prog.memory.profile_extractor import ProfileExtractor
-        from hse_prom_prog.memory.profile_repo import ProfileRepository
-        from hse_prom_prog.memory.summary_repo import SummaryRepository
+        from agile_assistant.memory.context_builder import ContextBuilder
+        from agile_assistant.memory.conversation_repo import ConversationRepository
+        from agile_assistant.memory.profile_extractor import ProfileExtractor
+        from agile_assistant.memory.profile_repo import ProfileRepository
+        from agile_assistant.memory.summary_repo import SummaryRepository
 
         mgr = MemoryManager(db=MagicMock())
         assert isinstance(mgr.conversation_repo, ConversationRepository)

@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.metrics``.
+"""Unit tests for ``agile_assistant.metrics``.
 
 The metrics registry is the single source of truth for all custom
 Prometheus metrics. Tests cover four invariants:
@@ -26,7 +26,7 @@ from typing import Any
 import pytest
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 
-from hse_prom_prog import metrics as m
+from agile_assistant import metrics as m
 
 # --------------------------------------------------------------------- #
 # Helpers

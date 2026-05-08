@@ -52,7 +52,7 @@ LLM-as-judge используется GPT-5.2 через OpenAI-compatible API (
 ```bash
 # 1. Убедитесь, что инфраструктура запущена и база знаний загружена
 docker compose up -d postgres qdrant redis vllm
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
+docker compose run --rm app python -m agile_assistant.rag.ingest
 
 # 2. Запуск baseline-оценки
 docker compose run --rm \

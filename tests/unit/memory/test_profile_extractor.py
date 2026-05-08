@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from hse_prom_prog.memory.profile_extractor import (
+from agile_assistant.memory.profile_extractor import (
     DEFAULT_TEAM_SHARE_THRESHOLD,
     FREQUENT_METRICS_TOP_N,
     MIN_MESSAGES_FOR_PROFILE,

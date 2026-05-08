@@ -180,11 +180,11 @@ multirun/
 .dvc/tmp/
 .dvc/cache/
 
-# Model artifacts (ML weights, not the Python module hse_prom_prog/models/)
+# Model artifacts (ML weights, not the Python module agile_assistant/models/)
 /models/
 checkpoints/
 *.model
-!hse_prom_prog/models/
+!agile_assistant/models/
 
 # Logs
 *.log

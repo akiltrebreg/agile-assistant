@@ -198,8 +198,8 @@ def _round(v: Any) -> Any:
 
 def _build_sql_agent():
     """Build SQL Agent with database connection."""
-    from hse_prom_prog.agents.sql_agent import SQLAgent
-    from hse_prom_prog.database.connection import get_database
+    from agile_assistant.agents.sql_agent import SQLAgent
+    from agile_assistant.database.connection import get_database
 
     db = get_database()
     return SQLAgent(db_connection=db)
@@ -376,7 +376,7 @@ def main(argv: list[str] | None = None) -> None:
 
 
 # Import settings lazily to avoid import errors when module is loaded
-from hse_prom_prog.config import settings  # noqa: E402
+from agile_assistant.config import settings  # noqa: E402
 
 if __name__ == "__main__":
     main()

@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from hse_prom_prog.agents.guardrails import sql_guard
-from hse_prom_prog.agents.guardrails.sql_guard import check_sql
+from agile_assistant.agents.guardrails import sql_guard
+from agile_assistant.agents.guardrails.sql_guard import check_sql
 
 _VALID_SELECT = "SELECT * FROM report_agile_dashboard WHERE issue_key = 'AL-1'"
 

@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from hse_prom_prog.agents.validator_agent import ValidatorAgent
+from agile_assistant.agents.validator_agent import ValidatorAgent
 
 
 @pytest.fixture

@@ -191,8 +191,8 @@ def _evaluate_checks(response: str, checks: dict[str, Any]) -> dict[str, Any]:
 
 def _build_response_agent() -> Any:
     """Build ResponseAgent with main LLM client."""
-    from hse_prom_prog.agents.response_agent import ResponseAgent
-    from hse_prom_prog.llm.client import LLMClient
+    from agile_assistant.agents.response_agent import ResponseAgent
+    from agile_assistant.llm.client import LLMClient
 
     client = LLMClient()
     return ResponseAgent(client)
@@ -201,7 +201,7 @@ def _build_response_agent() -> Any:
 def _try_get_db() -> Any | None:
     """Get DB connection or None if unavailable."""
     try:
-        from hse_prom_prog.database.connection import get_database
+        from agile_assistant.database.connection import get_database
 
         db = get_database()
         if db.test_connection():

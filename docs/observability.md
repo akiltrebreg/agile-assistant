@@ -34,9 +34,9 @@ cause.
 
 ## Метрики Prometheus
 
-Реестр метрик собран в [hse_prom_prog/metrics.py](../hse_prom_prog/metrics.py).
-Все имена живут в неймспейсе `agile_assistant_*`. ~50 кастомных метрик разделены
-на 12 секций.
+Реестр метрик собран в
+[agile_assistant/metrics.py](../agile_assistant/metrics.py). Все имена живут в
+неймспейсе `agile_assistant_*`. ~50 кастомных метрик разделены на 12 секций.
 
 **Pipeline (workflow_task)**:
 
@@ -345,7 +345,7 @@ PrometheusRule CRD в
 
 ## Трейсинг Langfuse
 
-Реализация — [hse_prom_prog/tracing.py](../hse_prom_prog/tracing.py). Один
+Реализация — [agile_assistant/tracing.py](../agile_assistant/tracing.py). Один
 singleton-клиент инициализируется при импорте, остальные модули используют
 реэкспорт `observe` / `langfuse_context` оттуда. Если SDK не установлен или
 выключен через `LANGFUSE_ENABLED=false` — `observe` становится no-op

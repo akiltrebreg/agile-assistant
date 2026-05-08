@@ -65,7 +65,7 @@ docker compose up -d
 
 # 2. Загрузить данные из S3 (при первом запуске)
 docker compose run --rm load-data
-docker compose run --rm app python -m hse_prom_prog.rag.ingest
+docker compose run --rm app python -m agile_assistant.rag.ingest
 
 # 3. Открыть в браузере
 open http://localhost

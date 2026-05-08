@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.rag.embeddings``.
+"""Unit tests for ``agile_assistant.rag.embeddings``.
 
 The module's S3 downloader replaces the previous HuggingFace-Hub flow:
 the embedding model snapshot lives in Yandex Cloud Object Storage at
@@ -29,7 +29,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from hse_prom_prog.rag import embeddings as emb
+from agile_assistant.rag import embeddings as emb
 
 # --------------------------------------------------------------------- #
 # Fixtures

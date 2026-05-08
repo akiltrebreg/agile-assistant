@@ -1,4 +1,4 @@
-"""Unit tests for ``hse_prom_prog.database.connection``.
+"""Unit tests for ``agile_assistant.database.connection``.
 
 The DatabaseConnection wraps SQLAlchemy. We test:
 
@@ -24,7 +24,7 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from hse_prom_prog.database import connection as conn_module
+from agile_assistant.database import connection as conn_module
 
 # --------------------------------------------------------------------- #
 # Fixtures
@@ -84,7 +84,7 @@ class TestConstruction:
     def test_uses_settings_when_no_url_passed(
         self, patched_sqlalchemy: dict[str, MagicMock]
     ) -> None:
-        from hse_prom_prog.config import settings
+        from agile_assistant.config import settings
 
         db = conn_module.DatabaseConnection()
         # The URL stored on the instance matches settings — pinning so a

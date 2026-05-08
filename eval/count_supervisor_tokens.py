@@ -21,9 +21,9 @@ import logging
 
 import requests
 
-from hse_prom_prog.agents.supervisor import SupervisorAgent
-from hse_prom_prog.config import settings
-from hse_prom_prog.llm.client import LLMClient
+from agile_assistant.agents.supervisor import SupervisorAgent
+from agile_assistant.config import settings
+from agile_assistant.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
 

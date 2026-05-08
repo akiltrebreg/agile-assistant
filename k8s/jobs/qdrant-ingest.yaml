@@ -17,7 +17,7 @@ spec:
         - name: ingest
           image: ghcr.io/akiltrebreg/agile-assistant:latest
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "hse_prom_prog.rag.ingest"]
+          command: ["python", "-m", "agile_assistant.rag.ingest"]
           envFrom:
             - configMapRef:
                 name: app-config

@@ -26,8 +26,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from hse_prom_prog.agents.response_agent import ResponseAgent, _resolve_branch
-from hse_prom_prog.agents.validator_agent import ValidatorAgent
+from agile_assistant.agents.response_agent import ResponseAgent, _resolve_branch
+from agile_assistant.agents.validator_agent import ValidatorAgent
 
 # --------------------------------------------------------------------- #
 # Helpers
