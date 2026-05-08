@@ -4,6 +4,12 @@
 # Load test results (per-run CSVs/HTML are large and not reproducible)
 loadtest/results/
 
+# Application log files written by RotatingFileHandler.
+# The directory itself is needed at deploy time (Docker bind mount),
+# but the *.log files churn and must not be tracked.
+logs/*.log
+logs/*.log.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

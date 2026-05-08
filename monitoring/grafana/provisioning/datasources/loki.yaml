@@ -1,0 +1,14 @@
+apiVersion: 1
+datasources:
+  - name: Loki
+    # UID stable so any future dashboards referencing Loki resolve
+    # cleanly across rebuilds.
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false
+    jsonData:
+      # Match the retention configured in loki-config.yaml.
+      maxLines: 5000

@@ -1,0 +1,62 @@
+# Single-binary Loki config. No object store, no Cassandra: a single
+# container with TSDB index + filesystem chunks. Suitable for the
+# project's traffic (a few hundred MB/day at INFO).
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+# Single-tenant for our single-host deployment.
+limits_config:
+  # Allow ~1 MiB per push request (default is 4 MiB; Promtail batches).
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+  # Reject log entries older than this — protects against clock skew
+  # and replay of huge log files on first boot.
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  # Series caps: small enough that a runaway label cardinality bug
+  # cannot exhaust memory.
+  max_streams_per_user: 5000
+  max_global_streams_per_user: 5000
+  # Retention for log streams.
+  retention_period: 168h
+
+# Single schema entry: TSDB index from day 1, no migration to plan.
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# Compaction is what actually deletes data after retention_period.
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+# Ruler is unused (no Loki alerting yet) — pointing it at a no-op dir
+# keeps Loki from complaining at startup.
+ruler:
+  alertmanager_url: http://localhost:9093

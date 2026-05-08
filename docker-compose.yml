@@ -415,6 +415,8 @@ services:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
       - embedding-models:/app/models
+      # App logs: RotatingFileHandler writes here, Promtail reads it.
+      - ./logs:/app/logs
     # Production: gunicorn with uvicorn workers (no --reload)
     command:
       gunicorn hse_prom_prog.api.app:app -k uvicorn.workers.UvicornWorker --bind
@@ -426,6 +428,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    # Cap Docker's stdout capture as a safety net — RotatingFileHandler
+    # already bounds the file logs at /app/logs.
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
 
   # Celery worker (Consumer) — uses the SAME Dockerfile, only command differs
   # No container_name so that --scale works: docker compose up --scale celery-worker=3
@@ -490,6 +499,8 @@ services:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
       - embedding-models:/app/models
+      # App logs: RotatingFileHandler writes here, Promtail reads it.
+      - ./logs:/app/logs
     # Prometheus side-car port (metrics exporter started by celery_app.py).
     # Internal-only — Prometheus scrapes celery-worker:9100 over the docker network.
     expose:
@@ -527,6 +538,11 @@ services:
       start_period: 60s
     networks:
       - hse-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
 
   # ──────────────────────────────────────────────────────────────
   # Celery Beat — scheduler for periodic tasks (Phase 5).
@@ -563,6 +579,8 @@ services:
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+      # App logs: RotatingFileHandler writes here, Promtail reads it.
+      - ./logs:/app/logs
     # ``celery beat`` exits 0 immediately if the schedule file is in
     # an unwritable location (rare) — we route it to /tmp inside the
     # container, matching beat_schedule_filename in celery_app.py.
@@ -588,6 +606,11 @@ services:
       start_period: 30s
     networks:
       - hse-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
 
   # ──────────────────────────────────────────────────────────────
   # Celery worker — judge queue (Phase 4: LLM-as-a-Judge)
@@ -633,6 +656,8 @@ services:
     volumes:
       - ./hse_prom_prog:/app/hse_prom_prog
       - ./.env:/app/.env
+      # App logs: RotatingFileHandler writes here, Promtail reads it.
+      - ./logs:/app/logs
     expose:
       - "9101"
     # --queues=judge isolates the worker from the default queue so a
@@ -661,6 +686,11 @@ services:
       start_period: 60s
     networks:
       - hse-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
 
   # Streamlit frontend (thin client, talks only to FastAPI)
   streamlit:
@@ -765,6 +795,7 @@ services:
       - "3000"
     depends_on:
       - prometheus
+      - loki
     networks:
       - hse-network
 
@@ -852,6 +883,74 @@ services:
     networks:
       - hse-network
 
+  # ──────────────────────────────────────────────────────────────
+  # Loki — log aggregation (single-binary, filesystem store).
+  # Scraped by Promtail; queried by Grafana via the Loki datasource
+  # provisioned in monitoring/grafana/provisioning/datasources/loki.yaml.
+  # ──────────────────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: hse-prom-prog-loki
+    user: "0" # root inside container so it can chown /loki on first boot
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    # Internal-only: Grafana → Loki via docker network. No external port.
+    expose:
+      - "3100"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "-O",
+          "-",
+          "http://localhost:3100/ready",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - hse-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ──────────────────────────────────────────────────────────────
+  # Promtail — log shipper. Tails the rotating files written by the
+  # app's RotatingFileHandler at ./logs (mounted read-only) and pushes
+  # them to Loki. Position cursor persisted in promtail_positions
+  # volume so a restart doesn't re-ship the entire history.
+  # ──────────────────────────────────────────────────────────────
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: hse-prom-prog-promtail
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      # The same ./logs directory the app writes to. Read-only — Promtail
+      # only tails, never writes.
+      - ./logs:/var/log/app:ro
+      - promtail_positions:/var/promtail
+    command: -config.file=/etc/promtail/config.yaml
+    expose:
+      - "9080"
+    networks:
+      - hse-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
 volumes:
   postgres_data:
   vllm-cache:
@@ -864,6 +963,12 @@ volumes:
   # download-embedding-model + download-reranker-model and consumed by
   # api / celery-worker via /app/models mount.
   embedding-models:
+  # Loki TSDB index + filesystem chunks (retention controlled by
+  # monitoring/loki/loki-config.yaml).
+  loki_data:
+  # Promtail cursor file: tracks offsets in app log files so restarts
+  # don't re-ship history.
+  promtail_positions:
 
 networks:
   hse-network:

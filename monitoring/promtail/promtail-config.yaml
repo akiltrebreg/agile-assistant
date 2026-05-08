@@ -1,0 +1,57 @@
+# Promtail config: scrapes the rotating files written by the Python
+# RotatingFileHandler (mounted at /var/log/app inside the container)
+# and ships them to Loki.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+# Local cursor file: tracks how far Promtail has read in each log file
+# so a restart doesn't re-ship the entire history.
+positions:
+  filename: /var/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    # Backoff that won't hammer Loki on transient failures.
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  # One job per Python service. The mount in docker-compose makes
+  # ./logs visible at /var/log/app, and the file basename becomes the
+  # service label (api.log -> service=api).
+  - job_name: app_files
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: app_files
+          __path__: /var/log/app/*.log
+    pipeline_stages:
+      # Use the file basename (minus .log) as the service label so
+      # queries like `{service="api"}` work without manual config per
+      # service. Falls back to the full path if the regex misses.
+      - regex:
+          source: filename
+          expression: '/var/log/app/(?P<service>[^/]+)\.log'
+      - labels:
+          service:
+      # Parse the Python log timestamp so Loki uses the original event
+      # time instead of "time the line was scraped". Matches the format
+      # in observability/logging.py: %(asctime)s default = ISO-ish.
+      - regex:
+          expression:
+            '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<logger>[^
+            ]+) - (?P<level>[A-Z]+) - (?P<msg>.*)$'
+      - timestamp:
+          source: ts
+          format: "2006-01-02 15:04:05,000"
+          # If a line doesn't parse (multi-line tracebacks, etc.) keep
+          # going with the scrape time rather than dropping the line.
+          action_on_failure: skip
+      - labels:
+          level:

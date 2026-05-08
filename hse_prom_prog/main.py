@@ -12,23 +12,17 @@ import sys
 from hse_prom_prog.config import settings
 from hse_prom_prog.graph.workflow import AgileWorkflow
 from hse_prom_prog.llm.client import get_llm_client
+from hse_prom_prog.observability.logging import setup_logging as _setup_logging
 
 
 def setup_logging() -> None:
-    """Configure root logger with stdout handler at the configured level.
+    """Configure root logger via the centralised observability module.
 
-    Reads ``settings.log_level`` (DEBUG/INFO/WARNING/ERROR/CRITICAL) and
-    installs a single StreamHandler writing to stdout. Idempotent only
-    insofar as ``logging.basicConfig`` is idempotent: subsequent calls
-    have no effect once a handler is attached.
+    Reads ``settings.log_level`` and delegates to
+    :func:`hse_prom_prog.observability.logging.setup_logging`, which
+    attaches stdout + a rotating file handler under ``/app/logs/cli.log``.
     """
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
+    _setup_logging("cli", level=settings.log_level)
 
 
 def print_separator() -> None:

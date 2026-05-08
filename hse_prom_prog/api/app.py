@@ -14,6 +14,13 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from hse_prom_prog.api.routers import conversations, tasks
 from hse_prom_prog.config import settings
+from hse_prom_prog.observability.logging import setup_logging
+
+# Install logging at import time so log lines from gunicorn workers'
+# initial imports (router registration, dependency wiring) land in the
+# rotating file handler too. ``setup_logging`` is idempotent — gunicorn
+# preload + per-worker fork won't stack handlers.
+setup_logging("api", level=settings.log_level)
 
 logger = logging.getLogger(__name__)
 

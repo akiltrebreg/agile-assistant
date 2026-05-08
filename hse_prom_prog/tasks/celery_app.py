@@ -28,6 +28,15 @@ from hse_prom_prog.metrics import (
     CELERY_TASKS_TOTAL,
     initialize_label_combinations,
 )
+from hse_prom_prog.observability.logging import setup_logging
+
+# Service name comes from PROMETHEUS_PORT (9100 = default queue,
+# 9101 = judge queue) so worker and judge write to separate files.
+_SERVICE_NAME = "celery-judge" if os.environ.get("PROMETHEUS_PORT") == "9101" else "celery-worker"
+
+# Install at import time — runs in each forked pool worker. The
+# function is idempotent so re-import on fork is safe.
+setup_logging(_SERVICE_NAME, level=settings.log_level)
 
 logger = logging.getLogger(__name__)
 
