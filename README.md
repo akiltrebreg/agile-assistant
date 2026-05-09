@@ -414,11 +414,12 @@ docker compose up download-model download-sql-model download-embedding-model dow
 docker compose up -d vllm vllm-sql
 ```
 
-vLLM при старте загружает модель в GPU — это занимает несколько минут.
-Healthcheck опирается на `/v1/models`. Прогресс старта:
+vLLM при старте загружает модель в GPU — это занимает несколько минут. Дождаться
+готовности и при необходимости посмотреть прогресс:
 
 ```bash
-docker compose logs -f vllm | grep -E "Application startup|Uvicorn running"
+docker compose ps vllm vllm-sql      # ждём статус (healthy)
+docker compose logs -f vllm          # прогресс загрузки модели
 ```
 
 ### Шаг 5: Миграции
