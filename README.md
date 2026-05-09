@@ -1,11 +1,7 @@
-<p align="center">
-  <font size="14"><b>Agile AI Assistant</b></font>
-</p>
-
-<div align="center">
+<h1 align="center">
+  Agile AI Assistant<br>
   <a href="https://opensource.org/licenses/MIT" target="_blank"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
-</div>
-<br>
+</h1>
 <p align="center">
 Multi-agent система для анализа Jira-задач и Agile-практик: LangGraph-роутер из
 пяти агентов (Supervisor / SQL / RAG / Validator / Response), трёхуровневые
