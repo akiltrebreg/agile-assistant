@@ -479,6 +479,118 @@ docker compose restart api celery-worker
 писаться. Полезно при отладке проблем с Langfuse-сервером или при локальной
 разработке без отдельного контейнера.
 
+## Логирование (Loki + Promtail)
+
+Третья плоскость наблюдаемости — централизованная агрегация **логов** всех
+сервисов. Метрики Prometheus отвечают на «что и сколько», Langfuse — «как именно
+работала LLM», логи — «почему упало в 18:43».
+
+### Архитектура
+
+```
+Python logger.info("...")
+       │
+       ├──▶ stdout                      ──▶ docker JSON-driver (100MB×5)
+       │                                    └─ docker compose logs <service>
+       │
+       └──▶ /app/logs/<service>.log     ── ротирует RotatingFileHandler
+                    (50 МБ × 5 backup)      ./logs на хосте через bind-mount
+                    │
+                    ▼
+              Promtail tails files
+                    │
+                    ▼
+                  Loki (filesystem store, retention 168h = 7 дней)
+                    │
+                    ▼
+            Grafana → Explore → datasource `Loki`
+```
+
+Пишут логи: `api`, `celery-worker`, `celery-beat`, `celery-judge`. У каждого
+свой файл — `./logs/api.log`, `./logs/celery-worker.log` и т.д. Имя файла
+становится Loki-меткой `service`.
+
+### Ротация — два уровня
+
+| Уровень              | Где настроено                                                                                                   | Лимит                       | Зачем                                                |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------- |
+| **Файлы приложения** | [agile_assistant/observability/logging.py](../agile_assistant/observability/logging.py) — `RotatingFileHandler` | 50 МБ × 5 = ~250 МБ/сервис  | Чтобы log-файлы не съели диск даже без Docker и Loki |
+| **Docker stdout**    | `logging:` блок в [docker-compose.yml](../docker-compose.yml) на api/celery-\*                                  | 100 МБ × 5 = ~500 МБ/сервис | Безопасность для `docker compose logs`               |
+
+### Запуск
+
+```bash
+# Логирующий стек поднимается вместе с остальным мониторингом
+docker compose up -d loki promtail
+```
+
+При первом старте Loki создаст структуру каталогов в volume `loki_data`,
+Promtail запишет курсор в `promtail_positions`.
+
+**Проверка после старта:**
+
+```bash
+# Loki ready?
+docker compose exec loki wget -qO- http://localhost:3100/ready
+# → ready
+
+# Promtail видит файлы?
+docker compose logs promtail | grep "Active file"
+
+# Файлы появились на хосте?
+ls -lah logs/
+# api.log, celery-worker.log, celery-beat.log, celery-judge.log
+```
+
+### Как искать логи в Grafana
+
+`http://195.209.218.21/grafana/` → **Explore** (компас слева) → datasource
+**Loki** → ввести LogQL-запрос → Run query.
+
+| Цель                               | LogQL                                                 |
+| ---------------------------------- | ----------------------------------------------------- |
+| Все логи API                       | `{service="api"}`                                     |
+| Только ошибки от API               | `{service="api", level="ERROR"}`                      |
+| Поиск по подстроке                 | `{service="celery-worker"} \|= "[SQL Agent]"`         |
+| Retry-loop SQL-агента              | `{service="celery-worker"} \|= "Max retries reached"` |
+| Все ошибки за час по всем сервисам | `{level="ERROR"}`                                     |
+| Логи за окно нагрузочного теста    | `{service="api"}` + time picker `last 1h`             |
+
+Метка `level` парсится Promtail из формата
+`%(asctime)s - %(name)s - %(levelname)s - %(message)s`, поэтому фильтр по
+`level="ERROR"` работает «из коробки».
+
+### Retention и место на диске
+
+- **Loki retention**: 168 часов (7 дней), задано в
+  [monitoring/loki/loki-config.yaml](../monitoring/loki/loki-config.yaml)
+  (`limits_config.retention_period`, `compactor.retention_enabled: true`)
+- **Compactor** удаляет старые chunks раз в 10 минут (по умолчанию)
+- **Промежуточная задержка**: 2 часа (`retention_delete_delay`) — между
+  попаданием в delete-queue и фактическим удалением
+
+Прикидка по диску при текущем трафике (capacity ≈ 4 пользователя): ~50– 200
+МБ/день × 7 дней = **350 МБ – 1.5 ГБ** в volume `loki_data`. Если полезете в
+DEBUG — умножайте на 5–10.
+
+### Если Loki не отвечает
+
+1. **Logger продолжает писать** — `setup_logging()` в
+   [agile_assistant/observability/logging.py](../agile_assistant/observability/logging.py)
+   кладёт логи в файлы и stdout независимо от Loki. Никакой потери событий, всё
+   в `./logs/<service>.log`.
+2. **Promtail копит позиции** — после восстановления Loki допишет накопленное
+   (cursor в `promtail_positions` volume).
+3. **Только Grafana → Explore → Loki не отвечает** — поднять
+   `docker compose up -d loki`, через 30 секунд работает снова.
+
+### Перенос на новое железо / бэкап
+
+Логи — данные с малой ценностью (7-дневное окно перетекает в новые прогоны).
+Volume `loki_data` бэкапить **не нужно**; при миграции просто пересоздать. Файлы
+в `./logs/` тоже можно не копировать. Бэкапить стоит только Postgres
+(`postgres_data`) и Qdrant (`qdrant_data`).
+
 ## Связанные разделы
 
 - [Конфигурация → Langfuse Tracing](configuration.md#langfuse-tracing-phase-3) —
