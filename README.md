@@ -492,21 +492,8 @@ curl -fsS http://localhost/health
 - Streamlit UI — `http://195.209.218.21/`
 - Grafana — `http://195.209.218.21/grafana/`
 - Prometheus — `http://195.209.218.21/prometheus/`
+- Langfuse — `http://195.209.218.21:3001/`
 - Swagger API — `http://195.209.218.21/api/docs`
-
-### Проверка слоя памяти
-
-После того как стек поднят, end-to-end-проверка conversation window, профиля
-пользователя и rotation запускается одной командой:
-
-```bash
-./scripts/verify_memory.sh                # Levels 1–3 (~2 мин)
-./scripts/verify_memory.sh --regression   # + 4 baseline-евала, ~10 мин на RTX 4090
-```
-
-Скрипт сам проверяет healthcheck-и сервисов, прогоняет unit-тесты, multi-turn
-eval и серию E2E-сценариев (anaphora carry-forward, profile gate / injection,
-inactivity rotation, session restore) и печатает агрегированный PASS / FAIL.
 
 ### Примеры запросов в Streamlit UI
 
