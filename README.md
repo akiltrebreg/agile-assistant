@@ -250,11 +250,11 @@ agile-assistant/
 │   │   └── sparse.py                  # Sparse embeddings (fastembed BM25 / BGE-M3)
 │   └── tasks/
 │       ├── __init__.py
-│       ├── celery_app.py              # Celery app factory + Beat schedule (sync_jira_data, sync_knowledge_base)
+│       ├── celery_app.py              # Celery app factory + Beat schedule (Jira: каждые 6 ч UTC, KB: 03:00 UTC ежесуточно)
 │       ├── workflow_task.py           # Celery task (wraps workflow + inactivity rotation)
 │       ├── memory_tasks.py            # Celery: summarize_session, update_profile_async, _refresh_rolling_summary
 │       ├── judge_task.py              # LLM-as-a-Judge async scoring (queue=judge, vsellm)
-│       └── sync_tasks.py              # периодический S3→PostgreSQL и S3→Qdrant sync (Beat-планируется)
+│       └── sync_tasks.py              # sync_jira_data (S3→PostgreSQL, каждые 6 ч) + sync_knowledge_base (S3→Qdrant, daily 03:00 UTC)
 ├── knowledge_base/                    # Загружается из S3 (S3_KB_BUCKET)
 │   ├── agile/                         # Agile-практики, дашборды
 │   ├── metrics/                       # Описания метрик
@@ -465,6 +465,12 @@ celery-worker) дополнительно подтянутся embedding- и rer
 ```bash
 docker compose up -d api celery-worker celery-beat celery-judge streamlit
 ```
+
+`celery-beat` сразу начнёт планировать периодический sync данных:
+`sync_jira_data` каждые 6 часов (S3 → PostgreSQL) и `sync_knowledge_base`
+ежесуточно в 03:00 UTC (S3 → Qdrant). Полное расписание и метрики свежести
+данных —
+[docs/observability.md → Data sync (Celery Beat)](docs/observability.md#метрики-prometheus).
 
 ### Шаг 8: Nginx и мониторинг
 

@@ -131,6 +131,22 @@ cause.
 | `data_sync_duration_seconds`  | Histogram | `source`         | Длительность одного прогона (CSV: секунды, база знаний: минуты)             |
 | `data_sync_rows`              | Gauge     | `source`         | Кол-во строк / чанков после успешного sync                                  |
 
+Расписание задано в
+[agile_assistant/tasks/celery_app.py](../agile_assistant/tasks/celery_app.py)
+через `beat_schedule`:
+
+| Задача                | Cron (UTC)    | Частота                                        | Что делает                                            | Метка `source`   |
+| --------------------- | ------------- | ---------------------------------------------- | ----------------------------------------------------- | ---------------- |
+| `sync_jira_data`      | `0 */6 * * *` | каждые 6 ч (00:00 / 06:00 / 12:00 / 18:00 UTC) | S3 → PostgreSQL: догружает свежие CSV с Jira-задачами | `jira_csv`       |
+| `sync_knowledge_base` | `0 3 * * *`   | раз в сутки в 03:00 UTC                        | S3 → Qdrant: переиндексирует методическую базу знаний | `knowledge_base` |
+
+Cron-расписания в UTC намеренно: сервер MSK (UTC+3), и 03:00 UTC = 06:00 MSK —
+off-peak относительно типичного рабочего дня, чтобы кратковременная просадка
+Qdrant-коллекции при переиндексации не затрагивала пользователей. Алерт
+`JiraDataStale` (>12h) и `KnowledgeBaseStale` (>48h) — вдвое больше интервала
+между запусками, чтобы единичный пропущенный slot не вызывал ложных
+срабатываний.
+
 **FastAPI HTTP** (через `prometheus-fastapi-instrumentator`): автоматические
 метрики `http_requests_total`, `http_request_duration_seconds` с лейблами
 `method`, `handler`, `status`. `/metrics` исключён из инструментирования, чтобы
