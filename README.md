@@ -1,5 +1,5 @@
 <p align="center">
-  <font size="7"><b>Agile AI Assistant</b></font>
+  <font size="14"><b>Agile AI Assistant</b></font>
 </p>
 
 <div align="center">
