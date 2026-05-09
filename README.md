@@ -479,9 +479,10 @@ docker compose up -d nginx prometheus grafana pg-exporter redis-exporter \
                      langfuse loki promtail
 ```
 
-`loki` хранит логи на volume, `promtail` тейлит файлы из bind-mount `./logs`
-(создаётся автоматически). Внешних портов у обоих нет — Grafana ходит к Loki по
-docker-сети.
+`loki` хранит логи в volume `loki_data` (retention 7 дней), `promtail` тейлит
+файлы из bind-mount `./logs` (директория есть в репозитории, `*.log`-файлы
+создаются Python'ом при старте api/celery-\*). Внешних портов у обоих нет —
+Grafana ходит к Loki по docker-сети.
 
 ### Шаг 9: Smoke-проверка
 
