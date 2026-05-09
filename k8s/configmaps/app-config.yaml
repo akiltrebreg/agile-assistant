@@ -54,11 +54,8 @@ data:
   # SESSION_TIMEOUT_MINUTES: a conversation idle longer than this is
   # auto-closed and a fresh one is started on the next request
   # (see tasks.workflow_task._maybe_rotate_stale_conversation).
-  # MAX_CONVERSATION_TURNS: upper bound on turns kept per conversation
-  # before forced rollover / summarisation.
   HISTORY_TOKEN_BUDGET: "1200"
   SESSION_TIMEOUT_MINUTES: "30"
-  MAX_CONVERSATION_TURNS: "50"
 
   # Logging
   LOG_LEVEL: "INFO"

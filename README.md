@@ -682,8 +682,7 @@ Streamlit-чат на `http://localhost/`. Тонкий клиент, ходит
 - **vLLM**: `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_TEMPERATURE`, `VLLM_MAX_TOKENS`
 - **Search/RAG**: `SEARCH_TYPE` (`dense`/`sparse`/`hybrid`), `EMBEDDING_MODEL`,
   `RERANKER_ENABLED`
-- **Memory Layer**: `HISTORY_TOKEN_BUDGET`, `SESSION_TIMEOUT_MINUTES`,
-  `MAX_CONVERSATION_TURNS`
+- **Memory Layer**: `HISTORY_TOKEN_BUDGET`, `SESSION_TIMEOUT_MINUTES`
 - **Langfuse**: `LANGFUSE_ENABLED`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
 
 ### Текущая лучшая конфигурация RAG
