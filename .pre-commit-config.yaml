@@ -40,7 +40,10 @@ repos:
     hooks:
       - id: codespell
         additional_dependencies: [tomli]
-        exclude: '^(database/data/.*\.csv|eval/results/.*)$'
+        # ROUGE is an NLP metric (Recall-Oriented Understudy for Gisting
+        # Evaluation), not a typo of "rogue" — exclude the experiments
+        # folder rather than maintain a custom ignore-words list.
+        exclude: '^(database/data/.*\.csv|eval/results/.*|eval/llm_as_a_judge_experiments/.*)$'
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1

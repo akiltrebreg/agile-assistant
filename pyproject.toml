@@ -130,6 +130,11 @@ output = "coverage.xml"
 [tool.ruff]
 line-length = 100
 format = { docstring-code-format = true }
+# Notebooks under docs/ are exploratory experiments, not production
+# code — exclude the whole directory from both `ruff check` and
+# `ruff format`. ``extend-exclude`` preserves ruff's defaults (.git,
+# .venv, build/, etc.).
+extend-exclude = ["eval/llm_as_a_judge_experiments"]
 
 [tool.ruff.lint]
 select = [
