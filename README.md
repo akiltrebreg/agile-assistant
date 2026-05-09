@@ -1,4 +1,8 @@
-# Agile AI Assistant
+<h1 align="center">Agile AI Assistant</h1>
+
+<div align="center">
+  <a href="https://opensource.org/licenses/MIT" target="_blank"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+</div>
 
 Multi-agent система для анализа Jira-задач и Agile-практик: LangGraph-роутер из
 пяти агентов (Supervisor / SQL / RAG / Validator / Response), трёхуровневые
@@ -774,7 +778,3 @@ poetry run pytest tests/ -v
 # С покрытием кода
 poetry run pytest tests/ --cov=agile_assistant
 ```
-
-## Лицензия
-
-MIT
