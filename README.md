@@ -333,7 +333,7 @@ agile-assistant/
 │   ├── spot_check.py                      # Точечная проверка retrieval без RAGAS
 │   └── results/                           # Результаты (gitignored)
 ├── k8s/                               # Kubernetes-манифесты (см. docs/kubernetes.md)
-├── tests/                             # 756 тестов (см. раздел «Разработка → Тестирование»)
+├── tests/                             # 586 тестов (см. раздел «Разработка → Тестирование»)
 │   ├── __init__.py
 │   ├── conftest.py
 │   ├── contract/                      # Связки агентов и маршрутизация workflow (41)
@@ -751,7 +751,7 @@ poetry run pre-commit run --all-files
 
 ### Тестирование
 
-Тесты разнесены по слою (unit/contract) и по модулю — всего **756 тестов**:
+Тесты разнесены по слою (unit/contract) и по модулю — всего **586 тестов**:
 
 | Каталог                             | Тестов | Что покрыто                                                                                  |
 | ----------------------------------- | -----: | -------------------------------------------------------------------------------------------- |
@@ -764,7 +764,7 @@ poetry run pre-commit run --all-files
 | `tests/unit/database/`              |     33 | Подключение к PostgreSQL, load_csv                                                           |
 | `tests/unit/observability/`         |     46 | Реестр Prometheus + Langfuse tracing (no-op + real SDK)                                      |
 | `tests/unit/llm/`                   |     26 | OpenAI-совместимый клиент vLLM                                                               |
-| `tests/unit/rag/`                   |     20 | Embeddings utilities (truncation, normalisation)                                             |
+| `tests/unit/rag/`                   |     24 | Embeddings utilities (truncation, normalisation), Reranker                                   |
 | `tests/unit/test_conftest_smoke.py` |      7 | Smoke-тесты на работоспособность фикстур                                                     |
 
 ```bash
