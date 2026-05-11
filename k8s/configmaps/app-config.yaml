@@ -15,9 +15,22 @@ data:
 
   # S3 Model Storage (Yandex Cloud)
   S3_ENDPOINT: "https://storage.yandexcloud.net"
+  AWS_DEFAULT_REGION: "ru-central1"
+
+  # Legacy keys (used by vllm init-container to fetch LLM weights)
   S3_BUCKET: "quant-models-agile"
   S3_MODEL_PATH: "models/avibe-gptq-8bit"
-  AWS_DEFAULT_REGION: "ru-central1"
+
+  # Embedding / reranker model storage (read at runtime by ingest + RAG)
+  S3_MODELS_BUCKET: "quant-models-agile"
+  S3_MODELS_PATH: "models"
+  EMBEDDING_MODEL_CACHE_DIR: "/app/models"
+
+  # Knowledge base + CSV data sources
+  S3_KB_BUCKET: "knowledge-base"
+  S3_KB_PATH: "knowledge_base"
+  S3_DATA_BUCKET: "database-agile"
+  S3_DATA_PATH: "data"
 
   # PostgreSQL
   POSTGRES_HOST: "postgres-cluster-rw"
@@ -28,7 +41,7 @@ data:
   # Qdrant
   QDRANT_URL: "http://qdrant:6333"
   QDRANT_COLLECTION_NAME: "business_docs"
-  EMBEDDING_MODEL: "intfloat/multilingual-e5-base"
+  EMBEDDING_MODEL: "multilingual-e5-base"
 
   # Redis
   REDIS_HOST: "redis"
