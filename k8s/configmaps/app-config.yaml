@@ -6,12 +6,18 @@ metadata:
   labels:
     app.kubernetes.io/part-of: agile-assistant
 data:
-  # vLLM
+  # vLLM main (Supervisor, RAG, Response Agents)
   VLLM_BASE_URL: "http://vllm-server:8000/v1"
   VLLM_MODEL: "/models/avibe-gptq-8bit"
   VLLM_TEMPERATURE: "0.7"
   VLLM_MAX_TOKENS: "2048"
   VLLM_REPETITION_PENALTY: "1.15"
+
+  # vLLM SQL (dedicated endpoint for SQL Agent, mirrors docker-compose).
+  # Service name is `vllm-sql` (not `vllm-sql-server`) — no VLLM_PORT collision
+  # because Kubernetes auto-vars only pick up the FIRST port-name of the Service.
+  SQL_VLLM_BASE_URL: "http://vllm-sql:8000/v1"
+  SQL_VLLM_MODEL: "/models/qwen3-8b-awq-4bit"
 
   # S3 Model Storage (Yandex Cloud)
   S3_ENDPOINT: "https://storage.yandexcloud.net"
