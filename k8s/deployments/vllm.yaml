@@ -45,12 +45,13 @@ spec:
               mountPath: /models
       containers:
         - name: vllm
-          image: vllm/vllm-openai:v0.8.5
+          image: vllm/vllm-openai:v0.9.1
           args:
             - --model=/models/avibe-gptq-8bit
             - --quantization=gptq
             - --dtype=float16
             - --max-model-len=8192
+            - --gpu-memory-utilization=0.55
           ports:
             - name: http
               containerPort: 8000
