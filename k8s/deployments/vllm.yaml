@@ -22,12 +22,8 @@ spec:
       labels:
         app: vllm
     spec:
-      # Init container: download GPTQ model from Yandex Cloud S3, then
-      # idempotently fix tokenizer_config.json — its `extra_special_tokens`
-      # field is a list (legacy format), but transformers >= 4.45 expects
-      # a dict, otherwise AsyncLLM init crashes with
-      # AttributeError: 'list' object has no attribute 'keys'.
       initContainers:
+        # 1. Download GPTQ model from Yandex Cloud S3
         - name: download-model
           image: amazon/aws-cli:2.22.35
           command:
@@ -37,35 +33,46 @@ spec:
               set -e
               if [ -f /models/avibe-gptq-8bit/config.json ]; then
                 echo "Model already downloaded, skipping S3 sync"
-              else
-                echo "Downloading avibe-gptq-8bit from S3..."
-                aws s3 sync \
-                  s3://${S3_BUCKET}/${S3_MODEL_PATH}/ \
-                  /models/avibe-gptq-8bit/ \
-                  --endpoint-url ${S3_ENDPOINT}
-                echo "Download complete"
+                exit 0
               fi
-              # Idempotent tokenizer_config.json patch — safe to run every start
-              python3 - <<'PY'
-              import json, sys
-              p = '/models/avibe-gptq-8bit/tokenizer_config.json'
-              try:
-                  d = json.load(open(p))
-                  if isinstance(d.get('extra_special_tokens'), list):
-                      d['extra_special_tokens'] = {}
-                      json.dump(d, open(p, 'w'), ensure_ascii=False, indent=2)
-                      print('Patched extra_special_tokens: list -> dict')
-                  else:
-                      print('tokenizer_config.json already correct')
-              except FileNotFoundError:
-                  print(f'WARN: {p} not found, skipping patch', file=sys.stderr)
-              PY
+              echo "Downloading avibe-gptq-8bit from S3..."
+              aws s3 sync \
+                s3://${S3_BUCKET}/${S3_MODEL_PATH}/ \
+                /models/avibe-gptq-8bit/ \
+                --endpoint-url ${S3_ENDPOINT}
+              echo "Download complete"
               ls -lh /models/avibe-gptq-8bit/
           envFrom:
             - configMapRef:
                 name: app-config
             - secretRef:
                 name: app-secrets
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+        # 2. Patch tokenizer_config.json idempotently — its
+        # `extra_special_tokens` field is a list (legacy format), but
+        # transformers >= 4.45 expects a dict. Without this fix vLLM
+        # crashes with AttributeError: 'list' object has no attribute 'keys'.
+        - name: fix-tokenizer-config
+          image: python:3.12-slim
+          command:
+            - python3
+            - -c
+            - |
+              import json, sys
+              p = '/models/avibe-gptq-8bit/tokenizer_config.json'
+              try:
+                  d = json.load(open(p))
+              except FileNotFoundError:
+                  print(f'WARN: {p} not found, nothing to patch', file=sys.stderr)
+                  sys.exit(0)
+              if isinstance(d.get('extra_special_tokens'), list):
+                  d['extra_special_tokens'] = {}
+                  json.dump(d, open(p, 'w'), ensure_ascii=False, indent=2)
+                  print('Patched extra_special_tokens: list -> dict')
+              else:
+                  print('tokenizer_config.json already correct')
           volumeMounts:
             - name: model-cache
               mountPath: /models
