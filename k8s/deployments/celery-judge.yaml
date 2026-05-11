@@ -21,8 +21,6 @@ spec:
       labels:
         app: celery-judge
     spec:
-      imagePullSecrets:
-        - name: registry-credentials
       containers:
         - name: celery-judge
           image: ghcr.io/akiltrebreg/agile-assistant:latest

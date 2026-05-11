@@ -27,8 +27,6 @@ spec:
       labels:
         app: celery-beat
     spec:
-      imagePullSecrets:
-        - name: registry-credentials
       containers:
         - name: celery-beat
           image: ghcr.io/akiltrebreg/agile-assistant:latest

@@ -11,8 +11,6 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      imagePullSecrets:
-        - name: registry-credentials
       containers:
         - name: load-data
           image: ghcr.io/akiltrebreg/agile-assistant:latest

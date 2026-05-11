@@ -16,8 +16,6 @@ spec:
       labels:
         app: streamlit
     spec:
-      imagePullSecrets:
-        - name: registry-credentials
       containers:
         - name: streamlit
           image: ghcr.io/akiltrebreg/agile-assistant:latest

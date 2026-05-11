@@ -16,8 +16,6 @@ spec:
       labels:
         app: celery-worker
     spec:
-      imagePullSecrets:
-        - name: registry-credentials
       containers:
         - name: celery-worker
           image: ghcr.io/akiltrebreg/agile-assistant:latest

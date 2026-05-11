@@ -16,8 +16,6 @@ spec:
       labels:
         app: api
     spec:
-      imagePullSecrets:
-        - name: registry-credentials
       containers:
         - name: api
           image: ghcr.io/akiltrebreg/agile-assistant:latest
