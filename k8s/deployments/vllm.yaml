@@ -8,6 +8,12 @@ metadata:
     app.kubernetes.io/part-of: agile-assistant
 spec:
   replicas: 1
+  # Recreate: GPU is a single physical resource shared via time-slicing
+  # with vllm-sql. Rolling update would try to spawn the new pod before
+  # killing the old one, and the new pod would stay Pending until the
+  # old pod releases GPU memory.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: vllm
@@ -16,7 +22,11 @@ spec:
       labels:
         app: vllm
     spec:
-      # Init container: download GPTQ model from Yandex Cloud S3
+      # Init container: download GPTQ model from Yandex Cloud S3, then
+      # idempotently fix tokenizer_config.json — its `extra_special_tokens`
+      # field is a list (legacy format), but transformers >= 4.45 expects
+      # a dict, otherwise AsyncLLM init crashes with
+      # AttributeError: 'list' object has no attribute 'keys'.
       initContainers:
         - name: download-model
           image: amazon/aws-cli:2.22.35
@@ -24,16 +34,32 @@ spec:
             - sh
             - -c
             - |
+              set -e
               if [ -f /models/avibe-gptq-8bit/config.json ]; then
-                echo "Model already downloaded, skipping"
-                exit 0
+                echo "Model already downloaded, skipping S3 sync"
+              else
+                echo "Downloading avibe-gptq-8bit from S3..."
+                aws s3 sync \
+                  s3://${S3_BUCKET}/${S3_MODEL_PATH}/ \
+                  /models/avibe-gptq-8bit/ \
+                  --endpoint-url ${S3_ENDPOINT}
+                echo "Download complete"
               fi
-              echo "Downloading avibe-gptq-8bit from S3..."
-              aws s3 sync \
-                s3://${S3_BUCKET}/${S3_MODEL_PATH}/ \
-                /models/avibe-gptq-8bit/ \
-                --endpoint-url ${S3_ENDPOINT}
-              echo "Download complete"
+              # Idempotent tokenizer_config.json patch — safe to run every start
+              python3 - <<'PY'
+              import json, sys
+              p = '/models/avibe-gptq-8bit/tokenizer_config.json'
+              try:
+                  d = json.load(open(p))
+                  if isinstance(d.get('extra_special_tokens'), list):
+                      d['extra_special_tokens'] = {}
+                      json.dump(d, open(p, 'w'), ensure_ascii=False, indent=2)
+                      print('Patched extra_special_tokens: list -> dict')
+                  else:
+                      print('tokenizer_config.json already correct')
+              except FileNotFoundError:
+                  print(f'WARN: {p} not found, skipping patch', file=sys.stderr)
+              PY
               ls -lh /models/avibe-gptq-8bit/
           envFrom:
             - configMapRef:

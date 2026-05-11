@@ -82,6 +82,11 @@ spec:
           report_agile_dashboard_metrics(launch_id)"
         - "CREATE INDEX IF NOT EXISTS idx_metrics_sprint_state ON
           report_agile_dashboard_metrics(sprint_state)"
+        # postInitApplicationSQL runs as the bootstrap superuser, so the tables
+        # above end up owned by `postgres`. Reassign them to the application
+        # user so the app can TRUNCATE/INSERT without permission errors.
+        - "ALTER TABLE report_agile_dashboard OWNER TO hse_user"
+        - "ALTER TABLE report_agile_dashboard_metrics OWNER TO hse_user"
 
   resources:
     requests:

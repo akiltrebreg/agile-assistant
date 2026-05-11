@@ -12,6 +12,10 @@ metadata:
     app.kubernetes.io/part-of: agile-assistant
 spec:
   replicas: 1
+  # Recreate: see comment in vllm.yaml — GPU is shared via time-slicing,
+  # rolling updates deadlock on physical memory.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: vllm-sql
